@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { getMarca } from '../lib/marcas'
 import styles from '../styles/App.module.css'
 
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
     motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084',
     llego_en_grua: false, fecha_ingreso_manual: ''
   })
+  const [fotoNuevo, setFotoNuevo] = useState(null)
   const [clienteDetalle, setClienteDetalle] = useState(null)
   const [mensaje, setMensaje] = useState('')
   const [modalSalida, setModalSalida] = useState(null)
@@ -30,6 +32,7 @@ export default function Home() {
   const [formActualizar, setFormActualizar] = useState({ tipo: 'estado', descripcion: '', taller_nuevo: 'Malvinas 3906' })
   const [subiendo, setSubiendo] = useState(false)
   const fileRef = useRef()
+  const fileNuevoRef = useRef()
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -43,8 +46,8 @@ export default function Home() {
   }
 
   async function cargarFotos(trabajoId) {
-    const { data } = await supabase.from('fotos').select('*').eq('trabajo_id', trabajoId).order('created_at', { ascending: false })
-    setFotos(data || [])
+    const { data, error } = await supabase.from('fotos').select('*').eq('trabajo_id', trabajoId).order('created_at', { ascending: false })
+    if (!error) setFotos(data || [])
   }
 
   async function cargarHistorial(trabajoId) {
@@ -61,6 +64,15 @@ export default function Home() {
 
   async function agregarHistorial(trabajoId, tipo, descripcion) {
     await supabase.from('historial').insert({ trabajo_id: trabajoId, tipo, descripcion })
+  }
+
+  async function subirFotoStorage(file, trabajoId) {
+    const ext = file.name.split('.').pop()
+    const nombre = `${trabajoId}/${Date.now()}.${ext}`
+    const { error: uploadError } = await supabase.storage.from('fotos-vehiculos').upload(nombre, file, { upsert: true })
+    if (uploadError) { console.error('Upload error:', uploadError); return null }
+    const { data } = supabase.storage.from('fotos-vehiculos').getPublicUrl(nombre)
+    return data.publicUrl
   }
 
   async function guardarCliente(e) {
@@ -80,23 +92,27 @@ export default function Home() {
     const { data: trabajo } = await supabase.from('trabajos').insert({
       vehiculo_id: vehiculo.id, motivo: form.motivo,
       estado: form.estado, mecanico: form.mecanico, taller: form.taller,
-      llego_en_grua: form.llego_en_grua,
-      fecha_ingreso: fechaIngreso
+      llego_en_grua: form.llego_en_grua, fecha_ingreso: fechaIngreso
     }).select().single()
+
+    // Subir foto si se seleccionó
+    if (fotoNuevo && trabajo) {
+      const url = await subirFotoStorage(fotoNuevo, trabajo.id)
+      if (url) await supabase.from('fotos').insert({ trabajo_id: trabajo.id, url })
+    }
 
     await agregarHistorial(trabajo.id, 'ingreso', `Ingresó al taller ${form.taller} ${form.llego_en_grua ? '(en grúa)' : '(andando)'}. Motivo: ${form.motivo}`)
 
     setMensaje('✓ Cliente registrado correctamente')
     setForm({ nombre: '', telefono: '', email: '', marca_modelo: '', patente: '', anio: '', kilometraje: '', motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084', llego_en_grua: false, fecha_ingreso_manual: '' })
+    setFotoNuevo(null)
     cargarDatos()
     setTimeout(() => { setMensaje(''); setSeccion('clientes') }, 1500)
   }
 
   async function registrarSalida() {
     await supabase.from('trabajos').update({
-      estado: 'Salio',
-      fecha_salida: new Date().toISOString(),
-      observacion_final: observacionFinal
+      estado: 'Salio', fecha_salida: new Date().toISOString(), observacion_final: observacionFinal
     }).eq('id', modalSalida.id)
     await agregarHistorial(modalSalida.id, 'salida', `Vehículo retirado. ${observacionFinal ? 'Obs: ' + observacionFinal : ''}`)
     setModalSalida(null)
@@ -137,7 +153,6 @@ export default function Home() {
     const t = modalActualizar
     let descripcion = formActualizar.descripcion
     let tipo = formActualizar.tipo
-
     if (tipo === 'taller') {
       await supabase.from('trabajos').update({ taller: formActualizar.taller_nuevo }).eq('id', t.id)
       descripcion = `Movido a ${formActualizar.taller_nuevo}. ${descripcion}`
@@ -145,7 +160,6 @@ export default function Home() {
     } else if (tipo === 'prueba') {
       descripcion = `En prueba. ${descripcion}`
     }
-
     await supabase.from('actualizaciones').insert({ trabajo_id: t.id, tipo, descripcion })
     setModalActualizar(null)
     setFormActualizar({ tipo: 'estado', descripcion: '', taller_nuevo: 'Malvinas 3906' })
@@ -168,16 +182,15 @@ export default function Home() {
 
   async function subirFoto(e) {
     const file = e.target.files[0]
-    if (!file) return
+    if (!file || !clienteDetalle) return
     setSubiendo(true)
-    const nombre = `${Date.now()}_${file.name}`
-    const { error } = await supabase.storage.from('fotos-vehiculos').upload(nombre, file)
-    if (!error) {
-      const { data: urlData } = supabase.storage.from('fotos-vehiculos').getPublicUrl(nombre)
-      await supabase.from('fotos').insert({ trabajo_id: clienteDetalle.id, url: urlData.publicUrl })
-      cargarFotos(clienteDetalle.id)
+    const url = await subirFotoStorage(file, clienteDetalle.id)
+    if (url) {
+      const { error } = await supabase.from('fotos').insert({ trabajo_id: clienteDetalle.id, url })
+      if (!error) await cargarFotos(clienteDetalle.id)
     }
     setSubiendo(false)
+    e.target.value = ''
   }
 
   async function borrarFoto(foto) {
@@ -212,24 +225,6 @@ export default function Home() {
     return styles.badgeGray
   }
 
-  // Conteo de marcas
-  function getMarca(modelo) {
-    const m = modelo?.toLowerCase() || ''
-    if (m.includes('amarok') || m.includes('golf') || m.includes('vento') || m.includes('passat') || m.includes('tiguan')) return 'Volkswagen'
-    if (m.includes('hilux') || m.includes('sw4') || m.includes('corolla') || m.includes('fortuner')) return 'Toyota'
-    if (m.includes('ranger') || m.includes('f-150') || m.includes('focus') || m.includes('fiesta') || m.includes('ecosport')) return 'Ford'
-    if (m.includes('bmw')) return 'BMW'
-    if (m.includes('mercedes') || m.includes('glk') || m.includes('clase')) return 'Mercedes-Benz'
-    if (m.includes('audi') || m.includes('q5') || m.includes('q3') || m.includes('a4')) return 'Audi'
-    if (m.includes('ram') || m.includes('jeep') || m.includes('cherokee') || m.includes('wrangler')) return 'Jeep/RAM'
-    if (m.includes('fiat') || m.includes('toro') || m.includes('cronos')) return 'Fiat'
-    if (m.includes('renault') || m.includes('fluence') || m.includes('duster') || m.includes('oroch')) return 'Renault'
-    if (m.includes('chevrolet') || m.includes('blazer') || m.includes('s10') || m.includes('tracker')) return 'Chevrolet'
-    if (m.includes('kia') || m.includes('sorento') || m.includes('sportage')) return 'Kia'
-    if (m.includes('honda') || m.includes('civic') || m.includes('cr-v') || m.includes('hrv')) return 'Honda'
-    return modelo?.split(' ')[0] || 'Otro'
-  }
-
   const trabajosActivos = trabajos.filter(t => t.estado !== 'Salio')
 
   const conteoMarcas = trabajosActivos.reduce((acc, t) => {
@@ -255,7 +250,6 @@ export default function Home() {
   }
 
   const tipoHistorial = { ingreso: '🟢', salida: '🔴', movimiento: '🔵', reingreso: '🟡', estado: '⚪', prueba: '🟠' }
-
   const trabajosTaller = tallerVista ? trabajos.filter(t => t.taller === tallerVista && t.estado !== 'Salio') : []
 
   return (
@@ -414,8 +408,6 @@ export default function Home() {
               <div className={styles.stat}><div className={styles.statN}>{stats.listos}</div><div className={styles.statL}>Listos</div></div>
               <div className={styles.stat}><div className={styles.statN}>{stats.salidos}</div><div className={styles.statL}>Salidos</div></div>
             </div>
-
-            {/* Talleres */}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1rem'}}>
               {['Malvinas 2084','Malvinas 3906'].map(taller => {
                 const t = trabajos.filter(x => x.taller === taller && x.estado !== 'Salio')
@@ -439,8 +431,6 @@ export default function Home() {
                 )
               })}
             </div>
-
-            {/* Conteo de marcas */}
             <div className={styles.card}>
               <div className={styles.cardTitle}>🚗 MARCAS EN TALLER</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'8px'}}>
@@ -577,6 +567,18 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>📷 FOTO DEL VEHÍCULO</div>
+                <input type="file" accept="image/*" ref={fileNuevoRef} style={{display:'none'}} onChange={e => setFotoNuevo(e.target.files[0])}/>
+                <button type="button" className={styles.btnPrimary} onClick={() => fileNuevoRef.current.click()}>
+                  {fotoNuevo ? `✓ ${fotoNuevo.name}` : '+ Seleccionar foto'}
+                </button>
+                {fotoNuevo && (
+                  <div style={{marginTop:'10px'}}>
+                    <img src={URL.createObjectURL(fotoNuevo)} alt="preview" style={{width:'100%',maxHeight:'200px',objectFit:'cover',borderRadius:'6px'}}/>
+                  </div>
+                )}
+              </div>
               <div className={styles.formActions}>
                 <button type="button" className={styles.btn} onClick={() => setSeccion('clientes')}>Cancelar</button>
                 <button type="submit" className={styles.btnPrimary}>Registrar cliente</button>
@@ -623,7 +625,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* REPUESTOS */}
             <div className={styles.card}>
               <div className={styles.cardTitle}>🔩 REPUESTOS</div>
               {repuestos.length === 0 && <div style={{color:'#64748B',fontSize:'13px'}}>Sin repuestos registrados</div>}
@@ -640,7 +641,7 @@ export default function Home() {
                       </tr>
                     ))}
                     <tr>
-                      <td colSpan="1" style={{fontWeight:'700',color:'#F1F5F9'}}>Total</td>
+                      <td style={{fontWeight:'700',color:'#F1F5F9'}}>Total</td>
                       <td style={{fontWeight:'700',color:'#16A34A'}}>${repuestos.reduce((a,r) => a + Number(r.valor), 0).toLocaleString('es-AR')}</td>
                       <td colSpan="2"></td>
                     </tr>
@@ -649,7 +650,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* HISTORIAL */}
             <div className={styles.card}>
               <div className={styles.cardTitle}>📋 HISTORIAL</div>
               {historial.length === 0 && <div style={{color:'#64748B',fontSize:'13px'}}>Sin historial todavía</div>}
@@ -664,7 +664,6 @@ export default function Home() {
               ))}
             </div>
 
-            {/* FOTOS */}
             <div className={styles.card}>
               <div className={styles.cardTitle}>📷 FOTOS DEL VEHÍCULO</div>
               <input type="file" accept="image/*" ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>
