@@ -7,10 +7,12 @@ export default function Home() {
   const [clientes, setClientes] = useState([])
   const [trabajos, setTrabajos] = useState([])
   const [loading, setLoading] = useState(true)
+  const [busqueda, setBusqueda] = useState('')
   const [form, setForm] = useState({
-    nombre: '', telefono: '', email: '', dni: '',
+    nombre: '', telefono: '', email: '',
     marca_modelo: '', patente: '', anio: '', kilometraje: '',
-    motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084'
+    motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084',
+    llego_en_grua: false, fecha_ingreso_manual: ''
   })
   const [clienteDetalle, setClienteDetalle] = useState(null)
   const [mensaje, setMensaje] = useState('')
@@ -19,6 +21,7 @@ export default function Home() {
   const [modalEditar, setModalEditar] = useState(null)
   const [formEditar, setFormEditar] = useState({})
   const [fotos, setFotos] = useState([])
+  const [historial, setHistorial] = useState([])
   const [subiendo, setSubiendo] = useState(false)
   const fileRef = useRef()
 
@@ -38,10 +41,19 @@ export default function Home() {
     setFotos(data || [])
   }
 
+  async function cargarHistorial(trabajoId) {
+    const { data } = await supabase.from('historial').select('*').eq('trabajo_id', trabajoId).order('fecha', { ascending: false })
+    setHistorial(data || [])
+  }
+
+  async function agregarHistorial(trabajoId, tipo, descripcion) {
+    await supabase.from('historial').insert({ trabajo_id: trabajoId, tipo, descripcion })
+  }
+
   async function guardarCliente(e) {
     e.preventDefault()
     const { data: cliente, error: errCliente } = await supabase
-      .from('clientes').insert({ nombre: form.nombre, telefono: form.telefono, email: form.email, dni: form.dni })
+      .from('clientes').insert({ nombre: form.nombre, telefono: form.telefono, email: form.email })
       .select().single()
     if (errCliente) { setMensaje('Error al guardar cliente'); return }
 
@@ -50,13 +62,19 @@ export default function Home() {
       .select().single()
     if (errVehiculo) { setMensaje('Error al guardar vehículo'); return }
 
-    await supabase.from('trabajos').insert({
+    const fechaIngreso = form.fecha_ingreso_manual ? new Date(form.fecha_ingreso_manual).toISOString() : new Date().toISOString()
+
+    const { data: trabajo } = await supabase.from('trabajos').insert({
       vehiculo_id: vehiculo.id, motivo: form.motivo,
-      estado: form.estado, mecanico: form.mecanico, taller: form.taller
-    })
+      estado: form.estado, mecanico: form.mecanico, taller: form.taller,
+      llego_en_grua: form.llego_en_grua,
+      fecha_ingreso: fechaIngreso
+    }).select().single()
+
+    await agregarHistorial(trabajo.id, 'ingreso', `Ingresó al taller ${form.taller} ${form.llego_en_grua ? '(en grúa)' : '(andando)'}. Motivo: ${form.motivo}`)
 
     setMensaje('✓ Cliente registrado correctamente')
-    setForm({ nombre: '', telefono: '', email: '', dni: '', marca_modelo: '', patente: '', anio: '', kilometraje: '', motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084' })
+    setForm({ nombre: '', telefono: '', email: '', marca_modelo: '', patente: '', anio: '', kilometraje: '', motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084', llego_en_grua: false, fecha_ingreso_manual: '' })
     cargarDatos()
     setTimeout(() => { setMensaje(''); setSeccion('clientes') }, 1500)
   }
@@ -67,10 +85,13 @@ export default function Home() {
       fecha_salida: new Date().toISOString(),
       observacion_final: observacionFinal
     }).eq('id', modalSalida.id)
+
+    await agregarHistorial(modalSalida.id, 'salida', `Vehículo retirado. ${observacionFinal ? 'Obs: ' + observacionFinal : ''}`)
+
     setModalSalida(null)
     setObservacionFinal('')
     if (clienteDetalle?.id === modalSalida.id) {
-      setSeccion('dashboard')
+      setSeccion('clientes')
       setClienteDetalle(null)
     }
     cargarDatos()
@@ -78,20 +99,24 @@ export default function Home() {
 
   async function borrarCliente(trabajo) {
     if (!confirm(`¿Borrar a ${trabajo.vehiculos?.clientes?.nombre}? Esta acción no se puede deshacer.`)) return
+    await supabase.from('historial').delete().eq('trabajo_id', trabajo.id)
+    await supabase.from('fotos').delete().eq('trabajo_id', trabajo.id)
     await supabase.from('trabajos').delete().eq('id', trabajo.id)
     await supabase.from('vehiculos').delete().eq('id', trabajo.vehiculos?.id)
     await supabase.from('clientes').delete().eq('id', trabajo.vehiculos?.clientes?.id)
-    setSeccion('dashboard')
+    setSeccion('clientes')
     setClienteDetalle(null)
     cargarDatos()
   }
 
   async function guardarEdicion() {
+    const tallerAnterior = formEditar.taller_anterior
+    const tallerNuevo = formEditar.taller
+
     await supabase.from('clientes').update({
       nombre: formEditar.nombre,
       telefono: formEditar.telefono,
       email: formEditar.email,
-      dni: formEditar.dni
     }).eq('id', formEditar.cliente_id)
 
     await supabase.from('vehiculos').update({
@@ -108,8 +133,13 @@ export default function Home() {
       taller: formEditar.taller
     }).eq('id', formEditar.trabajo_id)
 
+    if (tallerAnterior !== tallerNuevo) {
+      await agregarHistorial(formEditar.trabajo_id, 'movimiento', `Movido de ${tallerAnterior} a ${tallerNuevo}`)
+    }
+
     setModalEditar(null)
     cargarDatos()
+    if (clienteDetalle) cargarHistorial(formEditar.trabajo_id)
   }
 
   async function subirFoto(e) {
@@ -135,6 +165,7 @@ export default function Home() {
     setClienteDetalle(trabajo)
     setSeccion('detalle')
     cargarFotos(trabajo.id)
+    cargarHistorial(trabajo.id)
   }
 
   function abrirEditar(trabajo) {
@@ -145,7 +176,6 @@ export default function Home() {
       nombre: trabajo.vehiculos?.clientes?.nombre,
       telefono: trabajo.vehiculos?.clientes?.telefono,
       email: trabajo.vehiculos?.clientes?.email,
-      dni: trabajo.vehiculos?.clientes?.dni,
       marca_modelo: trabajo.vehiculos?.marca_modelo,
       patente: trabajo.vehiculos?.patente,
       anio: trabajo.vehiculos?.anio,
@@ -154,6 +184,7 @@ export default function Home() {
       estado: trabajo.estado,
       mecanico: trabajo.mecanico,
       taller: trabajo.taller,
+      taller_anterior: trabajo.taller,
     })
     setModalEditar(true)
   }
@@ -167,12 +198,23 @@ export default function Home() {
     return styles.badgeGray
   }
 
+  const trabajosFiltrados = trabajos.filter(t => {
+    const q = busqueda.toLowerCase()
+    return (
+      t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q) ||
+      t.vehiculos?.patente?.toLowerCase().includes(q) ||
+      t.vehiculos?.marca_modelo?.toLowerCase().includes(q)
+    )
+  })
+
   const stats = {
     total: clientes.length,
     enTaller: trabajos.filter(t => t.estado !== 'Salio').length,
     listos: trabajos.filter(t => t.estado === 'Listo').length,
-    diagnostico: trabajos.filter(t => t.estado === 'Diagnóstico').length,
+    salidos: trabajos.filter(t => t.estado === 'Salio').length,
   }
+
+  const tipoHistorial = { ingreso: '🟢', salida: '🔴', movimiento: '🔵', reingreso: '🟡' }
 
   return (
     <div className={styles.app}>
@@ -206,8 +248,7 @@ export default function Home() {
               <div className={styles.formGrid} style={{marginBottom:'1rem'}}>
                 <div className={styles.formGroup}><label>Nombre</label><input value={formEditar.nombre||''} onChange={e => setFormEditar({...formEditar, nombre: e.target.value})}/></div>
                 <div className={styles.formGroup}><label>Teléfono</label><input value={formEditar.telefono||''} onChange={e => setFormEditar({...formEditar, telefono: e.target.value})}/></div>
-                <div className={styles.formGroup}><label>Email</label><input value={formEditar.email||''} onChange={e => setFormEditar({...formEditar, email: e.target.value})}/></div>
-                <div className={styles.formGroup}><label>DNI</label><input value={formEditar.dni||''} onChange={e => setFormEditar({...formEditar, dni: e.target.value})}/></div>
+                <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Email</label><input value={formEditar.email||''} onChange={e => setFormEditar({...formEditar, email: e.target.value})}/></div>
               </div>
               <div className={styles.cardTitle}>DATOS DEL VEHÍCULO</div>
               <div className={styles.formGrid} style={{marginBottom:'1rem'}}>
@@ -244,9 +285,9 @@ export default function Home() {
           <div className={styles.logoSub}>Performance</div>
         </div>
         {[
-          { id: 'dashboard', label: 'Dashboard' },
-          { id: 'clientes', label: 'Clientes' },
-          { id: 'nuevo', label: 'Nuevo cliente' },
+          { id: 'dashboard', label: '▦ Dashboard' },
+          { id: 'clientes', label: '👥 Clientes' },
+          { id: 'nuevo', label: '＋ Nuevo cliente' },
         ].map(item => (
           <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => setSeccion(item.id)}>
             {item.label}
@@ -259,6 +300,7 @@ export default function Home() {
 
       <div className={styles.main}>
 
+        {/* DASHBOARD */}
         {seccion === 'dashboard' && (
           <div>
             <div className={styles.topBar}>
@@ -267,28 +309,65 @@ export default function Home() {
             </div>
             <div className={styles.divider}></div>
             <div className={styles.stats}>
-              <div className={styles.stat}><div className={styles.statN}>{stats.total}</div><div className={styles.statL}>Clientes</div></div>
+              <div className={styles.stat}><div className={styles.statN}>{stats.total}</div><div className={styles.statL}>Clientes totales</div></div>
               <div className={styles.stat}><div className={styles.statN}>{stats.enTaller}</div><div className={styles.statL}>En taller</div></div>
               <div className={styles.stat}><div className={styles.statN}>{stats.listos}</div><div className={styles.statL}>Listos</div></div>
-              <div className={styles.stat}><div className={styles.statN}>{stats.diagnostico}</div><div className={styles.statL}>Diagnóstico</div></div>
+              <div className={styles.stat}><div className={styles.statN}>{stats.salidos}</div><div className={styles.statL}>Salidos</div></div>
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>RESUMEN POR TALLER</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem'}}>
+                {['Malvinas 2084','Malvinas 3906'].map(taller => (
+                  <div key={taller} style={{background:'#212840',borderRadius:'6px',padding:'12px'}}>
+                    <div style={{fontSize:'13px',fontWeight:'600',color:'#F1F5F9',marginBottom:'8px'}}>{taller}</div>
+                    {['Diagnóstico','En proceso','En espera','Desarmando','Listo'].map(estado => {
+                      const n = trabajos.filter(t => t.taller === taller && t.estado === estado).length
+                      return n > 0 ? (
+                        <div key={estado} style={{display:'flex',justifyContent:'space-between',fontSize:'12px',padding:'3px 0',borderBottom:'1px solid #2D3748'}}>
+                          <span style={{color:'#64748B'}}>{estado}</span>
+                          <span style={{color:'#F1F5F9',fontWeight:'600'}}>{n}</span>
+                        </div>
+                      ) : null
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CLIENTES */}
+        {seccion === 'clientes' && (
+          <div>
+            <div className={styles.topBar}>
+              <h1 className={styles.pageTitle}>Clientes</h1>
+              <button className={styles.btnPrimary} onClick={() => setSeccion('nuevo')}>+ Nuevo cliente</button>
+            </div>
+            <div className={styles.divider}></div>
+            <div className={styles.searchBar}>
+              <input
+                type="text"
+                placeholder="Buscar por nombre, patente o vehículo..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+              />
             </div>
             <div className={styles.tblWrap}>
               {loading ? <p className={styles.loading}>Cargando...</p> : (
                 <table className={styles.table}>
-                  <thead><tr><th>Vehículo</th><th>Cliente</th><th>Trabajo</th><th>Estado</th><th>Mecánico</th><th>Taller</th><th>Acciones</th></tr></thead>
+                  <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th><th>Acciones</th></tr></thead>
                   <tbody>
-                    {trabajos.map(t => (
+                    {trabajosFiltrados.map((t, i) => (
                       <tr key={t.id}>
+                        <td style={{color:'#64748B',width:'40px'}}>{i+1}</td>
                         <td onClick={() => verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
                         <td onClick={() => verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td>
-                        <td onClick={() => verDetalle(t)}>{t.motivo?.substring(0,35)}{t.motivo?.length > 35 ? '...' : ''}</td>
+                        <td onClick={() => verDetalle(t)}>{t.vehiculos?.patente}</td>
                         <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
-                        <td onClick={() => verDetalle(t)}>{t.mecanico || '—'}</td>
                         <td onClick={() => verDetalle(t)}>{t.taller}</td>
-                        <td style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          {t.estado !== 'Salio' && (
-                            <button className={styles.btnDangerSolid} style={{fontSize:'11px',padding:'4px 10px'}} onClick={() => setModalSalida(t)}>Salida</button>
-                          )}
+                        <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#64748B'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
+                        <td style={{display:'flex',gap:'5px',cursor:'default'}}>
+                          {t.estado !== 'Salio' && <button className={styles.btnDangerSolid} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalSalida(t)}>Salida</button>}
                           <button className={styles.btnEdit} onClick={() => abrirEditar(t)}>✏️</button>
                           <button className={styles.btnDelete} onClick={() => borrarCliente(t)}>🗑️</button>
                         </td>
@@ -301,33 +380,7 @@ export default function Home() {
           </div>
         )}
 
-        {seccion === 'clientes' && (
-          <div>
-            <div className={styles.topBar}>
-              <h1 className={styles.pageTitle}>Clientes</h1>
-              <button className={styles.btnPrimary} onClick={() => setSeccion('nuevo')}>+ Nuevo cliente</button>
-            </div>
-            <div className={styles.divider}></div>
-            <div className={styles.tblWrap}>
-              {loading ? <p className={styles.loading}>Cargando...</p> : (
-                <table className={styles.table}>
-                  <thead><tr><th>Nombre</th><th>Teléfono</th><th>Email</th><th>DNI</th></tr></thead>
-                  <tbody>
-                    {clientes.map(c => (
-                      <tr key={c.id}>
-                        <td><b>{c.nombre}</b></td>
-                        <td>{c.telefono}</td>
-                        <td>{c.email}</td>
-                        <td>{c.dni}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-
+        {/* NUEVO CLIENTE */}
         {seccion === 'nuevo' && (
           <div>
             <div className={styles.topBar}>
@@ -342,8 +395,7 @@ export default function Home() {
                 <div className={styles.formGrid}>
                   <div className={styles.formGroup}><label>Nombre y apellido *</label><input required value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Juan García"/></div>
                   <div className={styles.formGroup}><label>Teléfono</label><input value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} placeholder="223 000-0000"/></div>
-                  <div className={styles.formGroup}><label>Email</label><input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="juan@email.com"/></div>
-                  <div className={styles.formGroup}><label>DNI</label><input value={form.dni} onChange={e => setForm({...form, dni: e.target.value})} placeholder="00.000.000"/></div>
+                  <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Email</label><input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="juan@email.com"/></div>
                 </div>
               </div>
               <div className={styles.card}>
@@ -354,13 +406,20 @@ export default function Home() {
                   <div className={styles.formGroup}><label>Año</label><input value={form.anio} onChange={e => setForm({...form, anio: e.target.value})} placeholder="2022"/></div>
                   <div className={styles.formGroup}><label>Kilometraje</label><input value={form.kilometraje} onChange={e => setForm({...form, kilometraje: e.target.value})} placeholder="85.000 km"/></div>
                   <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Motivo de ingreso</label><textarea value={form.motivo} onChange={e => setForm({...form, motivo: e.target.value})} placeholder="Describí el problema o trabajo a realizar..."/></div>
+                  <div className={styles.formGroup}><label>Fecha de ingreso</label><input type="datetime-local" value={form.fecha_ingreso_manual} onChange={e => setForm({...form, fecha_ingreso_manual: e.target.value})}/></div>
+                  <div className={styles.formGroup}><label>Llegó en</label>
+                    <select value={form.llego_en_grua ? 'grua' : 'andando'} onChange={e => setForm({...form, llego_en_grua: e.target.value === 'grua'})}>
+                      <option value="andando">🚗 Andando</option>
+                      <option value="grua">🚛 En grúa</option>
+                    </select>
+                  </div>
                   <div className={styles.formGroup}><label>Mecánico</label><input value={form.mecanico} onChange={e => setForm({...form, mecanico: e.target.value})} placeholder="Agus D."/></div>
                   <div className={styles.formGroup}><label>Estado</label>
                     <select value={form.estado} onChange={e => setForm({...form, estado: e.target.value})}>
                       <option>Diagnóstico</option><option>En proceso</option><option>En espera</option><option>Desarmando</option><option>Listo</option>
                     </select>
                   </div>
-                  <div className={styles.formGroup}><label>Taller</label>
+                  <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Taller</label>
                     <select value={form.taller} onChange={e => setForm({...form, taller: e.target.value})}>
                       <option>Malvinas 2084</option><option>Malvinas 3906</option>
                     </select>
@@ -375,10 +434,11 @@ export default function Home() {
           </div>
         )}
 
+        {/* DETALLE */}
         {seccion === 'detalle' && clienteDetalle && (
           <div>
             <div className={styles.topBar}>
-              <button className={styles.btn} onClick={() => setSeccion('dashboard')}>← Volver</button>
+              <button className={styles.btn} onClick={() => setSeccion('clientes')}>← Volver</button>
               <div style={{display:'flex',gap:'8px'}}>
                 <button className={styles.btnPrimary} onClick={() => abrirEditar(clienteDetalle)}>✏️ Editar</button>
                 {clienteDetalle.estado !== 'Salio' && (
@@ -392,7 +452,7 @@ export default function Home() {
               <div className={styles.detailAvatar}>{clienteDetalle.vehiculos?.clientes?.nombre?.charAt(0)}</div>
               <div style={{flex:1}}>
                 <div className={styles.detailNombre}>{clienteDetalle.vehiculos?.clientes?.nombre}</div>
-                <div className={styles.detailSub}>{clienteDetalle.vehiculos?.clientes?.telefono}</div>
+                <div className={styles.detailSub}>{clienteDetalle.vehiculos?.clientes?.telefono} {clienteDetalle.llego_en_grua ? '· 🚛 Llegó en grúa' : '· 🚗 Llegó andando'}</div>
               </div>
               <span className={badgeClass(clienteDetalle.estado)}>{clienteDetalle.estado}</span>
             </div>
@@ -413,7 +473,21 @@ export default function Home() {
             </div>
 
             <div className={styles.card}>
-              <div className={styles.cardTitle}>FOTOS DEL VEHÍCULO</div>
+              <div className={styles.cardTitle}>📋 HISTORIAL</div>
+              {historial.length === 0 && <div style={{color:'#64748B',fontSize:'13px'}}>Sin historial todavía</div>}
+              {historial.map(h => (
+                <div key={h.id} className={styles.histItem}>
+                  <span className={styles.histIcon}>{tipoHistorial[h.tipo] || '⚪'}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'13px',color:'#F1F5F9'}}>{h.descripcion}</div>
+                    <div style={{fontSize:'11px',color:'#64748B',marginTop:'2px'}}>{new Date(h.fecha).toLocaleString('es-AR')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>📷 FOTOS DEL VEHÍCULO</div>
               <input type="file" accept="image/*" ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>
               <button className={styles.btnPrimary} onClick={() => fileRef.current.click()} style={{marginBottom:'1rem'}}>
                 {subiendo ? 'Subiendo...' : '+ Agregar foto'}
