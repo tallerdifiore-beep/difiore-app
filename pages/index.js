@@ -14,6 +14,8 @@ export default function Home() {
   })
   const [clienteDetalle, setClienteDetalle] = useState(null)
   const [mensaje, setMensaje] = useState('')
+  const [modalSalida, setModalSalida] = useState(null)
+  const [observacionFinal, setObservacionFinal] = useState('')
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -49,6 +51,21 @@ export default function Home() {
     setTimeout(() => { setMensaje(''); setSeccion('clientes') }, 1500)
   }
 
+  async function registrarSalida() {
+    await supabase.from('trabajos').update({
+      estado: 'Salio',
+      fecha_salida: new Date().toISOString(),
+      observacion_final: observacionFinal
+    }).eq('id', modalSalida.id)
+    setModalSalida(null)
+    setObservacionFinal('')
+    if (clienteDetalle?.id === modalSalida.id) {
+      setSeccion('dashboard')
+      setClienteDetalle(null)
+    }
+    cargarDatos()
+  }
+
   function verDetalle(trabajo) {
     setClienteDetalle(trabajo)
     setSeccion('detalle')
@@ -59,18 +76,46 @@ export default function Home() {
     if (estado === 'En proceso') return styles.badgeAmber
     if (estado === 'En espera') return styles.badgeBlue
     if (estado === 'Desarmando') return styles.badgeRed
+    if (estado === 'Salio') return styles.badgeGray
     return styles.badgeGray
   }
 
   const stats = {
     total: clientes.length,
-    enTaller: trabajos.filter(t => t.estado !== 'Listo' && t.estado !== 'Salio').length,
+    enTaller: trabajos.filter(t => t.estado !== 'Salio').length,
     listos: trabajos.filter(t => t.estado === 'Listo').length,
     diagnostico: trabajos.filter(t => t.estado === 'Diagnóstico').length,
   }
 
   return (
     <div className={styles.app}>
+      {/* MODAL SALIDA */}
+      {modalSalida && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <div className={styles.modalTitle}>Registrar salida</div>
+            <div className={styles.modalSub}>
+              <b>{modalSalida.vehiculos?.marca_modelo}</b> — {modalSalida.vehiculos?.clientes?.nombre}
+            </div>
+            <div className={styles.formGroup} style={{marginTop:'1rem'}}>
+              <label>Observación final</label>
+              <textarea
+                value={observacionFinal}
+                onChange={e => setObservacionFinal(e.target.value)}
+                placeholder="Trabajo realizado, recomendaciones, etc..."
+              />
+            </div>
+            <div className={styles.modalDate}>
+              Fecha y hora: {new Date().toLocaleString('es-AR')}
+            </div>
+            <div className={styles.modalActions}>
+              <button className={styles.btn} onClick={() => setModalSalida(null)}>Cancelar</button>
+              <button className={styles.btnDanger} onClick={registrarSalida}>Confirmar salida</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.sidebar}>
         <div className={styles.logoArea}>
           <div className={styles.logoMain}>D<span className={styles.logoI}>I</span> FIORE</div>
@@ -108,16 +153,26 @@ export default function Home() {
             <div className={styles.tblWrap}>
               {loading ? <p className={styles.loading}>Cargando...</p> : (
                 <table className={styles.table}>
-                  <thead><tr><th>Vehículo</th><th>Cliente</th><th>Trabajo</th><th>Estado</th><th>Mecánico</th><th>Taller</th></tr></thead>
+                  <thead><tr><th>Vehículo</th><th>Cliente</th><th>Trabajo</th><th>Estado</th><th>Mecánico</th><th>Taller</th><th>Acción</th></tr></thead>
                   <tbody>
                     {trabajos.map(t => (
-                      <tr key={t.id} onClick={() => verDetalle(t)}>
-                        <td><b>{t.vehiculos?.marca_modelo}</b></td>
-                        <td>{t.vehiculos?.clientes?.nombre}</td>
-                        <td>{t.motivo?.substring(0,40)}{t.motivo?.length > 40 ? '...' : ''}</td>
-                        <td><span className={badgeClass(t.estado)}>{t.estado}</span></td>
-                        <td>{t.mecanico || '—'}</td>
-                        <td>{t.taller}</td>
+                      <tr key={t.id}>
+                        <td onClick={() => verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
+                        <td onClick={() => verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td>
+                        <td onClick={() => verDetalle(t)}>{t.motivo?.substring(0,40)}{t.motivo?.length > 40 ? '...' : ''}</td>
+                        <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
+                        <td onClick={() => verDetalle(t)}>{t.mecanico || '—'}</td>
+                        <td onClick={() => verDetalle(t)}>{t.taller}</td>
+                        <td>
+                          {t.estado !== 'Salio' && (
+                            <button className={styles.btnSalida} onClick={() => setModalSalida(t)}>
+                              Registrar salida
+                            </button>
+                          )}
+                          {t.estado === 'Salio' && (
+                            <span className={styles.badgeGray}>Salio {t.fecha_salida ? new Date(t.fecha_salida).toLocaleDateString('es-AR') : ''}</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -183,7 +238,7 @@ export default function Home() {
                   <div className={styles.formGroup}><label>Mecánico</label><input value={form.mecanico} onChange={e => setForm({...form, mecanico: e.target.value})} placeholder="Agus D."/></div>
                   <div className={styles.formGroup}><label>Estado</label>
                     <select value={form.estado} onChange={e => setForm({...form, estado: e.target.value})}>
-                      <option>Diagnóstico</option><option>En proceso</option><option>En espera</option><option>Desarmando</option><option>Listo</option><option>Salio</option>
+                      <option>Diagnóstico</option><option>En proceso</option><option>En espera</option><option>Desarmando</option><option>Listo</option>
                     </select>
                   </div>
                   <div className={styles.formGroup}><label>Taller</label>
@@ -205,6 +260,9 @@ export default function Home() {
           <div>
             <div className={styles.topBar}>
               <button className={styles.btn} onClick={() => setSeccion('dashboard')}>← Volver</button>
+              {clienteDetalle.estado !== 'Salio' && (
+                <button className={styles.btnDanger} onClick={() => setModalSalida(clienteDetalle)}>Registrar salida</button>
+              )}
             </div>
             <div className={styles.divider}></div>
             <div className={styles.detailHeader}>
@@ -226,6 +284,8 @@ export default function Home() {
                 <div className={styles.cardTitle}>TRABAJO</div>
                 <p className={styles.detText}>{clienteDetalle.motivo || 'Sin descripción'}</p>
                 <div className={styles.detFecha}>Ingresó: {new Date(clienteDetalle.fecha_ingreso).toLocaleDateString('es-AR')}</div>
+                {clienteDetalle.fecha_salida && <div className={styles.detFecha}>Salió: {new Date(clienteDetalle.fecha_salida).toLocaleDateString('es-AR')}</div>}
+                {clienteDetalle.observacion_final && <div className={styles.detText} style={{marginTop:'8px'}}><b>Obs. final:</b> {clienteDetalle.observacion_final}</div>}
               </div>
             </div>
           </div>
