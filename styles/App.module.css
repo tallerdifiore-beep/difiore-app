@@ -102,3 +102,13 @@
 .histItem { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #2D3748; align-items: flex-start; }
 .histItem:last-child { border: none; }
 .histIcon { font-size: 16px; margin-top: 1px; }
+.btnSuccess { padding: 7px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; background: #16A34A; color: #fff; border: none; font-weight: 600; font-family: inherit; transition: all .15s; }
+.btnSuccess:hover { background: #15803D; }
+.btnRepuesto { padding: 7px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; background: #78350F33; color: #D97706; border: 1px solid #D9770644; font-family: inherit; transition: all .15s; }
+.btnRepuesto:hover { background: #D97706; color: #fff; }
+.tallerCard { background: #1C2333; border: 1px solid #2D3748; border-radius: 8px; padding: 1.2rem; cursor: pointer; transition: all .15s; border-top: 2px solid #2563EB; }
+.tallerCard:hover { border-color: #3B82F6; background: #212840; }
+.tallerNombre { font-size: 14px; font-weight: 600; color: #F1F5F9; margin-bottom: 4px; }
+.tallerN { font-size: 28px; font-weight: 700; color: #3B82F6; }
+.tallerN span { font-size: 13px; color: #64748B; font-weight: 400; }
+.tallerBtn { margin-top: 12px; font-size: 12px; color: #3B82F6; }
