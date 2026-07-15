@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from '../styles/App.module.css'
 
@@ -16,6 +16,11 @@ export default function Home() {
   const [mensaje, setMensaje] = useState('')
   const [modalSalida, setModalSalida] = useState(null)
   const [observacionFinal, setObservacionFinal] = useState('')
+  const [modalEditar, setModalEditar] = useState(null)
+  const [formEditar, setFormEditar] = useState({})
+  const [fotos, setFotos] = useState([])
+  const [subiendo, setSubiendo] = useState(false)
+  const fileRef = useRef()
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -26,6 +31,11 @@ export default function Home() {
     setClientes(clientesData || [])
     setTrabajos(trabajosData || [])
     setLoading(false)
+  }
+
+  async function cargarFotos(trabajoId) {
+    const { data } = await supabase.from('fotos').select('*').eq('trabajo_id', trabajoId).order('created_at', { ascending: false })
+    setFotos(data || [])
   }
 
   async function guardarCliente(e) {
@@ -66,9 +76,86 @@ export default function Home() {
     cargarDatos()
   }
 
+  async function borrarCliente(trabajo) {
+    if (!confirm(`¿Borrar a ${trabajo.vehiculos?.clientes?.nombre}? Esta acción no se puede deshacer.`)) return
+    await supabase.from('trabajos').delete().eq('id', trabajo.id)
+    await supabase.from('vehiculos').delete().eq('id', trabajo.vehiculos?.id)
+    await supabase.from('clientes').delete().eq('id', trabajo.vehiculos?.clientes?.id)
+    setSeccion('dashboard')
+    setClienteDetalle(null)
+    cargarDatos()
+  }
+
+  async function guardarEdicion() {
+    await supabase.from('clientes').update({
+      nombre: formEditar.nombre,
+      telefono: formEditar.telefono,
+      email: formEditar.email,
+      dni: formEditar.dni
+    }).eq('id', formEditar.cliente_id)
+
+    await supabase.from('vehiculos').update({
+      marca_modelo: formEditar.marca_modelo,
+      patente: formEditar.patente,
+      anio: formEditar.anio,
+      kilometraje: formEditar.kilometraje
+    }).eq('id', formEditar.vehiculo_id)
+
+    await supabase.from('trabajos').update({
+      motivo: formEditar.motivo,
+      estado: formEditar.estado,
+      mecanico: formEditar.mecanico,
+      taller: formEditar.taller
+    }).eq('id', formEditar.trabajo_id)
+
+    setModalEditar(null)
+    cargarDatos()
+  }
+
+  async function subirFoto(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setSubiendo(true)
+    const nombre = `${Date.now()}_${file.name}`
+    const { data, error } = await supabase.storage.from('fotos-vehiculos').upload(nombre, file)
+    if (!error) {
+      const { data: urlData } = supabase.storage.from('fotos-vehiculos').getPublicUrl(nombre)
+      await supabase.from('fotos').insert({ trabajo_id: clienteDetalle.id, url: urlData.publicUrl })
+      cargarFotos(clienteDetalle.id)
+    }
+    setSubiendo(false)
+  }
+
+  async function borrarFoto(foto) {
+    await supabase.from('fotos').delete().eq('id', foto.id)
+    cargarFotos(clienteDetalle.id)
+  }
+
   function verDetalle(trabajo) {
     setClienteDetalle(trabajo)
     setSeccion('detalle')
+    cargarFotos(trabajo.id)
+  }
+
+  function abrirEditar(trabajo) {
+    setFormEditar({
+      trabajo_id: trabajo.id,
+      cliente_id: trabajo.vehiculos?.clientes?.id,
+      vehiculo_id: trabajo.vehiculos?.id,
+      nombre: trabajo.vehiculos?.clientes?.nombre,
+      telefono: trabajo.vehiculos?.clientes?.telefono,
+      email: trabajo.vehiculos?.clientes?.email,
+      dni: trabajo.vehiculos?.clientes?.dni,
+      marca_modelo: trabajo.vehiculos?.marca_modelo,
+      patente: trabajo.vehiculos?.patente,
+      anio: trabajo.vehiculos?.anio,
+      kilometraje: trabajo.vehiculos?.kilometraje,
+      motivo: trabajo.motivo,
+      estado: trabajo.estado,
+      mecanico: trabajo.mecanico,
+      taller: trabajo.taller,
+    })
+    setModalEditar(true)
   }
 
   function badgeClass(estado) {
@@ -89,28 +176,62 @@ export default function Home() {
 
   return (
     <div className={styles.app}>
+
       {/* MODAL SALIDA */}
       {modalSalida && (
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
-            <div className={styles.modalTitle}>Registrar salida</div>
-            <div className={styles.modalSub}>
-              <b>{modalSalida.vehiculos?.marca_modelo}</b> — {modalSalida.vehiculos?.clientes?.nombre}
-            </div>
+            <div className={styles.modalTitle}>🚗 Registrar salida</div>
+            <div className={styles.modalSub}><b>{modalSalida.vehiculos?.marca_modelo}</b> — {modalSalida.vehiculos?.clientes?.nombre}</div>
             <div className={styles.formGroup} style={{marginTop:'1rem'}}>
               <label>Observación final</label>
-              <textarea
-                value={observacionFinal}
-                onChange={e => setObservacionFinal(e.target.value)}
-                placeholder="Trabajo realizado, recomendaciones, etc..."
-              />
+              <textarea value={observacionFinal} onChange={e => setObservacionFinal(e.target.value)} placeholder="Trabajo realizado, recomendaciones, etc..."/>
             </div>
-            <div className={styles.modalDate}>
-              Fecha y hora: {new Date().toLocaleString('es-AR')}
-            </div>
+            <div className={styles.modalDate}>Fecha y hora: {new Date().toLocaleString('es-AR')}</div>
             <div className={styles.modalActions}>
               <button className={styles.btn} onClick={() => setModalSalida(null)}>Cancelar</button>
-              <button className={styles.btnDanger} onClick={registrarSalida}>Confirmar salida</button>
+              <button className={styles.btnDangerSolid} onClick={registrarSalida}>Confirmar salida</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR */}
+      {modalEditar && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal} style={{width:'520px',maxHeight:'80vh',overflowY:'auto'}}>
+            <div className={styles.modalTitle}>✏️ Editar cliente</div>
+            <div style={{marginTop:'1rem'}}>
+              <div className={styles.cardTitle}>DATOS DEL CLIENTE</div>
+              <div className={styles.formGrid} style={{marginBottom:'1rem'}}>
+                <div className={styles.formGroup}><label>Nombre</label><input value={formEditar.nombre||''} onChange={e => setFormEditar({...formEditar, nombre: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Teléfono</label><input value={formEditar.telefono||''} onChange={e => setFormEditar({...formEditar, telefono: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Email</label><input value={formEditar.email||''} onChange={e => setFormEditar({...formEditar, email: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>DNI</label><input value={formEditar.dni||''} onChange={e => setFormEditar({...formEditar, dni: e.target.value})}/></div>
+              </div>
+              <div className={styles.cardTitle}>DATOS DEL VEHÍCULO</div>
+              <div className={styles.formGrid} style={{marginBottom:'1rem'}}>
+                <div className={styles.formGroup}><label>Modelo</label><input value={formEditar.marca_modelo||''} onChange={e => setFormEditar({...formEditar, marca_modelo: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Patente</label><input value={formEditar.patente||''} onChange={e => setFormEditar({...formEditar, patente: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Año</label><input value={formEditar.anio||''} onChange={e => setFormEditar({...formEditar, anio: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Km</label><input value={formEditar.kilometraje||''} onChange={e => setFormEditar({...formEditar, kilometraje: e.target.value})}/></div>
+                <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Motivo</label><textarea value={formEditar.motivo||''} onChange={e => setFormEditar({...formEditar, motivo: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Mecánico</label><input value={formEditar.mecanico||''} onChange={e => setFormEditar({...formEditar, mecanico: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Estado</label>
+                  <select value={formEditar.estado||''} onChange={e => setFormEditar({...formEditar, estado: e.target.value})}>
+                    <option>Diagnóstico</option><option>En proceso</option><option>En espera</option><option>Desarmando</option><option>Listo</option><option>Salio</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}><label>Taller</label>
+                  <select value={formEditar.taller||''} onChange={e => setFormEditar({...formEditar, taller: e.target.value})}>
+                    <option>Malvinas 2084</option><option>Malvinas 3906</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button className={styles.btn} onClick={() => setModalEditar(null)}>Cancelar</button>
+              <button className={styles.btnPrimary} onClick={guardarEdicion}>Guardar cambios</button>
             </div>
           </div>
         </div>
@@ -137,6 +258,7 @@ export default function Home() {
       </div>
 
       <div className={styles.main}>
+
         {seccion === 'dashboard' && (
           <div>
             <div className={styles.topBar}>
@@ -153,25 +275,22 @@ export default function Home() {
             <div className={styles.tblWrap}>
               {loading ? <p className={styles.loading}>Cargando...</p> : (
                 <table className={styles.table}>
-                  <thead><tr><th>Vehículo</th><th>Cliente</th><th>Trabajo</th><th>Estado</th><th>Mecánico</th><th>Taller</th><th>Acción</th></tr></thead>
+                  <thead><tr><th>Vehículo</th><th>Cliente</th><th>Trabajo</th><th>Estado</th><th>Mecánico</th><th>Taller</th><th>Acciones</th></tr></thead>
                   <tbody>
                     {trabajos.map(t => (
                       <tr key={t.id}>
                         <td onClick={() => verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
                         <td onClick={() => verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td>
-                        <td onClick={() => verDetalle(t)}>{t.motivo?.substring(0,40)}{t.motivo?.length > 40 ? '...' : ''}</td>
+                        <td onClick={() => verDetalle(t)}>{t.motivo?.substring(0,35)}{t.motivo?.length > 35 ? '...' : ''}</td>
                         <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
                         <td onClick={() => verDetalle(t)}>{t.mecanico || '—'}</td>
                         <td onClick={() => verDetalle(t)}>{t.taller}</td>
-                        <td>
+                        <td style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                           {t.estado !== 'Salio' && (
-                            <button className={styles.btnSalida} onClick={() => setModalSalida(t)}>
-                              Registrar salida
-                            </button>
+                            <button className={styles.btnDangerSolid} style={{fontSize:'11px',padding:'4px 10px'}} onClick={() => setModalSalida(t)}>Salida</button>
                           )}
-                          {t.estado === 'Salio' && (
-                            <span className={styles.badgeGray}>Salio {t.fecha_salida ? new Date(t.fecha_salida).toLocaleDateString('es-AR') : ''}</span>
-                          )}
+                          <button className={styles.btnEdit} onClick={() => abrirEditar(t)}>✏️</button>
+                          <button className={styles.btnDelete} onClick={() => borrarCliente(t)}>🗑️</button>
                         </td>
                       </tr>
                     ))}
@@ -260,9 +379,13 @@ export default function Home() {
           <div>
             <div className={styles.topBar}>
               <button className={styles.btn} onClick={() => setSeccion('dashboard')}>← Volver</button>
-              {clienteDetalle.estado !== 'Salio' && (
-                <button className={styles.btnDanger} onClick={() => setModalSalida(clienteDetalle)}>Registrar salida</button>
-              )}
+              <div style={{display:'flex',gap:'8px'}}>
+                <button className={styles.btnPrimary} onClick={() => abrirEditar(clienteDetalle)}>✏️ Editar</button>
+                {clienteDetalle.estado !== 'Salio' && (
+                  <button className={styles.btnDangerSolid} onClick={() => setModalSalida(clienteDetalle)}>🚗 Registrar salida</button>
+                )}
+                <button className={styles.btnDanger} onClick={() => borrarCliente(clienteDetalle)}>🗑️ Borrar</button>
+              </div>
             </div>
             <div className={styles.divider}></div>
             <div className={styles.detailHeader}>
@@ -286,6 +409,23 @@ export default function Home() {
                 <div className={styles.detFecha}>Ingresó: {new Date(clienteDetalle.fecha_ingreso).toLocaleDateString('es-AR')}</div>
                 {clienteDetalle.fecha_salida && <div className={styles.detFecha}>Salió: {new Date(clienteDetalle.fecha_salida).toLocaleDateString('es-AR')}</div>}
                 {clienteDetalle.observacion_final && <div className={styles.detText} style={{marginTop:'8px'}}><b>Obs. final:</b> {clienteDetalle.observacion_final}</div>}
+              </div>
+            </div>
+
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>FOTOS DEL VEHÍCULO</div>
+              <input type="file" accept="image/*" ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>
+              <button className={styles.btnPrimary} onClick={() => fileRef.current.click()} style={{marginBottom:'1rem'}}>
+                {subiendo ? 'Subiendo...' : '+ Agregar foto'}
+              </button>
+              <div className={styles.fotoGrid}>
+                {fotos.map(f => (
+                  <div key={f.id} className={styles.fotoItem}>
+                    <img src={f.url} alt="foto vehiculo" className={styles.fotoImg}/>
+                    <button className={styles.fotoBorrar} onClick={() => borrarFoto(f)}>✕</button>
+                  </div>
+                ))}
+                {fotos.length === 0 && <div className={styles.fotoVacio}>No hay fotos todavía</div>}
               </div>
             </div>
           </div>
