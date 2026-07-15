@@ -95,7 +95,6 @@ export default function Home() {
       llego_en_grua: form.llego_en_grua, fecha_ingreso: fechaIngreso
     }).select().single()
 
-    // Subir foto si se seleccionó
     if (fotoNuevo && trabajo) {
       const url = await subirFotoStorage(fotoNuevo, trabajo.id)
       if (url) await supabase.from('fotos').insert({ trabajo_id: trabajo.id, url })
@@ -181,14 +180,14 @@ export default function Home() {
   }
 
   async function subirFoto(e) {
-    const file = e.target.files[0]
-    if (!file || !clienteDetalle) return
+    const files = Array.from(e.target.files)
+    if (!files.length || !clienteDetalle) return
     setSubiendo(true)
-    const url = await subirFotoStorage(file, clienteDetalle.id)
-    if (url) {
-      const { error } = await supabase.from('fotos').insert({ trabajo_id: clienteDetalle.id, url })
-      if (!error) await cargarFotos(clienteDetalle.id)
+    for (const file of files) {
+      const url = await subirFotoStorage(file, clienteDetalle.id)
+      if (url) await supabase.from('fotos').insert({ trabajo_id: clienteDetalle.id, url })
     }
+    await cargarFotos(clienteDetalle.id)
     setSubiendo(false)
     e.target.value = ''
   }
@@ -666,9 +665,9 @@ export default function Home() {
 
             <div className={styles.card}>
               <div className={styles.cardTitle}>📷 FOTOS DEL VEHÍCULO</div>
-              <input type="file" accept="image/*" ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>
+              <input type="file" accept="image/*" multiple ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>
               <button className={styles.btnPrimary} onClick={() => fileRef.current.click()} style={{marginBottom:'1rem'}}>
-                {subiendo ? 'Subiendo...' : '+ Agregar foto'}
+                {subiendo ? 'Subiendo...' : '+ Agregar fotos'}
               </button>
               <div className={styles.fotoGrid}>
                 {fotos.map(f => (
