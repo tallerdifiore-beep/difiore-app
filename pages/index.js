@@ -24,13 +24,15 @@ export default function Home() {
   const [modalEditar, setModalEditar] = useState(null)
   const [formEditar, setFormEditar] = useState({})
   const [fotos, setFotos] = useState([])
-  const [fotosTrabajo, setFotosTrabajo] = useState({})
   const [historial, setHistorial] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalRepuesto, setModalRepuesto] = useState(null)
+  const [modalEditarRepuesto, setModalEditarRepuesto] = useState(null)
+  const [formEditarRepuesto, setFormEditarRepuesto] = useState({ nombre: '', valor: '', lugar: '', fecha: '' })
   const [modalFotos, setModalFotos] = useState(null)
   const [modalFotosData, setModalFotosData] = useState([])
+  const [fotoZoom, setFotoZoom] = useState(null)
   const [formRepuesto, setFormRepuesto] = useState({ nombre: '', valor: '', lugar: '', fecha: new Date().toISOString().split('T')[0] })
   const [formActualizar, setFormActualizar] = useState({ tipo: 'estado', descripcion: '', taller_nuevo: 'Malvinas 3906' })
   const [subiendo, setSubiendo] = useState(false)
@@ -84,6 +86,10 @@ export default function Home() {
     if (uploadError) { console.error('Upload error:', uploadError); return null }
     const { data } = supabase.storage.from('fotos-vehiculos').getPublicUrl(nombre)
     return data.publicUrl
+  }
+
+  function formatPeso(valor) {
+    return Number(valor).toLocaleString('es-AR')
   }
 
   async function guardarCliente(e) {
@@ -194,9 +200,23 @@ export default function Home() {
     setModalRepuesto(null)
     setFormRepuesto({ nombre: '', valor: '', lugar: '', fecha: new Date().toISOString().split('T')[0] })
     await cargarRepuestos(trabajoId)
-    if (clienteDetalle?.id === trabajoId) {
-      await cargarRepuestos(trabajoId)
-    }
+  }
+
+  async function guardarEdicionRepuesto() {
+    await supabase.from('repuestos').update({
+      nombre: formEditarRepuesto.nombre,
+      valor: parseFloat(formEditarRepuesto.valor) || 0,
+      lugar: formEditarRepuesto.lugar,
+      fecha: formEditarRepuesto.fecha
+    }).eq('id', formEditarRepuesto.id)
+    setModalEditarRepuesto(null)
+    await cargarRepuestos(clienteDetalle.id)
+  }
+
+  async function borrarRepuesto(repuesto) {
+    if (!confirm(`¿Borrar repuesto "${repuesto.nombre}"?`)) return
+    await supabase.from('repuestos').delete().eq('id', repuesto.id)
+    await cargarRepuestos(clienteDetalle.id)
   }
 
   async function subirFotosModal(e) {
@@ -296,6 +316,13 @@ export default function Home() {
   return (
     <div className={styles.app}>
 
+      {/* ZOOM FOTO */}
+      {fotoZoom && (
+        <div className={styles.modalOverlay} onClick={() => setFotoZoom(null)} style={{cursor:'zoom-out'}}>
+          <img src={fotoZoom} alt="zoom" style={{maxWidth:'90vw',maxHeight:'90vh',objectFit:'contain',borderRadius:'8px',boxShadow:'0 0 40px #000'}}/>
+        </div>
+      )}
+
       {/* MODAL SALIDA */}
       {modalSalida && (
         <div className={styles.modalOverlay}>
@@ -315,7 +342,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL EDITAR */}
+      {/* MODAL EDITAR CLIENTE */}
       {modalEditar && (
         <div className={styles.modalOverlay}>
           <div className={styles.modal} style={{width:'520px',maxHeight:'80vh',overflowY:'auto'}}>
@@ -414,6 +441,27 @@ export default function Home() {
         </div>
       )}
 
+      {/* MODAL EDITAR REPUESTO */}
+      {modalEditarRepuesto && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <div className={styles.modalTitle}>✏️ Editar repuesto</div>
+            <div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}>
+              <div className={styles.formGroup}><label>Repuesto</label><input value={formEditarRepuesto.nombre} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, nombre: e.target.value})}/></div>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}><label>Valor ($)</label><input type="number" value={formEditarRepuesto.valor} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, valor: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Fecha</label><input type="date" value={formEditarRepuesto.fecha} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, fecha: e.target.value})}/></div>
+              </div>
+              <div className={styles.formGroup}><label>Lugar de compra</label><input value={formEditarRepuesto.lugar||''} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, lugar: e.target.value})}/></div>
+            </div>
+            <div className={styles.modalActions}>
+              <button className={styles.btn} onClick={() => setModalEditarRepuesto(null)}>Cancelar</button>
+              <button className={styles.btnPrimary} onClick={guardarEdicionRepuesto}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL FOTOS */}
       {modalFotos && (
         <div className={styles.modalOverlay}>
@@ -427,7 +475,7 @@ export default function Home() {
             <div className={styles.fotoGrid}>
               {modalFotosData.map(f => (
                 <div key={f.id} className={styles.fotoItem}>
-                  <img src={f.url} alt="foto" className={styles.fotoImg}/>
+                  <img src={f.url} alt="foto" className={styles.fotoImg} onClick={() => setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/>
                   <button className={styles.fotoBorrar} onClick={() => borrarFotoModal(f)}>✕</button>
                 </div>
               ))}
@@ -715,20 +763,24 @@ export default function Home() {
               {repuestos.length === 0 && <div style={{color:'#64748B',fontSize:'13px'}}>Sin repuestos registrados</div>}
               {repuestos.length > 0 && (
                 <table className={styles.table} style={{marginTop:'8px'}}>
-                  <thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th></tr></thead>
+                  <thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th><th></th></tr></thead>
                   <tbody>
                     {repuestos.map(r => (
                       <tr key={r.id}>
                         <td>{r.nombre}</td>
-                        <td>${Number(r.valor).toLocaleString('es-AR')}</td>
+                        <td>${formatPeso(r.valor)}</td>
                         <td>{r.lugar || '—'}</td>
                         <td style={{fontSize:'12px',color:'#64748B'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>
+                        <td style={{display:'flex',gap:'4px',cursor:'default'}}>
+                          <button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={() => { setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:r.valor,lugar:r.lugar||'',fecha:r.fecha}); setModalEditarRepuesto(true) }}>✏️</button>
+                          <button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={() => borrarRepuesto(r)}>🗑️</button>
+                        </td>
                       </tr>
                     ))}
                     <tr>
                       <td style={{fontWeight:'700',color:'#F1F5F9'}}>Total</td>
-                      <td style={{fontWeight:'700',color:'#16A34A'}}>${repuestos.reduce((a,r) => a + Number(r.valor), 0).toLocaleString('es-AR')}</td>
-                      <td colSpan="2"></td>
+                      <td style={{fontWeight:'700',color:'#16A34A'}}>${formatPeso(repuestos.reduce((a,r) => a + Number(r.valor), 0))}</td>
+                      <td colSpan="3"></td>
                     </tr>
                   </tbody>
                 </table>
@@ -758,7 +810,7 @@ export default function Home() {
               <div className={styles.fotoGrid}>
                 {fotos.map(f => (
                   <div key={f.id} className={styles.fotoItem}>
-                    <img src={f.url} alt="foto" className={styles.fotoImg}/>
+                    <img src={f.url} alt="foto" className={styles.fotoImg} onClick={() => setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/>
                     <button className={styles.fotoBorrar} onClick={() => borrarFoto(f)}>✕</button>
                   </div>
                 ))}
