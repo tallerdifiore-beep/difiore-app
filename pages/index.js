@@ -279,7 +279,7 @@ export default function Home() {
         t.vehiculos?.marca_modelo?.toLowerCase().includes(q)
       )
     })
-    .sort((a, b) => new Date(a.fecha_ingreso) - new Date(b.fecha_ingreso))
+    .sort((b, a) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso))
 
   const totalFiltrados = trabajosFiltrados.length
 
