@@ -6,6 +6,7 @@ import styles from '../styles/App.module.css'
 export default function Home() {
   const [seccion, setSeccion] = useState('dashboard')
   const [tallerVista, setTallerVista] = useState(null)
+  const [vistaStats, setVistaStats] = useState(null)
   const [clientes, setClientes] = useState([])
   const [trabajos, setTrabajos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -119,9 +120,6 @@ export default function Home() {
   .iconos { display: flex; justify-content: space-around; align-items: center; padding: 10px 0; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; margin-bottom: 12px; font-size: 22px; }
   .lineas { margin-bottom: 4px; }
   .linea { border-bottom: 1px solid #bbb; height: 28px; margin-bottom: 2px; }
-  .danos { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; text-align: center; margin-bottom: 16px; }
-  .dano-item label { font-size: 10px; display: block; margin-bottom: 4px; }
-  .dano-item .car-box { border: 1px solid #ccc; height: 90px; border-radius: 4px; display:flex; align-items:center; justify-content:center; font-size:32px; color:#aaa; }
   .acepto { text-align: center; margin-top: 16px; font-size: 11px; letter-spacing: 2px; }
   .acepto-line { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 6px; }
   .firma { border-bottom: 1px solid #000; width: 180px; }
@@ -140,12 +138,8 @@ export default function Home() {
     <h2>DI FIORE</h2>
     <p>MECÁNICA AUTOMOTRIZ</p>
   </div>
-  <div class="folio">
-    NUMERO DE FOLIO<br>
-    <div class="folio-line"></div>
-  </div>
+  <div class="folio">NUMERO DE FOLIO<br><div class="folio-line"></div></div>
 </div>
-
 <div class="body">
   <div>
     <div class="field"><label>Marca:</label><div class="val">${v?.marca_modelo?.split(' ')[0] || ''}</div></div>
@@ -153,7 +147,6 @@ export default function Home() {
     <div class="field"><label>Color:</label><div class="val">${v?.color || ''}</div></div>
     <div class="field"><label>Kilometraje:</label><div class="val">${v?.kilometraje || ''}</div></div>
     <div class="field"><label>Placas:</label><div class="val">${v?.patente || ''}</div></div>
-    <div class="field"><label>Número de serie:</label><div class="val"></div></div>
     <div class="grua">
       <span>Ingreso en grúa:</span>
       <span class="checkbox"><span class="box ${trabajo.llego_en_grua ? 'checked' : ''}"></span> Sí</span>
@@ -169,7 +162,6 @@ export default function Home() {
     <div class="field"><label>Email:</label><div class="val">${c?.email || ''}</div></div>
   </div>
 </div>
-
 <div class="iconos">
   <span title="Airbag">🧍</span>
   <span title="Motor">🔧</span>
@@ -182,21 +174,11 @@ export default function Home() {
   <span title="Suspensión">🚗</span>
   <span title="Temperatura">🌡️</span>
 </div>
-
 <div class="section-title">TRABAJO A REALIZAR / DESCRIPCIÓN DEL PROBLEMA</div>
 <div class="lineas">
   <div class="val" style="min-height:40px;border-bottom:1px solid #000;padding:4px;font-size:12px;">${trabajo.motivo || ''}</div>
   ${Array(9).fill('<div class="linea"></div>').join('')}
 </div>
-
-<div class="section-title">DAÑOS PREEXISTENTES DEL VEHÍCULO</div>
-<div class="danos">
-  <div class="dano-item"><label>Lado derecho</label><div class="car-box">🚗</div></div>
-  <div class="dano-item"><label>Frente</label><div class="car-box">🚗</div></div>
-  <div class="dano-item"><label>Detrás</label><div class="car-box">🚗</div></div>
-  <div class="dano-item"><label>Lado izquierdo</label><div class="car-box">🚗</div></div>
-</div>
-
 <div class="acepto">
   <div class="acepto-line">
     <div class="firma"></div>
@@ -205,7 +187,6 @@ export default function Home() {
   </div>
 </div>
 <div class="website">dilodocu.com</div>
-
 <script>window.onload = () => { window.print(); }<\/script>
 </body>
 </html>`
@@ -406,7 +387,6 @@ export default function Home() {
   }
 
   const trabajosActivos = trabajos.filter(t => t.estado !== 'Salio')
-
   const conteoMarcas = trabajosActivos.reduce((acc, t) => {
     const marca = getMarca(t.vehiculos?.marca_modelo)
     acc[marca] = (acc[marca] || 0) + 1
@@ -431,6 +411,19 @@ export default function Home() {
     enTaller: trabajosActivos.length,
     listos: trabajos.filter(t => t.estado === 'Listo').length,
     salidos: trabajos.filter(t => t.estado === 'Salio').length,
+  }
+
+  // Listas para vista de stats
+  const listaVistaStats = {
+    enTaller: trabajos.filter(t => t.estado !== 'Salio').sort((a,b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)),
+    listos: trabajos.filter(t => t.estado === 'Listo').sort((a,b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)),
+    salidos: trabajos.filter(t => t.estado === 'Salio').sort((a,b) => new Date(b.fecha_salida||b.fecha_ingreso) - new Date(a.fecha_salida||a.fecha_ingreso)),
+  }
+
+  const titulosVistaStats = {
+    enTaller: 'Autos en taller',
+    listos: 'Listos para entregar',
+    salidos: 'Salidos',
   }
 
   const tipoHistorial = { ingreso: '🟢', salida: '🔴', movimiento: '🔵', reingreso: '🟡', estado: '⚪', prueba: '🟠' }
@@ -622,7 +615,7 @@ export default function Home() {
           { id: 'clientes', label: '👥 Clientes' },
           { id: 'nuevo', label: '＋ Nuevo cliente' },
         ].map(item => (
-          <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => { setSeccion(item.id); setTallerVista(null) }}>
+          <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => { setSeccion(item.id); setTallerVista(null); setVistaStats(null) }}>
             {item.label}
           </button>
         ))}
@@ -633,8 +626,8 @@ export default function Home() {
 
       <div className={styles.main}>
 
-        {/* DASHBOARD */}
-        {seccion === 'dashboard' && !tallerVista && (
+        {/* DASHBOARD PRINCIPAL */}
+        {seccion === 'dashboard' && !tallerVista && !vistaStats && (
           <div>
             <div className={styles.topBar}>
               <h1 className={styles.pageTitle}>Dashboard</h1>
@@ -642,10 +635,22 @@ export default function Home() {
             </div>
             <div className={styles.divider}></div>
             <div className={styles.stats}>
-              <div className={styles.stat}><div className={styles.statN}>{stats.total}</div><div className={styles.statL}>Clientes totales</div></div>
-              <div className={styles.stat}><div className={styles.statN}>{stats.enTaller}</div><div className={styles.statL}>En taller</div></div>
-              <div className={styles.stat}><div className={styles.statN}>{stats.listos}</div><div className={styles.statL}>Listos</div></div>
-              <div className={styles.stat}><div className={styles.statN}>{stats.salidos}</div><div className={styles.statL}>Salidos</div></div>
+              <div className={styles.stat} style={{cursor:'default'}}>
+                <div className={styles.statN}>{stats.total}</div>
+                <div className={styles.statL}>Clientes totales</div>
+              </div>
+              <div className={styles.stat} style={{cursor:'pointer'}} onClick={() => setVistaStats('enTaller')}>
+                <div className={styles.statN}>{stats.enTaller}</div>
+                <div className={styles.statL}>En taller →</div>
+              </div>
+              <div className={styles.stat} style={{cursor:'pointer'}} onClick={() => setVistaStats('listos')}>
+                <div className={styles.statN}>{stats.listos}</div>
+                <div className={styles.statL}>Listos →</div>
+              </div>
+              <div className={styles.stat} style={{cursor:'pointer'}} onClick={() => setVistaStats('salidos')}>
+                <div className={styles.statN}>{stats.salidos}</div>
+                <div className={styles.statL}>Salidos →</div>
+              </div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1rem'}}>
               {['Malvinas 2084','Malvinas 3906'].map(taller => {
@@ -681,6 +686,39 @@ export default function Home() {
                 ))}
                 {Object.keys(conteoMarcas).length === 0 && <div style={{color:'#64748B',fontSize:'13px'}}>Sin autos en taller</div>}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* VISTA STATS (en taller / listos / salidos) */}
+        {seccion === 'dashboard' && !tallerVista && vistaStats && (
+          <div>
+            <div className={styles.topBar}>
+              <button className={styles.btn} onClick={() => setVistaStats(null)}>← Volver</button>
+              <h1 className={styles.pageTitle}>{titulosVistaStats[vistaStats]}</h1>
+            </div>
+            <div className={styles.divider}></div>
+            <div className={styles.tblWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Color</th><th>Estado</th><th>Taller</th><th>Ingreso</th></tr></thead>
+                <tbody>
+                  {listaVistaStats[vistaStats].map((t,i) => (
+                    <tr key={t.id} onClick={() => verDetalle(t)}>
+                      <td style={{color:'#64748B'}}>{i+1}</td>
+                      <td><b>{t.vehiculos?.marca_modelo}</b></td>
+                      <td>{t.vehiculos?.clientes?.nombre}</td>
+                      <td>{t.vehiculos?.patente}</td>
+                      <td style={{color:'#94A3B8'}}>{t.vehiculos?.color || '—'}</td>
+                      <td><span className={badgeClass(t.estado)}>{t.estado}</span></td>
+                      <td>{t.taller}</td>
+                      <td style={{fontSize:'12px',color:'#64748B'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
+                    </tr>
+                  ))}
+                  {listaVistaStats[vistaStats].length === 0 && (
+                    <tr><td colSpan="8" style={{textAlign:'center',color:'#64748B',padding:'2rem'}}>Sin resultados</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
