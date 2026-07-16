@@ -102,7 +102,7 @@ export default function Home() {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Orden de Servicio</title>
+<title>Orden de Servicio - DiFiore</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; font-size: 12px; color: #000; background: #fff; padding: 20px; max-width: 700px; margin: 0 auto; }
@@ -117,17 +117,18 @@ export default function Home() {
   .field label { font-size: 10px; color: #333; }
   .field .val { border-bottom: 1px solid #000; min-height: 18px; font-size: 12px; font-weight: 500; padding: 2px 0; }
   .section-title { background: #e0e0e0; text-align: center; font-weight: bold; font-size: 11px; padding: 4px; margin: 12px 0 8px; letter-spacing: 1px; }
-  .iconos { display: flex; justify-content: space-around; align-items: center; padding: 10px 0; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; margin-bottom: 12px; font-size: 22px; }
   .lineas { margin-bottom: 4px; }
   .linea { border-bottom: 1px solid #bbb; height: 28px; margin-bottom: 2px; }
-  .acepto { text-align: center; margin-top: 16px; font-size: 11px; letter-spacing: 2px; }
-  .acepto-line { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 6px; }
+  .acepto { text-align: center; margin-top: 20px; font-size: 11px; letter-spacing: 2px; }
+  .acepto-line { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 8px; }
   .firma { border-bottom: 1px solid #000; width: 180px; }
   .grua { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; }
-  .checkbox { display: inline-flex; align-items: center; gap: 4px; }
-  .box { width: 12px; height: 12px; border: 1px solid #000; display: inline-block; }
-  .box.checked { background: #000; }
-  .website { text-align: center; font-size: 10px; color: #888; margin-top: 8px; }
+  .checkbox { display: inline-flex; align-items: center; gap: 5px; }
+  .box { width: 13px; height: 13px; border: 1.5px solid #000; display: inline-block; vertical-align: middle; text-align: center; line-height: 13px; font-size: 10px; font-weight: bold; }
+  .footer { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; display: flex; justify-content: space-between; align-items: flex-start; font-size: 10px; color: #444; }
+  .footer a { color: #1a56db; text-decoration: none; }
+  .footer-left { display: flex; flex-direction: column; gap: 4px; }
+  .footer-right { text-align: right; display: flex; flex-direction: column; gap: 4px; }
   @media print { body { padding: 10px; } }
 </style>
 </head>
@@ -140,6 +141,7 @@ export default function Home() {
   </div>
   <div class="folio">NUMERO DE FOLIO<br><div class="folio-line"></div></div>
 </div>
+
 <div class="body">
   <div>
     <div class="field"><label>Marca:</label><div class="val">${v?.marca_modelo?.split(' ')[0] || ''}</div></div>
@@ -149,8 +151,8 @@ export default function Home() {
     <div class="field"><label>Placas:</label><div class="val">${v?.patente || ''}</div></div>
     <div class="grua">
       <span>Ingreso en grúa:</span>
-      <span class="checkbox"><span class="box ${trabajo.llego_en_grua ? 'checked' : ''}"></span> Sí</span>
-      <span class="checkbox"><span class="box ${!trabajo.llego_en_grua ? 'checked' : ''}"></span> No</span>
+      <span class="checkbox"><span class="box">${trabajo.llego_en_grua ? '✓' : ''}</span> Sí</span>
+      <span class="checkbox"><span class="box">${!trabajo.llego_en_grua ? '✓' : ''}</span> No</span>
     </div>
   </div>
   <div>
@@ -162,23 +164,13 @@ export default function Home() {
     <div class="field"><label>Email:</label><div class="val">${c?.email || ''}</div></div>
   </div>
 </div>
-<div class="iconos">
-  <span title="Airbag">🧍</span>
-  <span title="Motor">🔧</span>
-  <span title="ABS">🛞</span>
-  <span title="Aceite">🛢️</span>
-  <span title="Batería">🔋</span>
-  <span title="Cinturón">🔒</span>
-  <span title="Freno de mano">🅿️</span>
-  <span title="Luces">💡</span>
-  <span title="Suspensión">🚗</span>
-  <span title="Temperatura">🌡️</span>
-</div>
+
 <div class="section-title">TRABAJO A REALIZAR / DESCRIPCIÓN DEL PROBLEMA</div>
 <div class="lineas">
   <div class="val" style="min-height:40px;border-bottom:1px solid #000;padding:4px;font-size:12px;">${trabajo.motivo || ''}</div>
-  ${Array(9).fill('<div class="linea"></div>').join('')}
+  ${Array(10).fill('<div class="linea"></div>').join('')}
 </div>
+
 <div class="acepto">
   <div class="acepto-line">
     <div class="firma"></div>
@@ -186,7 +178,19 @@ export default function Home() {
     <div class="firma"></div>
   </div>
 </div>
-<div class="website">dilodocu.com</div>
+
+<div class="footer">
+  <div class="footer-left">
+    <div><strong>DiFiore Performance</strong></div>
+    <div>📍 <a href="https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1" target="_blank">Malvinas Argentinas 2084, Mar del Plata</a></div>
+    <div>📱 <a href="tel:+542235299700">223 529-9700</a></div>
+  </div>
+  <div class="footer-right">
+    <div>📸 <a href="https://www.instagram.com/di_fiore_mecanica/" target="_blank">@di_fiore_mecanica</a></div>
+    <div>👍 <a href="https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr" target="_blank">Facebook: DiFiore Mecánica</a></div>
+  </div>
+</div>
+
 <script>window.onload = () => { window.print(); }<\/script>
 </body>
 </html>`
@@ -413,7 +417,6 @@ export default function Home() {
     salidos: trabajos.filter(t => t.estado === 'Salio').length,
   }
 
-  // Listas para vista de stats
   const listaVistaStats = {
     enTaller: trabajos.filter(t => t.estado !== 'Salio').sort((a,b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)),
     listos: trabajos.filter(t => t.estado === 'Listo').sort((a,b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)),
@@ -620,7 +623,12 @@ export default function Home() {
           </button>
         ))}
         <div className={styles.navBottom}>
-          <div className={styles.navTaller}>Difiore Performance · MdP</div>
+          <div style={{fontSize:'11px',color:'#64748B',padding:'8px 10px',display:'flex',flexDirection:'column',gap:'4px'}}>
+            <a href="https://www.instagram.com/di_fiore_mecanica/" target="_blank" rel="noreferrer" style={{color:'#64748B',textDecoration:'none'}}>📸 @di_fiore_mecanica</a>
+            <a href="https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr" target="_blank" rel="noreferrer" style={{color:'#64748B',textDecoration:'none'}}>👍 Facebook</a>
+            <a href="tel:+542235299700" style={{color:'#64748B',textDecoration:'none'}}>📱 223 529-9700</a>
+            <a href="https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1" target="_blank" rel="noreferrer" style={{color:'#64748B',textDecoration:'none'}}>📍 Malvinas 2084, MdP</a>
+          </div>
         </div>
       </div>
 
@@ -690,7 +698,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* VISTA STATS (en taller / listos / salidos) */}
+        {/* VISTA STATS */}
         {seccion === 'dashboard' && !tallerVista && vistaStats && (
           <div>
             <div className={styles.topBar}>
