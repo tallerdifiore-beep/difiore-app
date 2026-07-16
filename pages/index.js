@@ -92,6 +92,129 @@ export default function Home() {
     return Number(valor).toLocaleString('es-AR')
   }
 
+  function imprimirOrden(trabajo) {
+    const c = trabajo.vehiculos?.clientes
+    const v = trabajo.vehiculos
+    const fecha = (f) => f ? new Date(f).toLocaleDateString('es-AR') : '___/___/______'
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Orden de Servicio</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #000; background: #fff; padding: 20px; max-width: 700px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 16px; }
+  .header h1 { font-size: 22px; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; }
+  .header h2 { font-size: 20px; font-weight: 900; letter-spacing: 6px; margin-bottom: 2px; }
+  .header p { font-size: 10px; letter-spacing: 3px; color: #555; }
+  .folio { position: absolute; top: 20px; right: 20px; font-size: 10px; font-weight: bold; }
+  .folio-line { border-bottom: 1px solid #000; width: 120px; margin-top: 4px; }
+  .body { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; margin-bottom: 16px; }
+  .field { margin-bottom: 10px; }
+  .field label { font-size: 10px; color: #333; }
+  .field .val { border-bottom: 1px solid #000; min-height: 18px; font-size: 12px; font-weight: 500; padding: 2px 0; }
+  .section-title { background: #e0e0e0; text-align: center; font-weight: bold; font-size: 11px; padding: 4px; margin: 12px 0 8px; letter-spacing: 1px; }
+  .iconos { display: flex; justify-content: space-around; align-items: center; padding: 10px 0; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; margin-bottom: 12px; font-size: 22px; }
+  .lineas { margin-bottom: 4px; }
+  .linea { border-bottom: 1px solid #bbb; height: 28px; margin-bottom: 2px; }
+  .danos { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; text-align: center; margin-bottom: 16px; }
+  .dano-item label { font-size: 10px; display: block; margin-bottom: 4px; }
+  .dano-item .car-box { border: 1px solid #ccc; height: 90px; border-radius: 4px; display:flex; align-items:center; justify-content:center; font-size:32px; color:#aaa; }
+  .acepto { text-align: center; margin-top: 16px; font-size: 11px; letter-spacing: 2px; }
+  .acepto-line { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 6px; }
+  .firma { border-bottom: 1px solid #000; width: 180px; }
+  .grua { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; }
+  .checkbox { display: inline-flex; align-items: center; gap: 4px; }
+  .box { width: 12px; height: 12px; border: 1px solid #000; display: inline-block; }
+  .box.checked { background: #000; }
+  .website { text-align: center; font-size: 10px; color: #888; margin-top: 8px; }
+  @media print { body { padding: 10px; } }
+</style>
+</head>
+<body>
+<div style="position:relative">
+  <div class="header">
+    <h1>ORDEN DE SERVICIO</h1>
+    <h2>DI FIORE</h2>
+    <p>MECÁNICA AUTOMOTRIZ</p>
+  </div>
+  <div class="folio">
+    NUMERO DE FOLIO<br>
+    <div class="folio-line"></div>
+  </div>
+</div>
+
+<div class="body">
+  <div>
+    <div class="field"><label>Marca:</label><div class="val">${v?.marca_modelo?.split(' ')[0] || ''}</div></div>
+    <div class="field"><label>Modelo:</label><div class="val">${v?.marca_modelo || ''}</div></div>
+    <div class="field"><label>Color:</label><div class="val">${v?.color || ''}</div></div>
+    <div class="field"><label>Kilometraje:</label><div class="val">${v?.kilometraje || ''}</div></div>
+    <div class="field"><label>Placas:</label><div class="val">${v?.patente || ''}</div></div>
+    <div class="field"><label>Número de serie:</label><div class="val"></div></div>
+    <div class="grua">
+      <span>Ingreso en grúa:</span>
+      <span class="checkbox"><span class="box ${trabajo.llego_en_grua ? 'checked' : ''}"></span> Sí</span>
+      <span class="checkbox"><span class="box ${!trabajo.llego_en_grua ? 'checked' : ''}"></span> No</span>
+    </div>
+  </div>
+  <div>
+    <div style="font-weight:bold;margin-bottom:8px;font-size:11px;">DATOS DEL CLIENTE</div>
+    <div class="field"><label>Ingreso:</label><div class="val">${fecha(trabajo.fecha_ingreso)}</div></div>
+    <div class="field"><label>Salida:</label><div class="val">${fecha(trabajo.fecha_salida)}</div></div>
+    <div class="field"><label>Nombre:</label><div class="val">${c?.nombre || ''}</div></div>
+    <div class="field"><label>Teléfono:</label><div class="val">${c?.telefono || ''}</div></div>
+    <div class="field"><label>Email:</label><div class="val">${c?.email || ''}</div></div>
+  </div>
+</div>
+
+<div class="iconos">
+  <span title="Airbag">🧍</span>
+  <span title="Motor">🔧</span>
+  <span title="ABS">🛞</span>
+  <span title="Aceite">🛢️</span>
+  <span title="Batería">🔋</span>
+  <span title="Cinturón">🔒</span>
+  <span title="Freno de mano">🅿️</span>
+  <span title="Luces">💡</span>
+  <span title="Suspensión">🚗</span>
+  <span title="Temperatura">🌡️</span>
+</div>
+
+<div class="section-title">TRABAJO A REALIZAR / DESCRIPCIÓN DEL PROBLEMA</div>
+<div class="lineas">
+  <div class="val" style="min-height:40px;border-bottom:1px solid #000;padding:4px;font-size:12px;">${trabajo.motivo || ''}</div>
+  ${Array(9).fill('<div class="linea"></div>').join('')}
+</div>
+
+<div class="section-title">DAÑOS PREEXISTENTES DEL VEHÍCULO</div>
+<div class="danos">
+  <div class="dano-item"><label>Lado derecho</label><div class="car-box">🚗</div></div>
+  <div class="dano-item"><label>Frente</label><div class="car-box">🚗</div></div>
+  <div class="dano-item"><label>Detrás</label><div class="car-box">🚗</div></div>
+  <div class="dano-item"><label>Lado izquierdo</label><div class="car-box">🚗</div></div>
+</div>
+
+<div class="acepto">
+  <div class="acepto-line">
+    <div class="firma"></div>
+    <span>A C E P T O</span>
+    <div class="firma"></div>
+  </div>
+</div>
+<div class="website">dilodocu.com</div>
+
+<script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`
+
+    const ventana = window.open('', '_blank', 'width=800,height=900')
+    ventana.document.write(html)
+    ventana.document.close()
+  }
+
   async function guardarCliente(e) {
     e.preventDefault()
     const { data: cliente, error: errCliente } = await supabase
@@ -718,6 +841,7 @@ export default function Home() {
             <div className={styles.topBar}>
               <button className={styles.btn} onClick={() => setSeccion('clientes')}>← Volver</button>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                <button className={styles.btn} onClick={() => imprimirOrden(clienteDetalle)}>🖨️ Imprimir orden</button>
                 <button className={styles.btnSuccess} onClick={() => { setModalActualizar(clienteDetalle); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>🟢 Actualización</button>
                 <button className={styles.btnRepuesto} onClick={() => setModalRepuesto(clienteDetalle)}>🔩 Repuesto</button>
                 <button className={styles.btnPrimary} onClick={() => abrirEditar(clienteDetalle)}>✏️ Editar</button>
