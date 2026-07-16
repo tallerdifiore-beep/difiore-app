@@ -16,7 +16,7 @@ export default function Home() {
     motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084',
     llego_en_grua: false, fecha_ingreso_manual: ''
   })
-  const [fotoNuevo, setFotoNuevo] = useState(null)
+  const [fotoNuevo, setFotoNuevo] = useState([])
   const [clienteDetalle, setClienteDetalle] = useState(null)
   const [mensaje, setMensaje] = useState('')
   const [modalSalida, setModalSalida] = useState(null)
@@ -28,11 +28,13 @@ export default function Home() {
   const [repuestos, setRepuestos] = useState([])
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalRepuesto, setModalRepuesto] = useState(null)
+  const [modalFotos, setModalFotos] = useState(null)
   const [formRepuesto, setFormRepuesto] = useState({ nombre: '', valor: '', lugar: '', fecha: new Date().toISOString().split('T')[0] })
   const [formActualizar, setFormActualizar] = useState({ tipo: 'estado', descripcion: '', taller_nuevo: 'Malvinas 3906' })
   const [subiendo, setSubiendo] = useState(false)
   const fileRef = useRef()
   const fileNuevoRef = useRef()
+  const fileFotosRef = useRef()
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -68,7 +70,7 @@ export default function Home() {
 
   async function subirFotoStorage(file, trabajoId) {
     const ext = file.name.split('.').pop()
-    const nombre = `${trabajoId}/${Date.now()}.${ext}`
+    const nombre = `${trabajoId}/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`
     const { error: uploadError } = await supabase.storage.from('fotos-vehiculos').upload(nombre, file, { upsert: true })
     if (uploadError) { console.error('Upload error:', uploadError); return null }
     const { data } = supabase.storage.from('fotos-vehiculos').getPublicUrl(nombre)
@@ -95,16 +97,18 @@ export default function Home() {
       llego_en_grua: form.llego_en_grua, fecha_ingreso: fechaIngreso
     }).select().single()
 
-    if (fotoNuevo && trabajo) {
-      const url = await subirFotoStorage(fotoNuevo, trabajo.id)
-      if (url) await supabase.from('fotos').insert({ trabajo_id: trabajo.id, url })
+    if (fotoNuevo.length > 0 && trabajo) {
+      for (const f of fotoNuevo) {
+        const url = await subirFotoStorage(f, trabajo.id)
+        if (url) await supabase.from('fotos').insert({ trabajo_id: trabajo.id, url })
+      }
     }
 
     await agregarHistorial(trabajo.id, 'ingreso', `Ingresó al taller ${form.taller} ${form.llego_en_grua ? '(en grúa)' : '(andando)'}. Motivo: ${form.motivo}`)
 
     setMensaje('✓ Cliente registrado correctamente')
     setForm({ nombre: '', telefono: '', email: '', marca_modelo: '', patente: '', anio: '', kilometraje: '', motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084', llego_en_grua: false, fecha_ingreso_manual: '' })
-    setFotoNuevo(null)
+    setFotoNuevo([])
     cargarDatos()
     setTimeout(() => { setMensaje(''); setSeccion('clientes') }, 1500)
   }
@@ -179,6 +183,19 @@ export default function Home() {
     if (clienteDetalle?.id === modalRepuesto.id) cargarRepuestos(modalRepuesto.id)
   }
 
+  async function subirFotosModal(e) {
+    const files = Array.from(e.target.files)
+    if (!files.length || !modalFotos) return
+    setSubiendo(true)
+    for (const file of files) {
+      const url = await subirFotoStorage(file, modalFotos.id)
+      if (url) await supabase.from('fotos').insert({ trabajo_id: modalFotos.id, url })
+    }
+    await cargarFotos(modalFotos.id)
+    setSubiendo(false)
+    e.target.value = ''
+  }
+
   async function subirFoto(e) {
     const files = Array.from(e.target.files)
     if (!files.length || !clienteDetalle) return
@@ -192,9 +209,9 @@ export default function Home() {
     e.target.value = ''
   }
 
-  async function borrarFoto(foto) {
+  async function borrarFoto(foto, trabajoId) {
     await supabase.from('fotos').delete().eq('id', foto.id)
-    cargarFotos(clienteDetalle.id)
+    cargarFotos(trabajoId)
   }
 
   function verDetalle(trabajo) {
@@ -371,6 +388,32 @@ export default function Home() {
         </div>
       )}
 
+      {/* MODAL FOTOS */}
+      {modalFotos && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal} style={{width:'560px',maxHeight:'85vh',overflowY:'auto'}}>
+            <div className={styles.modalTitle}>📷 Fotos del vehículo</div>
+            <div className={styles.modalSub}><b>{modalFotos.vehiculos?.marca_modelo}</b> — {modalFotos.vehiculos?.clientes?.nombre}</div>
+            <input type="file" accept="image/*" multiple ref={fileFotosRef} style={{display:'none'}} onChange={subirFotosModal}/>
+            <button className={styles.btnPrimary} style={{marginTop:'1rem',marginBottom:'1rem'}} onClick={() => fileFotosRef.current.click()}>
+              {subiendo ? 'Subiendo...' : '+ Agregar fotos'}
+            </button>
+            <div className={styles.fotoGrid}>
+              {fotos.map(f => (
+                <div key={f.id} className={styles.fotoItem}>
+                  <img src={f.url} alt="foto" className={styles.fotoImg}/>
+                  <button className={styles.fotoBorrar} onClick={() => borrarFoto(f, modalFotos.id)}>✕</button>
+                </div>
+              ))}
+              {fotos.length === 0 && <div className={styles.fotoVacio}>No hay fotos todavía</div>}
+            </div>
+            <div className={styles.modalActions}>
+              <button className={styles.btn} onClick={() => { setModalFotos(null); setFotos([]) }}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.sidebar}>
         <div className={styles.logoArea}>
           <div className={styles.logoMain}>D<span className={styles.logoI}>I</span> FIORE</div>
@@ -507,6 +550,7 @@ export default function Home() {
                         <td style={{display:'flex',gap:'5px',cursor:'default'}}>
                           <button className={styles.btnSuccess} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => { setModalActualizar(t); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>Actualizar</button>
                           <button className={styles.btnRepuesto} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalRepuesto(t)}>🔩</button>
+                          <button className={styles.btnEdit} style={{fontSize:'11px',padding:'4px 8px'}} onClick={async () => { await cargarFotos(t.id); setModalFotos(t) }}>📷</button>
                           {t.estado !== 'Salio' && <button className={styles.btnDangerSolid} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalSalida(t)}>Salida</button>}
                           <button className={styles.btnEdit} onClick={() => abrirEditar(t)}>✏️</button>
                           <button className={styles.btnDelete} onClick={() => borrarCliente(t)}>🗑️</button>
@@ -567,14 +611,16 @@ export default function Home() {
                 </div>
               </div>
               <div className={styles.card}>
-                <div className={styles.cardTitle}>📷 FOTO DEL VEHÍCULO</div>
-                <input type="file" accept="image/*" ref={fileNuevoRef} style={{display:'none'}} onChange={e => setFotoNuevo(e.target.files[0])}/>
+                <div className={styles.cardTitle}>📷 FOTOS DEL VEHÍCULO</div>
+                <input type="file" accept="image/*" multiple ref={fileNuevoRef} style={{display:'none'}} onChange={e => setFotoNuevo(Array.from(e.target.files))}/>
                 <button type="button" className={styles.btnPrimary} onClick={() => fileNuevoRef.current.click()}>
-                  {fotoNuevo ? `✓ ${fotoNuevo.name}` : '+ Seleccionar foto'}
+                  {fotoNuevo.length > 0 ? `✓ ${fotoNuevo.length} foto(s) seleccionada(s)` : '+ Seleccionar fotos'}
                 </button>
-                {fotoNuevo && (
-                  <div style={{marginTop:'10px'}}>
-                    <img src={URL.createObjectURL(fotoNuevo)} alt="preview" style={{width:'100%',maxHeight:'200px',objectFit:'cover',borderRadius:'6px'}}/>
+                {fotoNuevo.length > 0 && (
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginTop:'10px'}}>
+                    {fotoNuevo.map((f,i) => (
+                      <img key={i} src={URL.createObjectURL(f)} alt="preview" style={{width:'100%',aspectRatio:'4/3',objectFit:'cover',borderRadius:'6px'}}/>
+                    ))}
                   </div>
                 )}
               </div>
@@ -673,7 +719,7 @@ export default function Home() {
                 {fotos.map(f => (
                   <div key={f.id} className={styles.fotoItem}>
                     <img src={f.url} alt="foto" className={styles.fotoImg}/>
-                    <button className={styles.fotoBorrar} onClick={() => borrarFoto(f)}>✕</button>
+                    <button className={styles.fotoBorrar} onClick={() => borrarFoto(f, clienteDetalle.id)}>✕</button>
                   </div>
                 ))}
                 {fotos.length === 0 && <div className={styles.fotoVacio}>No hay fotos todavía</div>}
