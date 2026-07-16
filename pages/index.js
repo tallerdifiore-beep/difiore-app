@@ -12,7 +12,7 @@ export default function Home() {
   const [busqueda, setBusqueda] = useState('')
   const [form, setForm] = useState({
     nombre: '', telefono: '', email: '',
-    marca_modelo: '', patente: '', anio: '', kilometraje: '',
+    marca_modelo: '', patente: '', anio: '', kilometraje: '', color: '',
     motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084',
     llego_en_grua: false, fecha_ingreso_manual: ''
   })
@@ -24,11 +24,13 @@ export default function Home() {
   const [modalEditar, setModalEditar] = useState(null)
   const [formEditar, setFormEditar] = useState({})
   const [fotos, setFotos] = useState([])
+  const [fotosTrabajo, setFotosTrabajo] = useState({})
   const [historial, setHistorial] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalRepuesto, setModalRepuesto] = useState(null)
   const [modalFotos, setModalFotos] = useState(null)
+  const [modalFotosData, setModalFotosData] = useState([])
   const [formRepuesto, setFormRepuesto] = useState({ nombre: '', valor: '', lugar: '', fecha: new Date().toISOString().split('T')[0] })
   const [formActualizar, setFormActualizar] = useState({ tipo: 'estado', descripcion: '', taller_nuevo: 'Malvinas 3906' })
   const [subiendo, setSubiendo] = useState(false)
@@ -41,7 +43,7 @@ export default function Home() {
   async function cargarDatos() {
     setLoading(true)
     const { data: clientesData } = await supabase.from('clientes').select('*').order('created_at', { ascending: false })
-    const { data: trabajosData } = await supabase.from('trabajos').select('*, vehiculos(*, clientes(*))').order('fecha_ingreso', { ascending: false })
+    const { data: trabajosData } = await supabase.from('trabajos').select('*, vehiculos(*, clientes(*))').order('fecha_ingreso', { ascending: true })
     setClientes(clientesData || [])
     setTrabajos(trabajosData || [])
     setLoading(false)
@@ -50,6 +52,13 @@ export default function Home() {
   async function cargarFotos(trabajoId) {
     const { data, error } = await supabase.from('fotos').select('*').eq('trabajo_id', trabajoId).order('created_at', { ascending: false })
     if (!error) setFotos(data || [])
+    return data || []
+  }
+
+  async function cargarFotosModal(trabajoId) {
+    const { data, error } = await supabase.from('fotos').select('*').eq('trabajo_id', trabajoId).order('created_at', { ascending: false })
+    if (!error) setModalFotosData(data || [])
+    return data || []
   }
 
   async function cargarHistorial(trabajoId) {
@@ -85,7 +94,7 @@ export default function Home() {
     if (errCliente) { setMensaje('Error al guardar cliente'); return }
 
     const { data: vehiculo, error: errVehiculo } = await supabase
-      .from('vehiculos').insert({ cliente_id: cliente.id, marca_modelo: form.marca_modelo, patente: form.patente, anio: form.anio, kilometraje: form.kilometraje })
+      .from('vehiculos').insert({ cliente_id: cliente.id, marca_modelo: form.marca_modelo, patente: form.patente, anio: form.anio, kilometraje: form.kilometraje, color: form.color })
       .select().single()
     if (errVehiculo) { setMensaje('Error al guardar vehículo'); return }
 
@@ -107,7 +116,7 @@ export default function Home() {
     await agregarHistorial(trabajo.id, 'ingreso', `Ingresó al taller ${form.taller} ${form.llego_en_grua ? '(en grúa)' : '(andando)'}. Motivo: ${form.motivo}`)
 
     setMensaje('✓ Cliente registrado correctamente')
-    setForm({ nombre: '', telefono: '', email: '', marca_modelo: '', patente: '', anio: '', kilometraje: '', motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084', llego_en_grua: false, fecha_ingreso_manual: '' })
+    setForm({ nombre: '', telefono: '', email: '', marca_modelo: '', patente: '', anio: '', kilometraje: '', color: '', motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084', llego_en_grua: false, fecha_ingreso_manual: '' })
     setFotoNuevo([])
     cargarDatos()
     setTimeout(() => { setMensaje(''); setSeccion('clientes') }, 1500)
@@ -142,7 +151,7 @@ export default function Home() {
     const tallerAnterior = formEditar.taller_anterior
     const tallerNuevo = formEditar.taller
     await supabase.from('clientes').update({ nombre: formEditar.nombre, telefono: formEditar.telefono, email: formEditar.email }).eq('id', formEditar.cliente_id)
-    await supabase.from('vehiculos').update({ marca_modelo: formEditar.marca_modelo, patente: formEditar.patente, anio: formEditar.anio, kilometraje: formEditar.kilometraje }).eq('id', formEditar.vehiculo_id)
+    await supabase.from('vehiculos').update({ marca_modelo: formEditar.marca_modelo, patente: formEditar.patente, anio: formEditar.anio, kilometraje: formEditar.kilometraje, color: formEditar.color }).eq('id', formEditar.vehiculo_id)
     await supabase.from('trabajos').update({ motivo: formEditar.motivo, estado: formEditar.estado, mecanico: formEditar.mecanico, taller: formEditar.taller }).eq('id', formEditar.trabajo_id)
     if (tallerAnterior !== tallerNuevo) {
       await agregarHistorial(formEditar.trabajo_id, 'movimiento', `Movido de ${tallerAnterior} a ${tallerNuevo}`)
@@ -167,12 +176,16 @@ export default function Home() {
     setModalActualizar(null)
     setFormActualizar({ tipo: 'estado', descripcion: '', taller_nuevo: 'Malvinas 3906' })
     cargarDatos()
-    if (clienteDetalle?.id === t.id) cargarHistorial(t.id)
+    if (clienteDetalle?.id === t.id) {
+      await cargarHistorial(t.id)
+      await cargarRepuestos(t.id)
+    }
   }
 
   async function guardarRepuesto() {
+    const trabajoId = modalRepuesto.id
     await supabase.from('repuestos').insert({
-      trabajo_id: modalRepuesto.id,
+      trabajo_id: trabajoId,
       nombre: formRepuesto.nombre,
       valor: parseFloat(formRepuesto.valor) || 0,
       lugar: formRepuesto.lugar,
@@ -180,7 +193,10 @@ export default function Home() {
     })
     setModalRepuesto(null)
     setFormRepuesto({ nombre: '', valor: '', lugar: '', fecha: new Date().toISOString().split('T')[0] })
-    if (clienteDetalle?.id === modalRepuesto.id) cargarRepuestos(modalRepuesto.id)
+    await cargarRepuestos(trabajoId)
+    if (clienteDetalle?.id === trabajoId) {
+      await cargarRepuestos(trabajoId)
+    }
   }
 
   async function subirFotosModal(e) {
@@ -191,9 +207,14 @@ export default function Home() {
       const url = await subirFotoStorage(file, modalFotos.id)
       if (url) await supabase.from('fotos').insert({ trabajo_id: modalFotos.id, url })
     }
-    await cargarFotos(modalFotos.id)
+    await cargarFotosModal(modalFotos.id)
     setSubiendo(false)
     e.target.value = ''
+  }
+
+  async function borrarFotoModal(foto) {
+    await supabase.from('fotos').delete().eq('id', foto.id)
+    await cargarFotosModal(modalFotos.id)
   }
 
   async function subirFoto(e) {
@@ -209,9 +230,9 @@ export default function Home() {
     e.target.value = ''
   }
 
-  async function borrarFoto(foto, trabajoId) {
+  async function borrarFoto(foto) {
     await supabase.from('fotos').delete().eq('id', foto.id)
-    cargarFotos(trabajoId)
+    await cargarFotos(clienteDetalle.id)
   }
 
   function verDetalle(trabajo) {
@@ -226,7 +247,7 @@ export default function Home() {
     setFormEditar({
       trabajo_id: trabajo.id, cliente_id: trabajo.vehiculos?.clientes?.id, vehiculo_id: trabajo.vehiculos?.id,
       nombre: trabajo.vehiculos?.clientes?.nombre, telefono: trabajo.vehiculos?.clientes?.telefono, email: trabajo.vehiculos?.clientes?.email,
-      marca_modelo: trabajo.vehiculos?.marca_modelo, patente: trabajo.vehiculos?.patente, anio: trabajo.vehiculos?.anio, kilometraje: trabajo.vehiculos?.kilometraje,
+      marca_modelo: trabajo.vehiculos?.marca_modelo, patente: trabajo.vehiculos?.patente, anio: trabajo.vehiculos?.anio, kilometraje: trabajo.vehiculos?.kilometraje, color: trabajo.vehiculos?.color,
       motivo: trabajo.motivo, estado: trabajo.estado, mecanico: trabajo.mecanico, taller: trabajo.taller, taller_anterior: trabajo.taller,
     })
     setModalEditar(true)
@@ -249,14 +270,18 @@ export default function Home() {
     return acc
   }, {})
 
-  const trabajosFiltrados = trabajos.filter(t => {
-    const q = busqueda.toLowerCase()
-    return (
-      t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q) ||
-      t.vehiculos?.patente?.toLowerCase().includes(q) ||
-      t.vehiculos?.marca_modelo?.toLowerCase().includes(q)
-    )
-  })
+  const trabajosFiltrados = trabajos
+    .filter(t => {
+      const q = busqueda.toLowerCase()
+      return (
+        t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q) ||
+        t.vehiculos?.patente?.toLowerCase().includes(q) ||
+        t.vehiculos?.marca_modelo?.toLowerCase().includes(q)
+      )
+    })
+    .sort((a, b) => new Date(a.fecha_ingreso) - new Date(b.fecha_ingreso))
+
+  const totalFiltrados = trabajosFiltrados.length
 
   const stats = {
     total: clientes.length,
@@ -266,7 +291,7 @@ export default function Home() {
   }
 
   const tipoHistorial = { ingreso: '🟢', salida: '🔴', movimiento: '🔵', reingreso: '🟡', estado: '⚪', prueba: '🟠' }
-  const trabajosTaller = tallerVista ? trabajos.filter(t => t.taller === tallerVista && t.estado !== 'Salio') : []
+  const trabajosTaller = tallerVista ? trabajos.filter(t => t.taller === tallerVista && t.estado !== 'Salio').sort((a,b) => new Date(a.fecha_ingreso) - new Date(b.fecha_ingreso)) : []
 
   return (
     <div className={styles.app}>
@@ -308,6 +333,7 @@ export default function Home() {
                 <div className={styles.formGroup}><label>Patente</label><input value={formEditar.patente||''} onChange={e => setFormEditar({...formEditar, patente: e.target.value})}/></div>
                 <div className={styles.formGroup}><label>Año</label><input value={formEditar.anio||''} onChange={e => setFormEditar({...formEditar, anio: e.target.value})}/></div>
                 <div className={styles.formGroup}><label>Km</label><input value={formEditar.kilometraje||''} onChange={e => setFormEditar({...formEditar, kilometraje: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Color</label><input value={formEditar.color||''} onChange={e => setFormEditar({...formEditar, color: e.target.value})} placeholder="Ej: Blanco, Negro..."/></div>
                 <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Motivo</label><textarea value={formEditar.motivo||''} onChange={e => setFormEditar({...formEditar, motivo: e.target.value})}/></div>
                 <div className={styles.formGroup}><label>Mecánico</label><input value={formEditar.mecanico||''} onChange={e => setFormEditar({...formEditar, mecanico: e.target.value})}/></div>
                 <div className={styles.formGroup}><label>Estado</label>
@@ -399,16 +425,16 @@ export default function Home() {
               {subiendo ? 'Subiendo...' : '+ Agregar fotos'}
             </button>
             <div className={styles.fotoGrid}>
-              {fotos.map(f => (
+              {modalFotosData.map(f => (
                 <div key={f.id} className={styles.fotoItem}>
                   <img src={f.url} alt="foto" className={styles.fotoImg}/>
-                  <button className={styles.fotoBorrar} onClick={() => borrarFoto(f, modalFotos.id)}>✕</button>
+                  <button className={styles.fotoBorrar} onClick={() => borrarFotoModal(f)}>✕</button>
                 </div>
               ))}
-              {fotos.length === 0 && <div className={styles.fotoVacio}>No hay fotos todavía</div>}
+              {modalFotosData.length === 0 && <div className={styles.fotoVacio}>No hay fotos todavía</div>}
             </div>
             <div className={styles.modalActions}>
-              <button className={styles.btn} onClick={() => { setModalFotos(null); setFotos([]) }}>Cerrar</button>
+              <button className={styles.btn} onClick={() => { setModalFotos(null); setModalFotosData([]) }}>Cerrar</button>
             </div>
           </div>
         </div>
@@ -498,7 +524,7 @@ export default function Home() {
             <div className={styles.divider}></div>
             <div className={styles.tblWrap}>
               <table className={styles.table}>
-                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Mecánico</th><th>Ingreso</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Color</th><th>Estado</th><th>Mecánico</th><th>Ingreso</th><th>Acciones</th></tr></thead>
                 <tbody>
                   {trabajosTaller.map((t,i) => (
                     <tr key={t.id}>
@@ -506,6 +532,7 @@ export default function Home() {
                       <td onClick={() => verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
                       <td onClick={() => verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td>
                       <td onClick={() => verDetalle(t)}>{t.vehiculos?.patente}</td>
+                      <td onClick={() => verDetalle(t)} style={{color:'#94A3B8'}}>{t.vehiculos?.color || '—'}</td>
                       <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
                       <td onClick={() => verDetalle(t)}>{t.mecanico || '—'}</td>
                       <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#64748B'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
@@ -536,21 +563,22 @@ export default function Home() {
             <div className={styles.tblWrap}>
               {loading ? <p className={styles.loading}>Cargando...</p> : (
                 <table className={styles.table}>
-                  <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th><th>Acciones</th></tr></thead>
+                  <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Color</th><th>Estado</th><th>Taller</th><th>Ingreso</th><th>Acciones</th></tr></thead>
                   <tbody>
                     {trabajosFiltrados.map((t,i) => (
                       <tr key={t.id}>
-                        <td style={{color:'#64748B',width:'40px'}}>{i+1}</td>
+                        <td style={{color:'#64748B',width:'40px'}}>{totalFiltrados - i}</td>
                         <td onClick={() => verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
                         <td onClick={() => verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td>
                         <td onClick={() => verDetalle(t)}>{t.vehiculos?.patente}</td>
+                        <td onClick={() => verDetalle(t)} style={{color:'#94A3B8'}}>{t.vehiculos?.color || '—'}</td>
                         <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
                         <td onClick={() => verDetalle(t)}>{t.taller}</td>
                         <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#64748B'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
                         <td style={{display:'flex',gap:'5px',cursor:'default'}}>
                           <button className={styles.btnSuccess} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => { setModalActualizar(t); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>Actualizar</button>
                           <button className={styles.btnRepuesto} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalRepuesto(t)}>🔩</button>
-                          <button className={styles.btnEdit} style={{fontSize:'11px',padding:'4px 8px'}} onClick={async () => { await cargarFotos(t.id); setModalFotos(t) }}>📷</button>
+                          <button className={styles.btnEdit} style={{fontSize:'11px',padding:'4px 8px'}} onClick={async () => { await cargarFotosModal(t.id); setModalFotos(t) }}>📷</button>
                           {t.estado !== 'Salio' && <button className={styles.btnDangerSolid} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalSalida(t)}>Salida</button>}
                           <button className={styles.btnEdit} onClick={() => abrirEditar(t)}>✏️</button>
                           <button className={styles.btnDelete} onClick={() => borrarCliente(t)}>🗑️</button>
@@ -589,6 +617,7 @@ export default function Home() {
                   <div className={styles.formGroup}><label>Patente</label><input value={form.patente} onChange={e => setForm({...form, patente: e.target.value})} placeholder="AB 123 CD"/></div>
                   <div className={styles.formGroup}><label>Año</label><input value={form.anio} onChange={e => setForm({...form, anio: e.target.value})} placeholder="2022"/></div>
                   <div className={styles.formGroup}><label>Kilometraje</label><input value={form.kilometraje} onChange={e => setForm({...form, kilometraje: e.target.value})} placeholder="85.000 km"/></div>
+                  <div className={styles.formGroup}><label>Color</label><input value={form.color} onChange={e => setForm({...form, color: e.target.value})} placeholder="Ej: Blanco, Negro, Gris..."/></div>
                   <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Motivo de ingreso</label><textarea value={form.motivo} onChange={e => setForm({...form, motivo: e.target.value})} placeholder="Describí el problema o trabajo a realizar..."/></div>
                   <div className={styles.formGroup}><label>Fecha de ingreso</label><input type="datetime-local" value={form.fecha_ingreso_manual} onChange={e => setForm({...form, fecha_ingreso_manual: e.target.value})}/></div>
                   <div className={styles.formGroup}><label>Llegó en</label>
@@ -619,7 +648,10 @@ export default function Home() {
                 {fotoNuevo.length > 0 && (
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginTop:'10px'}}>
                     {fotoNuevo.map((f,i) => (
-                      <img key={i} src={URL.createObjectURL(f)} alt="preview" style={{width:'100%',aspectRatio:'4/3',objectFit:'cover',borderRadius:'6px'}}/>
+                      <div key={i} style={{position:'relative'}}>
+                        <img src={URL.createObjectURL(f)} alt="preview" style={{width:'100%',aspectRatio:'4/3',objectFit:'cover',borderRadius:'6px'}}/>
+                        <button type="button" className={styles.fotoBorrar} onClick={() => setFotoNuevo(fotoNuevo.filter((_,j) => j !== i))}>✕</button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -657,7 +689,15 @@ export default function Home() {
             <div className={styles.detGrid}>
               <div className={styles.card}>
                 <div className={styles.cardTitle}>VEHÍCULO</div>
-                {[['Modelo', clienteDetalle.vehiculos?.marca_modelo],['Patente', clienteDetalle.vehiculos?.patente],['Año', clienteDetalle.vehiculos?.anio],['Km', clienteDetalle.vehiculos?.kilometraje],['Mecánico', clienteDetalle.mecanico],['Taller', clienteDetalle.taller]].map(([k,v]) => (
+                {[
+                  ['Modelo', clienteDetalle.vehiculos?.marca_modelo],
+                  ['Patente', clienteDetalle.vehiculos?.patente],
+                  ['Color', clienteDetalle.vehiculos?.color],
+                  ['Año', clienteDetalle.vehiculos?.anio],
+                  ['Km', clienteDetalle.vehiculos?.kilometraje],
+                  ['Mecánico', clienteDetalle.mecanico],
+                  ['Taller', clienteDetalle.taller]
+                ].map(([k,v]) => (
                   <div key={k} className={styles.detRow}><span className={styles.detLabel}>{k}</span><span className={styles.detVal}>{v || '—'}</span></div>
                 ))}
               </div>
@@ -719,7 +759,7 @@ export default function Home() {
                 {fotos.map(f => (
                   <div key={f.id} className={styles.fotoItem}>
                     <img src={f.url} alt="foto" className={styles.fotoImg}/>
-                    <button className={styles.fotoBorrar} onClick={() => borrarFoto(f, clienteDetalle.id)}>✕</button>
+                    <button className={styles.fotoBorrar} onClick={() => borrarFoto(f)}>✕</button>
                   </div>
                 ))}
                 {fotos.length === 0 && <div className={styles.fotoVacio}>No hay fotos todavía</div>}
