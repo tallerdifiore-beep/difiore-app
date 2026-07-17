@@ -17,6 +17,7 @@ export default function Home() {
   const [seccion, setSeccion] = useState('dashboard')
   const [tallerVista, setTallerVista] = useState(null)
   const [vistaStats, setVistaStats] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [clientes, setClientes] = useState([])
   const [trabajos, setTrabajos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -152,7 +153,6 @@ export default function Home() {
   </div>
   <div class="folio">NUMERO DE FOLIO<br><div class="folio-line"></div></div>
 </div>
-
 <div class="body">
   <div>
     <div class="field"><label>Marca:</label><div class="val">${v?.marca_modelo?.split(' ')[0] || ''}</div></div>
@@ -175,13 +175,11 @@ export default function Home() {
     <div class="field"><label>Email:</label><div class="val">${c?.email || ''}</div></div>
   </div>
 </div>
-
 <div class="section-title">TRABAJO A REALIZAR / DESCRIPCIÓN DEL PROBLEMA</div>
 <div class="lineas">
   <div class="motivo-text">${trabajo.motivo || ''}</div>
   ${Array(9).fill('<div class="linea"></div>').join('')}
 </div>
-
 <div class="acepto">
   <div class="acepto-line">
     <div class="firma"></div>
@@ -189,7 +187,6 @@ export default function Home() {
     <div class="firma"></div>
   </div>
 </div>
-
 <div class="footer">
   <div class="footer-left">
     <div><strong>DiFiore Performance</strong></div>
@@ -201,7 +198,6 @@ export default function Home() {
     <div>👍 <a href="https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr" target="_blank">Facebook: DiFiore Mecánica</a></div>
   </div>
 </div>
-
 <script>window.onload = () => { window.print(); }<\/script>
 </body>
 </html>`
@@ -377,6 +373,7 @@ export default function Home() {
   function verDetalle(trabajo) {
     setClienteDetalle(trabajo)
     setSeccion('detalle')
+    setSidebarOpen(false)
     cargarFotos(trabajo.id)
     cargarHistorial(trabajo.id)
     cargarRepuestos(trabajo.id)
@@ -443,8 +440,21 @@ export default function Home() {
   const tipoHistorial = { ingreso: '🟢', salida: '🔴', movimiento: '🔵', reingreso: '🟡', estado: '⚪', prueba: '🟠' }
   const trabajosTaller = tallerVista ? trabajos.filter(t => t.taller === tallerVista && t.estado !== 'Salio').sort((a,b) => new Date(a.fecha_ingreso) - new Date(b.fecha_ingreso)) : []
 
+  const navLinks = [
+    { color: '#E1306C', icon: <IgIcon/>, href: 'https://www.instagram.com/di_fiore_mecanica/', label: '@di_fiore_mecanica' },
+    { color: '#1877F2', icon: <FbIcon/>, href: 'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr', label: 'Facebook' },
+    { color: '#25D366', icon: <WaIcon/>, href: 'tel:+542235299700', label: '223 529-9700' },
+    { color: '#EA4335', icon: <MapIcon/>, href: 'https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1', label: 'Malvinas 2084, MdP' },
+  ]
+
   return (
     <div className={styles.app}>
+
+      {/* HAMBURGUESA MOBILE */}
+      <button className={styles.menuBtn} onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
+
+      {/* OVERLAY MOBILE */}
+      {sidebarOpen && <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)}/>}
 
       {/* ZOOM FOTO */}
       {fotoZoom && (
@@ -475,7 +485,7 @@ export default function Home() {
       {/* MODAL EDITAR CLIENTE */}
       {modalEditar && (
         <div className={styles.modalOverlay}>
-          <div className={styles.modal} style={{width:'520px',maxHeight:'80vh',overflowY:'auto'}}>
+          <div className={styles.modal} style={{width:'100%',maxWidth:'520px',maxHeight:'80vh',overflowY:'auto'}}>
             <div className={styles.modalTitle}>Editar cliente</div>
             <div style={{marginTop:'1rem'}}>
               <div className={styles.cardTitle}>Datos del cliente</div>
@@ -595,7 +605,7 @@ export default function Home() {
       {/* MODAL FOTOS */}
       {modalFotos && (
         <div className={styles.modalOverlay}>
-          <div className={styles.modal} style={{width:'560px',maxHeight:'85vh',overflowY:'auto'}}>
+          <div className={styles.modal} style={{width:'100%',maxWidth:'560px',maxHeight:'85vh',overflowY:'auto'}}>
             <div className={styles.modalTitle}>Fotos del vehículo</div>
             <div className={styles.modalSub}><b>{modalFotos.vehiculos?.marca_modelo}</b> — {modalFotos.vehiculos?.clientes?.nombre}</div>
             <input type="file" accept="image/*" multiple ref={fileFotosRef} style={{display:'none'}} onChange={subirFotosModal}/>
@@ -618,7 +628,8 @@ export default function Home() {
         </div>
       )}
 
-      <div className={styles.sidebar}>
+      {/* SIDEBAR */}
+      <div className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.logoArea}>
           <div className={styles.logoMain}>D<span className={styles.logoI}>I</span> FIORE</div>
           <div className={styles.logoLine}></div>
@@ -629,28 +640,17 @@ export default function Home() {
           { id: 'clientes', label: 'Clientes' },
           { id: 'nuevo', label: 'Nuevo cliente' },
         ].map(item => (
-          <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => { setSeccion(item.id); setTallerVista(null); setVistaStats(null) }}>
+          <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => { setSeccion(item.id); setTallerVista(null); setVistaStats(null); setSidebarOpen(false) }}>
             {item.label}
           </button>
         ))}
         <div className={styles.navBottom}>
-          <div style={{display:'flex',flexDirection:'column',gap:'8px',padding:'4px 0'}}>
-            <a href="https://www.instagram.com/di_fiore_mecanica/" target="_blank" rel="noreferrer" style={{color:'#94A3B8',textDecoration:'none',fontSize:'12px',display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',borderRadius:'6px',transition:'all .15s'}}
-              onMouseOver={e=>e.currentTarget.style.background='#2D3748'} onMouseOut={e=>e.currentTarget.style.background='transparent'}>
-              <span style={{color:'#E1306C'}}><IgIcon/></span> @di_fiore_mecanica
-            </a>
-            <a href="https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr" target="_blank" rel="noreferrer" style={{color:'#94A3B8',textDecoration:'none',fontSize:'12px',display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',borderRadius:'6px',transition:'all .15s'}}
-              onMouseOver={e=>e.currentTarget.style.background='#2D3748'} onMouseOut={e=>e.currentTarget.style.background='transparent'}>
-              <span style={{color:'#1877F2'}}><FbIcon/></span> Facebook
-            </a>
-            <a href="tel:+542235299700" style={{color:'#94A3B8',textDecoration:'none',fontSize:'12px',display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',borderRadius:'6px',transition:'all .15s'}}
-              onMouseOver={e=>e.currentTarget.style.background='#2D3748'} onMouseOut={e=>e.currentTarget.style.background='transparent'}>
-              <span style={{color:'#25D366'}}><WaIcon/></span> 223 529-9700
-            </a>
-            <a href="https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1" target="_blank" rel="noreferrer" style={{color:'#94A3B8',textDecoration:'none',fontSize:'12px',display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',borderRadius:'6px',transition:'all .15s'}}
-              onMouseOver={e=>e.currentTarget.style.background='#2D3748'} onMouseOut={e=>e.currentTarget.style.background='transparent'}>
-              <span style={{color:'#EA4335'}}><MapIcon/></span> Malvinas 2084, MdP
-            </a>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px',padding:'4px 0'}}>
+            {navLinks.map((l,i) => (
+              <a key={i} href={l.href} target="_blank" rel="noreferrer" style={{color:'#94A3B8',textDecoration:'none',fontSize:'12px',display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',borderRadius:'6px'}}>
+                <span style={{color:l.color}}>{l.icon}</span>{l.label}
+              </a>
+            ))}
           </div>
         </div>
       </div>
@@ -708,7 +708,7 @@ export default function Home() {
             </div>
             <div className={styles.card}>
               <div className={styles.cardTitle}>Marcas en taller</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'8px'}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'8px'}}>
                 {Object.entries(conteoMarcas).sort((a,b) => b[1]-a[1]).map(([marca, n]) => (
                   <div key={marca} style={{background:'#F7FAFC',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',border:'1px solid #E2E8F0'}}>
                     <span style={{fontSize:'13px',color:'#4A5568',fontWeight:'500'}}>{marca}</span>
@@ -731,7 +731,7 @@ export default function Home() {
             <div className={styles.divider}></div>
             <div className={styles.tblWrap}>
               <table className={styles.table}>
-                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Color</th><th>Estado</th><th>Taller</th><th>Ingreso</th></tr></thead>
+                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th></tr></thead>
                 <tbody>
                   {listaVistaStats[vistaStats].map((t,i) => (
                     <tr key={t.id} onClick={() => verDetalle(t)}>
@@ -739,14 +739,13 @@ export default function Home() {
                       <td><b>{t.vehiculos?.marca_modelo}</b></td>
                       <td>{t.vehiculos?.clientes?.nombre}</td>
                       <td>{t.vehiculos?.patente}</td>
-                      <td style={{color:'#718096'}}>{t.vehiculos?.color || '—'}</td>
                       <td><span className={badgeClass(t.estado)}>{t.estado}</span></td>
                       <td>{t.taller}</td>
                       <td style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
                     </tr>
                   ))}
                   {listaVistaStats[vistaStats].length === 0 && (
-                    <tr><td colSpan="8" style={{textAlign:'center',color:'#A0AEC0',padding:'2rem'}}>Sin resultados</td></tr>
+                    <tr><td colSpan="7" style={{textAlign:'center',color:'#A0AEC0',padding:'2rem'}}>Sin resultados</td></tr>
                   )}
                 </tbody>
               </table>
@@ -764,7 +763,7 @@ export default function Home() {
             <div className={styles.divider}></div>
             <div className={styles.tblWrap}>
               <table className={styles.table}>
-                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Color</th><th>Estado</th><th>Mecánico</th><th>Ingreso</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Mecánico</th><th>Ingreso</th><th>Acciones</th></tr></thead>
                 <tbody>
                   {trabajosTaller.map((t,i) => (
                     <tr key={t.id}>
@@ -772,7 +771,6 @@ export default function Home() {
                       <td onClick={() => verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
                       <td onClick={() => verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td>
                       <td onClick={() => verDetalle(t)}>{t.vehiculos?.patente}</td>
-                      <td onClick={() => verDetalle(t)} style={{color:'#718096'}}>{t.vehiculos?.color || '—'}</td>
                       <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
                       <td onClick={() => verDetalle(t)}>{t.mecanico || '—'}</td>
                       <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
@@ -803,7 +801,7 @@ export default function Home() {
             <div className={styles.tblWrap}>
               {loading ? <p className={styles.loading}>Cargando...</p> : (
                 <table className={styles.table}>
-                  <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Color</th><th>Estado</th><th>Taller</th><th>Ingreso</th><th>Acciones</th></tr></thead>
+                  <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th><th>Acciones</th></tr></thead>
                   <tbody>
                     {trabajosFiltrados.map((t,i) => (
                       <tr key={t.id}>
@@ -811,11 +809,10 @@ export default function Home() {
                         <td onClick={() => verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
                         <td onClick={() => verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td>
                         <td onClick={() => verDetalle(t)}>{t.vehiculos?.patente}</td>
-                        <td onClick={() => verDetalle(t)} style={{color:'#718096'}}>{t.vehiculos?.color || '—'}</td>
                         <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
                         <td onClick={() => verDetalle(t)}>{t.taller}</td>
                         <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
-                        <td style={{display:'flex',gap:'5px',cursor:'default'}}>
+                        <td style={{display:'flex',gap:'5px',cursor:'default',flexWrap:'wrap'}}>
                           <button className={styles.btnSuccess} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => { setModalActualizar(t); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>Actualizar</button>
                           <button className={styles.btnRepuesto} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalRepuesto(t)}>🔩</button>
                           <button className={styles.btnEdit} style={{fontSize:'11px',padding:'4px 8px'}} onClick={async () => { await cargarFotosModal(t.id); setModalFotos(t) }}>📷</button>
@@ -910,7 +907,7 @@ export default function Home() {
             <div className={styles.topBar}>
               <button className={styles.btn} onClick={() => setSeccion('clientes')}>← Volver</button>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                <button className={styles.btn} onClick={() => imprimirOrden(clienteDetalle)}>🖨️ Imprimir orden</button>
+                <button className={styles.btn} onClick={() => imprimirOrden(clienteDetalle)}>🖨️ Imprimir</button>
                 <button className={styles.btnSuccess} onClick={() => { setModalActualizar(clienteDetalle); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>Actualización</button>
                 <button className={styles.btnRepuesto} onClick={() => setModalRepuesto(clienteDetalle)}>🔩 Repuesto</button>
                 <button className={styles.btnPrimary} onClick={() => abrirEditar(clienteDetalle)}>✏️ Editar</button>
