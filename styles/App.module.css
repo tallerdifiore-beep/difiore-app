@@ -16,7 +16,7 @@
 
 .main { flex: 1; overflow-y: auto; padding: 2rem; background: #F8F9FA; }
 
-.topBar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.topBar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 8px; }
 .pageTitle { font-size: 18px; font-weight: 700; color: #1A1A2E; }
 .divider { height: 1px; background: #E2E8F0; margin-bottom: 1.5rem; }
 
@@ -42,8 +42,8 @@
 .statN { font-size: 28px; font-weight: 700; color: #1A1A2E; }
 .statL { font-size: 11px; color: #718096; margin-top: 3px; text-transform: uppercase; letter-spacing: .5px; font-weight: 500; }
 
-.tblWrap { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tblWrap { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
 .table thead th { text-align: left; padding: 12px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #718096; border-bottom: 1px solid #E2E8F0; background: #F7FAFC; }
 .table tbody tr { border-bottom: 1px solid #EDF2F7; transition: background .1s; }
 .table tbody tr:last-child { border-bottom: none; }
@@ -53,11 +53,11 @@
 
 .loading { padding: 2rem; text-align: center; color: #718096; }
 
-.badgeGreen { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#DCFCE7; color:#16A34A; }
-.badgeAmber { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#FEF3C7; color:#D97706; }
-.badgeBlue { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#DBEAFE; color:#2563EB; }
-.badgeRed { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#FEE2E2; color:#DC2626; }
-.badgeGray { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#F1F5F9; color:#64748B; }
+.badgeGreen { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#DCFCE7; color:#16A34A; white-space:nowrap; }
+.badgeAmber { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#FEF3C7; color:#D97706; white-space:nowrap; }
+.badgeBlue { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#DBEAFE; color:#2563EB; white-space:nowrap; }
+.badgeRed { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#FEE2E2; color:#DC2626; white-space:nowrap; }
+.badgeGray { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#F1F5F9; color:#64748B; white-space:nowrap; }
 
 .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
 .cardTitle { font-size: 11px; font-weight: 700; color: #718096; margin-bottom: 14px; letter-spacing: .8px; text-transform: uppercase; }
@@ -69,28 +69,28 @@
 .formGroup textarea { resize: vertical; min-height: 70px; }
 .formGroup input:focus, .formGroup select:focus, .formGroup textarea:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
 .formGroup select option { background: #fff; }
-.formActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: .5rem; }
+.formActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: .5rem; flex-wrap: wrap; }
 
 .mensaje { background: #DCFCE7; border: 1px solid #86EFAC; color: #16A34A; padding: 12px 16px; border-radius: 8px; margin-bottom: 1rem; font-size: 13px; font-weight: 500; }
 
-.detailHeader { display: flex; align-items: center; gap: 16px; margin-bottom: 1.5rem; padding: 1.25rem; background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.detailHeader { display: flex; align-items: center; gap: 16px; margin-bottom: 1.5rem; padding: 1.25rem; background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-wrap: wrap; }
 .detailAvatar { width: 50px; height: 50px; border-radius: 50%; background: #2563EB; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; }
 .detailNombre { font-size: 16px; font-weight: 700; color: #1A1A2E; }
 .detailSub { font-size: 13px; color: #718096; margin-top: 3px; }
 .detGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.detRow { display: flex; justify-content: space-between; font-size: 13px; padding: 7px 0; border-bottom: 1px solid #EDF2F7; }
+.detRow { display: flex; justify-content: space-between; font-size: 13px; padding: 7px 0; border-bottom: 1px solid #EDF2F7; gap: 8px; }
 .detRow:last-child { border: none; }
-.detLabel { color: #718096; font-weight: 500; }
-.detVal { color: #2D3748; font-weight: 600; }
+.detLabel { color: #718096; font-weight: 500; flex-shrink: 0; }
+.detVal { color: #2D3748; font-weight: 600; text-align: right; }
 .detText { font-size: 13px; color: #4A5568; line-height: 1.7; }
 .detFecha { font-size: 11px; color: #718096; margin-top: 10px; text-transform: uppercase; letter-spacing: .4px; font-weight: 600; }
 
-.modalOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px); }
-.modal { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.75rem; width: 480px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+.modalOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px); padding: 1rem; }
+.modal { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.75rem; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
 .modalTitle { font-size: 17px; font-weight: 700; color: #1A1A2E; margin-bottom: 6px; }
 .modalSub { font-size: 13px; color: #718096; }
 .modalDate { font-size: 12px; color: #718096; margin-top: 10px; font-weight: 500; }
-.modalActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 1.5rem; }
+.modalActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 1.5rem; flex-wrap: wrap; }
 
 .fotoGrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
 .fotoItem { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 4/3; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
@@ -113,3 +113,52 @@
 .tallerN { font-size: 32px; font-weight: 700; color: #2563EB; }
 .tallerN span { font-size: 13px; color: #718096; font-weight: 400; }
 .tallerBtn { margin-top: 12px; font-size: 12px; color: #2563EB; font-weight: 600; }
+
+/* HAMBURGER MENU - MOBILE */
+.menuBtn { display: none; background: #1A1A2E; border: none; color: #fff; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 18px; position: fixed; top: 12px; left: 12px; z-index: 200; }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .menuBtn { display: block; }
+
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 150;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    width: 260px;
+  }
+  .sidebarOpen { transform: translateX(0) !important; }
+
+  .sidebarOverlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 140;
+  }
+  .sidebarOverlayVisible { display: block; }
+
+  .main {
+    padding: 1rem;
+    padding-top: 60px;
+    width: 100%;
+  }
+
+  .stats { grid-template-columns: repeat(2,1fr); gap: 8px; }
+  .statN { font-size: 22px; }
+
+  .detGrid { grid-template-columns: 1fr; }
+  .formGrid { grid-template-columns: 1fr; }
+
+  .topBar { flex-direction: column; align-items: flex-start; gap: 10px; }
+
+  .fotoGrid { grid-template-columns: repeat(2,1fr); }
+
+  .tallerCard { padding: 1rem; }
+  .tallerN { font-size: 26px; }
+
+  .table { min-width: 500px; font-size: 12px; }
+  .table td, .table thead th { padding: 8px 10px; }
+}
