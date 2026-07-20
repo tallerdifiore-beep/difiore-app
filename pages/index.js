@@ -10,7 +10,9 @@ const FbIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="curre
 const WaIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 const MapIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.402 16.199 0 12 0zm0 11c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/></svg>
 
-export default function Home() {
+export default function Home({ rol }) {
+  const admin = rol === 'admin'
+
   const [seccion, setSeccion] = useState('dashboard')
   const [tallerVista, setTallerVista] = useState(null)
   const [vistaStats, setVistaStats] = useState(null)
@@ -338,22 +340,12 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   async function registrarReingreso() {
     const trabajo = modalReingreso
     const fechaIngreso = formReingreso.fecha_ingreso_manual ? new Date(formReingreso.fecha_ingreso_manual).toISOString() : new Date().toISOString()
-
     const { data: nuevoTrabajo } = await supabase.from('trabajos').insert({
-      vehiculo_id: trabajo.vehiculos?.id,
-      motivo: formReingreso.motivo,
-      estado: formReingreso.estado,
-      mecanico: formReingreso.mecanico,
-      taller: formReingreso.taller,
-      llego_en_grua: formReingreso.llego_en_grua,
-      tiene_seguro: trabajo.tiene_seguro,
-      fecha_ingreso: fechaIngreso
+      vehiculo_id: trabajo.vehiculos?.id, motivo: formReingreso.motivo, estado: formReingreso.estado,
+      mecanico: formReingreso.mecanico, taller: formReingreso.taller, llego_en_grua: formReingreso.llego_en_grua,
+      tiene_seguro: trabajo.tiene_seguro, fecha_ingreso: fechaIngreso
     }).select('*, vehiculos(*, clientes(*))').single()
-
-    if (nuevoTrabajo) {
-      await agregarHistorial(nuevoTrabajo.id, 'reingreso', `Reingreso al taller ${formReingreso.taller}. Motivo: ${formReingreso.motivo}`)
-    }
-
+    if (nuevoTrabajo) await agregarHistorial(nuevoTrabajo.id, 'reingreso', `Reingreso al taller ${formReingreso.taller}. Motivo: ${formReingreso.motivo}`)
     setModalReingreso(null)
     setFormReingreso({ motivo: '', mecanico: '', taller: 'Malvinas 2084', estado: 'Diagnóstico', llego_en_grua: false, fecha_ingreso_manual: '' })
     cargarDatos()
@@ -363,35 +355,26 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   async function guardarCliente(e) {
     e.preventDefault()
     const { data: cliente, error: errCliente } = await supabase
-      .from('clientes').insert({ nombre: form.nombre, telefono: form.telefono, email: form.email })
-      .select().single()
+      .from('clientes').insert({ nombre: form.nombre, telefono: form.telefono, email: form.email }).select().single()
     if (errCliente) { setMensaje('Error al guardar cliente'); return }
-
     const { data: vehiculo, error: errVehiculo } = await supabase
-      .from('vehiculos').insert({ cliente_id: cliente.id, marca_modelo: form.marca_modelo, patente: form.patente, anio: form.anio, kilometraje: form.kilometraje, color: form.color })
-      .select().single()
+      .from('vehiculos').insert({ cliente_id: cliente.id, marca_modelo: form.marca_modelo, patente: form.patente, anio: form.anio, kilometraje: form.kilometraje, color: form.color }).select().single()
     if (errVehiculo) { setMensaje('Error al guardar vehículo'); return }
-
     const fechaIngreso = form.fecha_ingreso_manual ? new Date(form.fecha_ingreso_manual).toISOString() : new Date().toISOString()
-
     const { data: trabajo } = await supabase.from('trabajos').insert({
       vehiculo_id: vehiculo.id, motivo: form.motivo, estado: form.estado, mecanico: form.mecanico,
       taller: form.taller, llego_en_grua: form.llego_en_grua, tiene_seguro: form.tiene_seguro, fecha_ingreso: fechaIngreso
     }).select('*, vehiculos(*, clientes(*))').single()
-
     if (fotoNuevo.length > 0 && trabajo) {
       for (const f of fotoNuevo) {
         const url = await subirFotoStorage(f, trabajo.id)
         if (url) await supabase.from('fotos').insert({ trabajo_id: trabajo.id, url })
       }
     }
-
     await agregarHistorial(trabajo.id, 'ingreso', `Ingresó al taller ${form.taller} ${form.llego_en_grua ? '(en grúa)' : '(andando)'}. Seguro: ${form.tiene_seguro ? 'Sí' : 'No'}. Motivo: ${form.motivo}`)
-
     setForm({ nombre: '', telefono: '', email: '', marca_modelo: '', patente: '', anio: '', kilometraje: '', color: '', motivo: '', estado: 'Diagnóstico', mecanico: '', taller: 'Malvinas 2084', llego_en_grua: false, tiene_seguro: false, fecha_ingreso_manual: '' })
     setFotoNuevo([])
     cargarDatos()
-
     if (trabajo?.vehiculos?.clientes?.telefono) {
       const tel = trabajo.vehiculos.clientes.telefono.replace(/\D/g,'')
       setModalWsp({ trabajo, tel })
@@ -402,9 +385,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   }
 
   async function registrarSalida() {
-    await supabase.from('trabajos').update({
-      estado: 'Salio', fecha_salida: new Date().toISOString(), observacion_final: observacionFinal
-    }).eq('id', modalSalida.id)
+    await supabase.from('trabajos').update({ estado: 'Salio', fecha_salida: new Date().toISOString(), observacion_final: observacionFinal }).eq('id', modalSalida.id)
     await agregarHistorial(modalSalida.id, 'salida', `Vehículo retirado. ${observacionFinal ? 'Obs: ' + observacionFinal : ''}`)
     setModalSalida(null)
     setObservacionFinal('')
@@ -421,9 +402,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
     await supabase.from('trabajos').delete().eq('id', trabajo.id)
     await supabase.from('vehiculos').delete().eq('id', trabajo.vehiculos?.id)
     await supabase.from('clientes').delete().eq('id', trabajo.vehiculos?.clientes?.id)
-    setSeccion('clientes')
-    setClienteDetalle(null)
-    cargarDatos()
+    setSeccion('clientes'); setClienteDetalle(null); cargarDatos()
   }
 
   async function guardarEdicion() {
@@ -433,8 +412,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
     await supabase.from('vehiculos').update({ marca_modelo: formEditar.marca_modelo, patente: formEditar.patente, anio: formEditar.anio, kilometraje: formEditar.kilometraje, color: formEditar.color }).eq('id', formEditar.vehiculo_id)
     await supabase.from('trabajos').update({ motivo: formEditar.motivo, estado: formEditar.estado, mecanico: formEditar.mecanico, taller: formEditar.taller, llego_en_grua: formEditar.llego_en_grua, tiene_seguro: formEditar.tiene_seguro }).eq('id', formEditar.trabajo_id)
     if (tallerAnterior !== tallerNuevo) await agregarHistorial(formEditar.trabajo_id, 'movimiento', `Movido de ${tallerAnterior} a ${tallerNuevo}`)
-    setModalEditar(null)
-    cargarDatos()
+    setModalEditar(null); cargarDatos()
     if (clienteDetalle) cargarHistorial(formEditar.trabajo_id)
   }
 
@@ -458,20 +436,14 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
 
   async function guardarRepuesto() {
     const trabajoId = modalRepuesto.id
-    await supabase.from('repuestos').insert({
-      trabajo_id: trabajoId, nombre: formRepuesto.nombre,
-      valor: parseFloat(formRepuesto.valor) || 0, lugar: formRepuesto.lugar, fecha: formRepuesto.fecha
-    })
+    await supabase.from('repuestos').insert({ trabajo_id: trabajoId, nombre: formRepuesto.nombre, valor: parseFloat(formRepuesto.valor) || 0, lugar: formRepuesto.lugar, fecha: formRepuesto.fecha })
     setModalRepuesto(null)
     setFormRepuesto({ nombre: '', valor: '', lugar: '', fecha: new Date().toISOString().split('T')[0] })
     await cargarRepuestos(trabajoId)
   }
 
   async function guardarEdicionRepuesto() {
-    await supabase.from('repuestos').update({
-      nombre: formEditarRepuesto.nombre, valor: parseFloat(formEditarRepuesto.valor) || 0,
-      lugar: formEditarRepuesto.lugar, fecha: formEditarRepuesto.fecha
-    }).eq('id', formEditarRepuesto.id)
+    await supabase.from('repuestos').update({ nombre: formEditarRepuesto.nombre, valor: parseFloat(formEditarRepuesto.valor) || 0, lugar: formEditarRepuesto.lugar, fecha: formEditarRepuesto.fecha }).eq('id', formEditarRepuesto.id)
     setModalEditarRepuesto(null)
     await cargarRepuestos(clienteDetalle.id)
   }
@@ -519,12 +491,8 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   }
 
   function verDetalle(trabajo) {
-    setClienteDetalle(trabajo)
-    setSeccion('detalle')
-    setSidebarOpen(false)
-    cargarFotos(trabajo.id)
-    cargarHistorial(trabajo.id)
-    cargarRepuestos(trabajo.id)
+    setClienteDetalle(trabajo); setSeccion('detalle'); setSidebarOpen(false)
+    cargarFotos(trabajo.id); cargarHistorial(trabajo.id); cargarRepuestos(trabajo.id)
   }
 
   function abrirEditar(trabajo) {
@@ -549,33 +517,17 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
 
   const trabajosActivos = trabajos.filter(t => t.estado !== 'Salio')
   const trabajosSalidos = trabajos.filter(t => t.estado === 'Salio').sort((a,b) => new Date(b.fecha_salida||b.fecha_ingreso) - new Date(a.fecha_salida||a.fecha_ingreso))
-
   const conteoMarcas = trabajosActivos.reduce((acc, t) => {
     const marca = getMarca(t.vehiculos?.marca_modelo)
     acc[marca] = (acc[marca] || 0) + 1
     return acc
   }, {})
-
-  const trabajosFiltrados = trabajos
-    .filter(t => t.estado !== 'Salio')
-    .filter(t => {
-      const q = busqueda.toLowerCase()
-      return (
-        t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q) ||
-        t.vehiculos?.patente?.toLowerCase().includes(q) ||
-        t.vehiculos?.marca_modelo?.toLowerCase().includes(q)
-      )
-    })
-    .sort((a, b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso))
-
+  const trabajosFiltrados = trabajos.filter(t => t.estado !== 'Salio').filter(t => {
+    const q = busqueda.toLowerCase()
+    return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q) || t.vehiculos?.patente?.toLowerCase().includes(q) || t.vehiculos?.marca_modelo?.toLowerCase().includes(q)
+  }).sort((a, b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso))
   const totalFiltrados = trabajosFiltrados.length
-  const stats = {
-    total: clientes.length,
-    enTaller: trabajosActivos.length,
-    listos: trabajos.filter(t => t.estado === 'Listo').length,
-    salidos: trabajosSalidos.length,
-  }
-
+  const stats = { total: clientes.length, enTaller: trabajosActivos.length, listos: trabajos.filter(t => t.estado === 'Listo').length, salidos: trabajosSalidos.length }
   const listaVistaStats = {
     enTaller: trabajos.filter(t => t.estado !== 'Salio').sort((a,b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)),
     listos: trabajos.filter(t => t.estado === 'Listo').sort((a,b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)),
@@ -585,7 +537,6 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   const tipoHistorial = { ingreso: '🟢', salida: '🔴', movimiento: '🔵', reingreso: '🟡', estado: '⚪', prueba: '🟠' }
   const trabajosTaller = tallerVista ? trabajos.filter(t => t.taller === tallerVista && t.estado !== 'Salio').sort((a,b) => new Date(a.fecha_ingreso) - new Date(b.fecha_ingreso)) : []
   const trabajosDeMarca = vistaMarca ? trabajosActivos.filter(t => getMarca(t.vehiculos?.marca_modelo) === vistaMarca) : []
-
   const navLinks = [
     { color:'#E1306C', icon:<IgIcon/>, href:'https://www.instagram.com/di_fiore_mecanica/', label:'@di_fiore_mecanica' },
     { color:'#1877F2', icon:<FbIcon/>, href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr', label:'Facebook' },
@@ -630,7 +581,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.modalTitle}>🔄 Registrar reingreso</div>
             <div className={styles.modalSub}><b>{modalReingreso.vehiculos?.marca_modelo}</b> — {modalReingreso.vehiculos?.clientes?.nombre}</div>
             <div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}>
-              <div className={styles.formGroup}><label>Motivo de reingreso</label><textarea value={formReingreso.motivo} onChange={e => setFormReingreso({...formReingreso, motivo: e.target.value})} placeholder="Describí el problema o trabajo..."/></div>
+              <div className={styles.formGroup}><label>Motivo</label><textarea value={formReingreso.motivo} onChange={e => setFormReingreso({...formReingreso, motivo: e.target.value})} placeholder="Describí el problema..."/></div>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}><label>Mecánico</label><input value={formReingreso.mecanico} onChange={e => setFormReingreso({...formReingreso, mecanico: e.target.value})} placeholder="Agus D."/></div>
                 <div className={styles.formGroup}><label>Estado</label>
@@ -645,8 +596,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                 </div>
                 <div className={styles.formGroup}><label>Llegó en</label>
                   <select value={formReingreso.llego_en_grua ? 'grua' : 'andando'} onChange={e => setFormReingreso({...formReingreso, llego_en_grua: e.target.value === 'grua'})}>
-                    <option value="andando">Andando</option>
-                    <option value="grua">En grúa</option>
+                    <option value="andando">Andando</option><option value="grua">En grúa</option>
                   </select>
                 </div>
                 <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Fecha de ingreso</label><input type="datetime-local" value={formReingreso.fecha_ingreso_manual} onChange={e => setFormReingreso({...formReingreso, fecha_ingreso_manual: e.target.value})}/></div>
@@ -680,7 +630,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
       )}
 
       {/* MODAL EDITAR */}
-      {modalEditar && (
+      {modalEditar && admin && (
         <div className={styles.modalOverlay}>
           <div className={styles.modal} style={{width:'100%',maxWidth:'520px',maxHeight:'80vh',overflowY:'auto'}}>
             <div className={styles.modalTitle}>Editar cliente</div>
@@ -767,7 +717,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
       )}
 
       {/* MODAL REPUESTO */}
-      {modalRepuesto && (
+      {modalRepuesto && admin && (
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <div className={styles.modalTitle}>Agregar repuesto</div>
@@ -789,7 +739,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
       )}
 
       {/* MODAL EDITAR REPUESTO */}
-      {modalEditarRepuesto && (
+      {modalEditarRepuesto && admin && (
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <div className={styles.modalTitle}>Editar repuesto</div>
@@ -816,14 +766,12 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.modalTitle}>Fotos del vehículo</div>
             <div className={styles.modalSub}><b>{modalFotos.vehiculos?.marca_modelo}</b> — {modalFotos.vehiculos?.clientes?.nombre}</div>
             <input type="file" accept="image/*" multiple ref={fileFotosRef} style={{display:'none'}} onChange={subirFotosModal}/>
-            <button className={styles.btnPrimary} style={{marginTop:'1rem',marginBottom:'1rem'}} onClick={() => fileFotosRef.current.click()}>
-              {subiendo ? 'Subiendo...' : '+ Agregar fotos'}
-            </button>
+            {admin && <button className={styles.btnPrimary} style={{marginTop:'1rem',marginBottom:'1rem'}} onClick={() => fileFotosRef.current.click()}>{subiendo ? 'Subiendo...' : '+ Agregar fotos'}</button>}
             <div className={styles.fotoGrid}>
               {modalFotosData.map(f => (
                 <div key={f.id} className={styles.fotoItem}>
                   <img src={f.url} alt="foto" className={styles.fotoImg} onClick={() => setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/>
-                  <button className={styles.fotoBorrar} onClick={() => borrarFotoModal(f)}>✕</button>
+                  {admin && <button className={styles.fotoBorrar} onClick={() => borrarFotoModal(f)}>✕</button>}
                 </div>
               ))}
               {modalFotosData.length === 0 && <div className={styles.fotoVacio}>No hay fotos todavía</div>}
@@ -843,12 +791,15 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
         {[
           { id: 'dashboard', label: 'Dashboard' },
           { id: 'clientes', label: 'Clientes' },
-          { id: 'nuevo', label: 'Nuevo cliente' },
+          ...(admin ? [{ id: 'nuevo', label: 'Nuevo cliente' }] : []),
         ].map(item => (
           <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => { setSeccion(item.id); setTallerVista(null); setVistaStats(null); setVistaMarca(null); setVerSalidos(false); setSidebarOpen(false) }}>
             {item.label}
           </button>
         ))}
+        <div style={{marginTop:'8px',padding:'6px 8px',fontSize:'11px',color:'#64748B',borderTop:'1px solid #2D3748',paddingTop:'10px'}}>
+          {admin ? '👑 Admin' : '👷 Empleado'}
+        </div>
         <div className={styles.navBottom}>
           <div style={{display:'flex',flexDirection:'column',gap:'4px',padding:'4px 0'}}>
             {navLinks.map((l,i) => (
@@ -986,7 +937,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.divider}></div>
             <div className={styles.tblWrap}>
               <table className={styles.table}>
-                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Mecánico</th><th>Ingreso</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Mecánico</th><th>Ingreso</th>{admin && <th>Acciones</th>}</tr></thead>
                 <tbody>
                   {trabajosTaller.map((t,i) => (
                     <tr key={t.id}>
@@ -997,11 +948,11 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                       <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
                       <td onClick={() => verDetalle(t)}>{t.mecanico || '—'}</td>
                       <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
-                      <td style={{display:'flex',gap:'5px',cursor:'default'}}>
+                      {admin && <td style={{display:'flex',gap:'5px',cursor:'default'}}>
                         <button className={styles.btnSuccess} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => { setModalActualizar(t); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>✓</button>
                         {t.estado !== 'Salio' && <button className={styles.btnDangerSolid} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalSalida(t)}>Salida</button>}
                         <button className={styles.btnEdit} onClick={() => abrirEditar(t)}>✏️</button>
-                      </td>
+                      </td>}
                     </tr>
                   ))}
                 </tbody>
@@ -1017,7 +968,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
               <h1 className={styles.pageTitle}>Clientes</h1>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                 <button className={styles.btn} onClick={() => setVerSalidos(true)}>Clientes salidos ({trabajosSalidos.length})</button>
-                <button className={styles.btnPrimary} onClick={() => setSeccion('nuevo')}>+ Nuevo cliente</button>
+                {admin && <button className={styles.btnPrimary} onClick={() => setSeccion('nuevo')}>+ Nuevo cliente</button>}
               </div>
             </div>
             <div className={styles.divider}></div>
@@ -1027,7 +978,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.tblWrap}>
               {loading ? <p className={styles.loading}>Cargando...</p> : (
                 <table className={styles.table}>
-                  <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th><th>Acciones</th></tr></thead>
+                  <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th>{admin && <th>Acciones</th>}</tr></thead>
                   <tbody>
                     {trabajosFiltrados.map((t,i) => (
                       <tr key={t.id}>
@@ -1038,7 +989,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                         <td onClick={() => verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
                         <td onClick={() => verDetalle(t)}>{t.taller}</td>
                         <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
-                        <td style={{display:'flex',gap:'5px',cursor:'default',flexWrap:'wrap'}}>
+                        {admin && <td style={{display:'flex',gap:'5px',cursor:'default',flexWrap:'wrap'}}>
                           <button className={styles.btnSuccess} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => { setModalActualizar(t); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>Actualizar</button>
                           <button className={styles.btnRepuesto} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalRepuesto(t)}>🔩</button>
                           <button className={styles.btnEdit} style={{fontSize:'11px',padding:'4px 8px'}} onClick={async () => { await cargarFotosModal(t.id); setModalFotos(t) }}>📷</button>
@@ -1046,7 +997,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                           {t.estado !== 'Salio' && <button className={styles.btnDangerSolid} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => setModalSalida(t)}>Salida</button>}
                           <button className={styles.btnEdit} onClick={() => abrirEditar(t)}>✏️</button>
                           <button className={styles.btnDelete} onClick={() => borrarCliente(t)}>🗑️</button>
-                        </td>
+                        </td>}
                       </tr>
                     ))}
                   </tbody>
@@ -1066,7 +1017,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.divider}></div>
             <div className={styles.tblWrap}>
               <table className={styles.table}>
-                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Salida</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Salida</th>{admin && <th>Acciones</th>}</tr></thead>
                 <tbody>
                   {trabajosSalidos.map((t,i) => (
                     <tr key={t.id}>
@@ -1076,12 +1027,12 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                       <td onClick={() => verDetalle(t)}>{t.vehiculos?.patente}</td>
                       <td onClick={() => verDetalle(t)}>{t.taller}</td>
                       <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#718096'}}>{t.fecha_salida ? new Date(t.fecha_salida).toLocaleDateString('es-AR') : '—'}</td>
-                      <td style={{display:'flex',gap:'5px',cursor:'default'}}>
+                      {admin && <td style={{display:'flex',gap:'5px',cursor:'default'}}>
                         <button className={styles.btnPrimary} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => { setModalReingreso(t); setFormReingreso({ motivo: '', mecanico: t.mecanico||'', taller: t.taller||'Malvinas 2084', estado: 'Diagnóstico', llego_en_grua: false, fecha_ingreso_manual: '' }) }}>🔄 Reingreso</button>
                         <button style={{fontSize:'11px',padding:'4px 8px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={() => abrirWsp(t)}>💬</button>
                         <button className={styles.btnEdit} onClick={() => abrirEditar(t)}>✏️</button>
                         <button className={styles.btnDelete} onClick={() => borrarCliente(t)}>🗑️</button>
-                      </td>
+                      </td>}
                     </tr>
                   ))}
                   {trabajosSalidos.length === 0 && <tr><td colSpan="7" style={{textAlign:'center',color:'#A0AEC0',padding:'2rem'}}>Sin clientes salidos todavía</td></tr>}
@@ -1091,8 +1042,8 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
           </div>
         )}
 
-        {/* NUEVO CLIENTE */}
-        {seccion === 'nuevo' && (
+        {/* NUEVO CLIENTE - solo admin */}
+        {seccion === 'nuevo' && admin && (
           <div>
             <div className={styles.topBar}>
               <h1 className={styles.pageTitle}>Nuevo cliente</h1>
@@ -1173,14 +1124,14 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.topBar}>
               <button className={styles.btn} onClick={() => setSeccion('clientes')}>← Volver</button>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                <button className={styles.btn} onClick={() => imprimirOrden(clienteDetalle)}>🖨️ Imprimir</button>
-                <button className={styles.btnSuccess} onClick={() => { setModalActualizar(clienteDetalle); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>Actualización</button>
-                <button className={styles.btnRepuesto} onClick={() => setModalRepuesto(clienteDetalle)}>🔩 Repuesto</button>
-                <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',fontFamily:'inherit',fontWeight:'500'}} onClick={() => abrirWsp(clienteDetalle)}>💬 WhatsApp</button>
-                <button className={styles.btnPrimary} onClick={() => abrirEditar(clienteDetalle)}>✏️ Editar</button>
-                {clienteDetalle.estado !== 'Salio' && <button className={styles.btnDangerSolid} onClick={() => setModalSalida(clienteDetalle)}>Registrar salida</button>}
-                {clienteDetalle.estado === 'Salio' && <button className={styles.btnPrimary} onClick={() => { setModalReingreso(clienteDetalle); setFormReingreso({ motivo: '', mecanico: clienteDetalle.mecanico||'', taller: clienteDetalle.taller||'Malvinas 2084', estado: 'Diagnóstico', llego_en_grua: false, fecha_ingreso_manual: '' }) }}>🔄 Reingreso</button>}
-                <button className={styles.btnDanger} onClick={() => borrarCliente(clienteDetalle)}>🗑️ Borrar</button>
+                {admin && <button className={styles.btn} onClick={() => imprimirOrden(clienteDetalle)}>🖨️ Imprimir</button>}
+                {admin && <button className={styles.btnSuccess} onClick={() => { setModalActualizar(clienteDetalle); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'}) }}>Actualización</button>}
+                {admin && <button className={styles.btnRepuesto} onClick={() => setModalRepuesto(clienteDetalle)}>🔩 Repuesto</button>}
+                {admin && <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',fontFamily:'inherit',fontWeight:'500'}} onClick={() => abrirWsp(clienteDetalle)}>💬 WhatsApp</button>}
+                {admin && <button className={styles.btnPrimary} onClick={() => abrirEditar(clienteDetalle)}>✏️ Editar</button>}
+                {admin && clienteDetalle.estado !== 'Salio' && <button className={styles.btnDangerSolid} onClick={() => setModalSalida(clienteDetalle)}>Registrar salida</button>}
+                {admin && clienteDetalle.estado === 'Salio' && <button className={styles.btnPrimary} onClick={() => { setModalReingreso(clienteDetalle); setFormReingreso({ motivo: '', mecanico: clienteDetalle.mecanico||'', taller: clienteDetalle.taller||'Malvinas 2084', estado: 'Diagnóstico', llego_en_grua: false, fecha_ingreso_manual: '' }) }}>🔄 Reingreso</button>}
+                {admin && <button className={styles.btnDanger} onClick={() => borrarCliente(clienteDetalle)}>🗑️ Borrar</button>}
               </div>
             </div>
             <div className={styles.divider}></div>
@@ -1220,12 +1171,12 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.card}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
                 <div className={styles.cardTitle} style={{margin:0}}>Repuestos</div>
-                {repuestos.length > 0 && <button className={styles.btn} style={{fontSize:'12px',padding:'4px 10px'}} onClick={() => imprimirRepuestos(clienteDetalle, repuestos)}>🖨️ Imprimir</button>}
+                {admin && repuestos.length > 0 && <button className={styles.btn} style={{fontSize:'12px',padding:'4px 10px'}} onClick={() => imprimirRepuestos(clienteDetalle, repuestos)}>🖨️ Imprimir</button>}
               </div>
               {repuestos.length === 0 && <div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin repuestos registrados</div>}
               {repuestos.length > 0 && (
                 <table className={styles.table}>
-                  <thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th><th></th></tr></thead>
+                  <thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th>{admin && <th></th>}</tr></thead>
                   <tbody>
                     {repuestos.map(r => (
                       <tr key={r.id}>
@@ -1233,16 +1184,16 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                         <td>${formatPeso(r.valor)}</td>
                         <td>{r.lugar || '—'}</td>
                         <td style={{fontSize:'12px',color:'#718096'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>
-                        <td style={{display:'flex',gap:'4px',cursor:'default'}}>
+                        {admin && <td style={{display:'flex',gap:'4px',cursor:'default'}}>
                           <button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={() => { setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:r.valor,lugar:r.lugar||'',fecha:r.fecha}); setModalEditarRepuesto(true) }}>✏️</button>
                           <button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={() => borrarRepuesto(r)}>🗑️</button>
-                        </td>
+                        </td>}
                       </tr>
                     ))}
                     <tr>
                       <td style={{fontWeight:'700',color:'#2D3748'}}>Total</td>
                       <td style={{fontWeight:'700',color:'#16A34A'}}>${formatPeso(repuestos.reduce((a,r) => a + Number(r.valor), 0))}</td>
-                      <td colSpan="3"></td>
+                      <td colSpan={admin ? 3 : 2}></td>
                     </tr>
                   </tbody>
                 </table>
@@ -1266,14 +1217,12 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.card}>
               <div className={styles.cardTitle}>Fotos del vehículo</div>
               <input type="file" accept="image/*" multiple ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>
-              <button className={styles.btnPrimary} onClick={() => fileRef.current.click()} style={{marginBottom:'1rem'}}>
-                {subiendo ? 'Subiendo...' : '+ Agregar fotos'}
-              </button>
+              {admin && <button className={styles.btnPrimary} onClick={() => fileRef.current.click()} style={{marginBottom:'1rem'}}>{subiendo ? 'Subiendo...' : '+ Agregar fotos'}</button>}
               <div className={styles.fotoGrid}>
                 {fotos.map(f => (
                   <div key={f.id} className={styles.fotoItem}>
                     <img src={f.url} alt="foto" className={styles.fotoImg} onClick={() => setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/>
-                    <button className={styles.fotoBorrar} onClick={() => borrarFoto(f)}>✕</button>
+                    {admin && <button className={styles.fotoBorrar} onClick={() => borrarFoto(f)}>✕</button>}
                   </div>
                 ))}
                 {fotos.length === 0 && <div className={styles.fotoVacio}>No hay fotos todavía</div>}
