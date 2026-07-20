@@ -53,7 +53,7 @@ body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:12px; m
 .firma { border-bottom:1px solid #000; width:150px; }
 .footer { margin-top:8px; border-top:1px solid #ccc; padding-top:5px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:9px; color:#444; }
 .footer-icon { display:flex; align-items:center; gap:4px; text-decoration:none; color:#444; }
-@media print { body { padding:6px; } }`
+@media print { body { padding:6px; } @page { margin:0.5cm; } }`
 
 const tcHTML = `
 <div class="tc">
@@ -117,17 +117,27 @@ export default function Home({ rol, cerrarSesion }) {
   const [formRepuesto, setFormRepuesto] = useState({nombre:'',valor:'',lugar:'',fecha:new Date().toISOString().split('T')[0]})
   const [formActualizar, setFormActualizar] = useState({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'})
   const [subiendo, setSubiendo] = useState(false)
+
   const [presupuesto, setPresupuesto] = useState({
-    numero:'001-00001',fecha:new Date().toISOString().split('T')[0],
-    cliente:'',vehiculo:'',
+    numero:'001-00001', fecha:new Date().toISOString().split('T')[0],
+    cliente:'', vehiculo:'',
     items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],
-    notas:'',moneda_mano_obra:'ARS'
+    notas:'', moneda_mano_obra:'ARS',
+    descuento_concepto:'Descuento por diagnóstico', descuento_monto:'', aplicar_descuento:false
   })
+
   const [recibo, setRecibo] = useState({
-    numero:'001-00001',fecha:new Date().toISOString().split('T')[0],
-    cliente:'',vehiculo:'',patente:'',
-    concepto:'',monto:'',moneda:'ARS',forma_pago:'Efectivo',observaciones:''
+    numero:'001-00001', fecha:new Date().toISOString().split('T')[0],
+    cliente:'', vehiculo:'', patente:'',
+    concepto:'', monto:'', moneda:'ARS', forma_pago:'Efectivo', observaciones:''
   })
+
+  // Autocomplete presupuesto/recibo
+  const [busqPresupuesto, setBusqPresupuesto] = useState('')
+  const [busqRecibo, setBusqRecibo] = useState('')
+  const [sugsPresupuesto, setSugsPresupuesto] = useState([])
+  const [sugsRecibo, setSugsRecibo] = useState([])
+
   const fileRef = useRef()
   const fileNuevoRef = useRef()
   const fileFotosRef = useRef()
@@ -143,6 +153,51 @@ export default function Home({ rol, cerrarSesion }) {
     }
     fetchDolar()
   }, [])
+
+  function buscarClientesPresupuesto(q) {
+    setBusqPresupuesto(q)
+    if (!q || q.length < 2) { setSugsPresupuesto([]); return }
+    const ql = q.toLowerCase()
+    const resultados = trabajos.filter(t =>
+      t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql) ||
+      t.vehiculos?.patente?.toLowerCase().includes(ql) ||
+      t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)
+    ).slice(0, 6)
+    setSugsPresupuesto(resultados)
+  }
+
+  function seleccionarClientePresupuesto(t) {
+    setPresupuesto({
+      ...presupuesto,
+      cliente: t.vehiculos?.clientes?.nombre || '',
+      vehiculo: t.vehiculos?.marca_modelo || ''
+    })
+    setBusqPresupuesto('')
+    setSugsPresupuesto([])
+  }
+
+  function buscarClientesRecibo(q) {
+    setBusqRecibo(q)
+    if (!q || q.length < 2) { setSugsRecibo([]); return }
+    const ql = q.toLowerCase()
+    const resultados = trabajos.filter(t =>
+      t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql) ||
+      t.vehiculos?.patente?.toLowerCase().includes(ql) ||
+      t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)
+    ).slice(0, 6)
+    setSugsRecibo(resultados)
+  }
+
+  function seleccionarClienteRecibo(t) {
+    setRecibo({
+      ...recibo,
+      cliente: t.vehiculos?.clientes?.nombre || '',
+      vehiculo: t.vehiculos?.marca_modelo || '',
+      patente: t.vehiculos?.patente || ''
+    })
+    setBusqRecibo('')
+    setSugsRecibo([])
+  }
 
   async function cargarDatos() {
     setLoading(true)
@@ -182,6 +237,27 @@ export default function Home({ rol, cerrarSesion }) {
     return data.publicUrl
   }
   function formatPeso(v) { return Number(v).toLocaleString('es-AR') }
+
+  function calcularTotalesPresupuesto() {
+    let totalPesos = 0, totalUSD = 0
+    try {
+      presupuesto.items.forEach(item => {
+        if (!item.total) return
+        const val = parseFloat(parseNum(item.total.toString())) || 0
+        if (item.es_mano_obra && presupuesto.moneda_mano_obra === 'USD') {
+          totalUSD += val
+          if (dolarBlue) totalPesos += val * dolarBlue.venta
+        } else {
+          totalPesos += val
+        }
+      })
+      if (presupuesto.aplicar_descuento && presupuesto.descuento_monto) {
+        const desc = parseFloat(parseNum(presupuesto.descuento_monto.toString())) || 0
+        totalPesos -= desc
+      }
+    } catch(e) {}
+    return { totalPesos: Math.max(0, totalPesos), totalUSD }
+  }
 
   function buildHeader(nroCliente) {
     return `<div class="header">
@@ -308,6 +384,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
 .total-row td { font-weight:900; background:#e8f4e8; font-size:13px; border-top:2px solid #000; }
 .footer { margin-top:10px; border-top:1px solid #ccc; padding-top:6px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:9px; color:#444; }
 .footer-icon { display:flex; align-items:center; gap:4px; text-decoration:none; color:#444; }
+@media print { body { padding:8px; } @page { margin:0.5cm; } }
 </style></head><body>
 <div class="header">
   <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
@@ -336,16 +413,15 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   }
 
   function imprimirPresupuesto() {
+    const { totalPesos, totalUSD } = calcularTotalesPresupuesto()
     const usandoUSD = presupuesto.moneda_mano_obra === 'USD'
     const manoObra = presupuesto.items.find(i=>i.es_mano_obra)
-    const totalRepuestos = presupuesto.items.filter(i=>!i.es_mano_obra&&i.total).reduce((a,i)=>a+(parseFloat(parseNum(i.total))||0),0)
-    let totalPesos = totalRepuestos
-    let totalUSD = 0
-    if(manoObra&&manoObra.total) {
-      const val = parseFloat(parseNum(manoObra.total))||0
-      if(usandoUSD) { totalUSD=val; if(dolarBlue) totalPesos+=val*dolarBlue.venta }
-      else totalPesos+=val
-    }
+    const totalRepuestos = presupuesto.items
+      .filter(i=>!i.es_mano_obra&&i.total)
+      .reduce((a,i)=>a+(parseFloat(parseNum(i.total.toString()))||0),0)
+    const descMonto = presupuesto.aplicar_descuento && presupuesto.descuento_monto
+      ? parseFloat(parseNum(presupuesto.descuento_monto.toString()))||0 : 0
+
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -365,6 +441,7 @@ thead th:nth-child(2),thead th:nth-child(3) { text-align:right; }
 tbody td { padding:10px 12px; border-bottom:1px solid #f0f0f0; font-size:12px; vertical-align:top; }
 tbody td:nth-child(2),tbody td:nth-child(3) { text-align:right; font-weight:600; }
 tbody tr:nth-child(even) { background:#f8faff; }
+.descuento-row td { color:#16A34A; font-weight:600; }
 .footer-box { display:flex; justify-content:space-between; align-items:flex-start; margin-top:16px; }
 .notas { flex:1; padding-right:30px; }
 .notas p { font-size:11px; color:#444; display:flex; gap:6px; margin-bottom:6px; }
@@ -374,8 +451,9 @@ tbody tr:nth-child(even) { background:#f8faff; }
 .total-row.highlight { background:#1a56db; color:#fff; font-size:15px; font-weight:900; }
 .total-row.highlight2 { background:#0f3fa3; color:#fff; font-size:15px; font-weight:900; }
 .total-row.sub { background:#f8faff; font-size:11px; color:#555; }
+.total-row.desc { background:#f0fdf4; font-size:11px; color:#16A34A; }
 .bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
-@media print { body { padding:15px; } }
+@media print { body { padding:15px; } @page { margin:0.5cm; } }
 </style></head><body>
 <div class="header">
   <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
@@ -398,14 +476,17 @@ tbody tr:nth-child(even) { background:#f8faff; }
       const s=item.es_mano_obra?(usandoUSD?'USS':'$'):'$'
       return `<tr><td>${item.descripcion}</td><td>${item.precio_unitario?`${s} ${item.precio_unitario}`:''}</td><td>${item.total?`${s} ${item.total}`:''}</td></tr>`
     }).join('')}
+    ${descMonto>0?`<tr class="descuento-row"><td>${presupuesto.descuento_concepto||'Descuento'}</td><td></td><td>-$${formatPeso(descMonto)}</td></tr>`:''}
   </tbody>
 </table>
 <div class="footer-box">
   <div class="notas">${presupuesto.notas?presupuesto.notas.split('\n').filter(n=>n.trim()).map(n=>`<p>✅ ${n}</p>`).join(''):''}</div>
   <div>
     <div class="totales">
-      ${usandoUSD&&manoObra?`<div class="total-row sub"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div><div class="total-row sub"><span>Repuestos</span><span>$ ${formatPeso(totalRepuestos)}</span></div>`:''}
-      ${usandoUSD&&dolarBlue?`<div class="total-row highlight"><span>Total en pesos</span><span>$ ${formatPeso(Math.round(totalPesos))}</span></div><div class="total-row highlight2"><span>Total en USD</span><span>USS ${manoObra?.total||0}</span></div>`:`<div class="total-row highlight"><span>TOTAL</span><span>$ ${formatPeso(Math.round(totalPesos))}</span></div>`}
+      ${usandoUSD&&manoObra?`<div class="total-row sub"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div>`:''}
+      ${totalRepuestos>0?`<div class="total-row sub"><span>Repuestos</span><span>$${formatPeso(totalRepuestos)}</span></div>`:''}
+      ${descMonto>0?`<div class="total-row desc"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span>-$${formatPeso(descMonto)}</span></div>`:''}
+      ${usandoUSD&&dolarBlue?`<div class="total-row highlight"><span>Total en pesos</span><span>$${formatPeso(Math.round(totalPesos))}</span></div><div class="total-row highlight2"><span>Total en USD</span><span>USS ${manoObra?.total||0}</span></div>`:`<div class="total-row highlight"><span>TOTAL</span><span>$${formatPeso(Math.round(totalPesos))}</span></div>`}
     </div>
     ${usandoUSD&&dolarBlue?`<div style="font-size:9px;color:#888;text-align:right;margin-top:4px">Dólar blue venta: $${formatPeso(dolarBlue.venta)}</div>`:''}
   </div>
@@ -418,7 +499,7 @@ tbody tr:nth-child(even) { background:#f8faff; }
 
   function imprimirRecibo() {
     const esUSD = recibo.moneda==='USD'
-    const montoNum = parseFloat(parseNum(recibo.monto))||0
+    const montoNum = parseFloat(parseNum(recibo.monto.toString()))||0
     const montoEnPesos = esUSD&&dolarBlue ? montoNum*dolarBlue.venta : null
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibo</title>
 <style>
@@ -444,7 +525,7 @@ body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; m
 .firma-line { border-bottom:1px solid #000; width:180px; margin:0 auto 8px; }
 .firma span { font-size:10px; color:#555; }
 .bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
-@media print { body { padding:15px; } }
+@media print { body { padding:15px; } @page { margin:0.5cm; } }
 </style></head><body>
 <div class="header">
   <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
@@ -499,7 +580,7 @@ ${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p
     }).select('*, vehiculos(*, clientes(*))').single()
     if(nt) {
       await agregarHistorial(nt.id,'reingreso',`Reingreso al taller ${formReingreso.taller}. Motivo: ${formReingreso.motivo}`)
-      await agregarHistorial(nt.id,'estado',`Historial anterior: el vehículo ya había ingresado previamente (trabajo N° ${trabajo.id.slice(0,8)}).`)
+      await agregarHistorial(nt.id,'estado',`Historial anterior conservado (trabajo N° ${trabajo.id.slice(0,8)}).`)
     }
     setModalReingreso(null)
     setFormReingreso({motivo:'',mecanico:'',taller:'Malvinas 2084',estado:'Diagnóstico',llego_en_grua:false,fecha_ingreso_manual:''})
@@ -524,7 +605,7 @@ ${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p
     if(trabajo?.vehiculos?.clientes?.telefono){
       const tel=trabajo.vehiculos.clientes.telefono.replace(/\D/g,'')
       setModalWsp({trabajo,tel})
-      setMsgWsp(`Hola ${trabajo.vehiculos.clientes.nombre}! Te contactamos desde DiFiore Performance. Tu ${trabajo.vehiculos.marca_modelo} (${trabajo.vehiculos.patente}) ingresó al taller. Ante cualquier consulta estamos a tu disposición.`)
+      setMsgWsp(`Hola ${trabajo.vehiculos.clientes.nombre}! Te contactamos desde DiFiore Performance. Tu ${trabajo.vehiculos.marca_modelo} (${trabajo.vehiculos.patente}) ingresó al taller.`)
     } else setSeccion('clientes')
   }
 
@@ -573,13 +654,13 @@ ${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p
 
   async function guardarRepuesto() {
     const id=modalRepuesto.id
-    await supabase.from('repuestos').insert({trabajo_id:id,nombre:formRepuesto.nombre,valor:parseFloat(parseNum(formRepuesto.valor))||0,lugar:formRepuesto.lugar,fecha:formRepuesto.fecha})
+    await supabase.from('repuestos').insert({trabajo_id:id,nombre:formRepuesto.nombre,valor:parseFloat(parseNum(formRepuesto.valor.toString()))||0,lugar:formRepuesto.lugar,fecha:formRepuesto.fecha})
     setModalRepuesto(null); setFormRepuesto({nombre:'',valor:'',lugar:'',fecha:new Date().toISOString().split('T')[0]})
     await cargarRepuestos(id)
   }
 
   async function guardarEdicionRepuesto() {
-    await supabase.from('repuestos').update({nombre:formEditarRepuesto.nombre,valor:parseFloat(parseNum(formEditarRepuesto.valor))||0,lugar:formEditarRepuesto.lugar,fecha:formEditarRepuesto.fecha}).eq('id',formEditarRepuesto.id)
+    await supabase.from('repuestos').update({nombre:formEditarRepuesto.nombre,valor:parseFloat(parseNum(formEditarRepuesto.valor.toString()))||0,lugar:formEditarRepuesto.lugar,fecha:formEditarRepuesto.fecha}).eq('id',formEditarRepuesto.id)
     setModalEditarRepuesto(null); await cargarRepuestos(clienteDetalle.id)
   }
 
@@ -595,20 +676,15 @@ ${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p
     for(const f of files){const url=await subirFotoStorage(f,modalFotos.id);if(url)await supabase.from('fotos').insert({trabajo_id:modalFotos.id,url})}
     await cargarFotosModal(modalFotos.id); setSubiendo(false); e.target.value=''
   }
-
   async function borrarFotoModal(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotosModal(modalFotos.id)}
-
   async function subirFoto(e) {
     const files=Array.from(e.target.files); if(!files.length||!clienteDetalle) return
     setSubiendo(true)
     for(const f of files){const url=await subirFotoStorage(f,clienteDetalle.id);if(url)await supabase.from('fotos').insert({trabajo_id:clienteDetalle.id,url})}
     await cargarFotos(clienteDetalle.id); setSubiendo(false); e.target.value=''
   }
-
   async function borrarFoto(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotos(clienteDetalle.id)}
-
   function verDetalle(t){setClienteDetalle(t);setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarHistorial(t.id);cargarRepuestos(t.id)}
-
   function abrirEditar(t) {
     setFormEditar({
       trabajo_id:t.id,cliente_id:t.vehiculos?.clientes?.id,vehiculo_id:t.vehiculos?.id,
@@ -619,7 +695,6 @@ ${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p
     })
     setModalEditar(true)
   }
-
   function badgeClass(e){
     if(e==='Listo') return styles.badgeGreen
     if(e==='En proceso') return styles.badgeAmber
@@ -664,7 +739,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
 .marcas { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 .marca-item { border:1px solid #e0e0e0; border-radius:6px; padding:10px; display:flex; justify-content:space-between; align-items:center; }
 .bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
-@media print { body { padding:15px; } }
+@media print { body { padding:15px; } @page { margin:0.5cm; } }
 </style></head><body>
 <div class="header">
   <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
@@ -716,6 +791,7 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
   const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠'}
   const trabajosTaller=tallerVista?trabajos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(a.fecha_ingreso)-new Date(b.fecha_ingreso)):[]
   const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca):[]
+  const {totalPesos,totalUSD}=calcularTotalesPresupuesto()
   const navLinks=[
     {color:'#E1306C',icon:<IgIcon/>,href:'https://www.instagram.com/di_fiore_mecanica/',label:'@di_fiore_mecanica'},
     {color:'#1877F2',icon:<FbIcon/>,href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr',label:'di_fiore_mecanica'},
@@ -723,18 +799,13 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
     {color:'#EA4335',icon:<MapIcon/>,href:'https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1',label:'Malvinas 2084, MdP'},
   ]
 
-  const calcularTotalesPresupuesto = () => {
-    let totalPesos=0, totalUSD=0
-    presupuesto.items.forEach(item=>{
-      if(!item.total) return
-      const val=parseFloat(parseNum(item.total))||0
-      if(item.es_mano_obra&&presupuesto.moneda_mano_obra==='USD'){totalUSD+=val;if(dolarBlue)totalPesos+=val*dolarBlue.venta}
-      else totalPesos+=val
-    })
-    return {totalPesos,totalUSD}
+  const autocompleteSyle = {
+    position:'absolute',top:'100%',left:0,right:0,background:'white',border:'1px solid #CBD5E0',
+    borderRadius:'6px',zIndex:100,boxShadow:'0 4px 12px rgba(0,0,0,.1)',maxHeight:'200px',overflowY:'auto'
   }
-  const {totalPesos,totalUSD}=calcularTotalesPresupuesto()
-
+  const autocompleteItemStyle = {
+    padding:'8px 12px',cursor:'pointer',fontSize:'13px',borderBottom:'1px solid #F7FAFC'
+  }
   return (
     <div className={styles.app}>
       <button className={styles.menuBtn} onClick={()=>setSidebarOpen(!sidebarOpen)}>☰</button>
@@ -912,8 +983,7 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1rem'}}>
               {['Malvinas 2084','Malvinas 3906'].map(taller=>{
                 const t=trabajos.filter(x=>x.taller===taller&&x.estado!=='Salio')
-                return <div key={taller} className={styles.tallerCard} onClick
-                ={() => setTallerVista(taller)}>
+                return <div key={taller} className={styles.tallerCard} onClick={()=>setTallerVista(taller)}>
                   <div className={styles.tallerNombre}>{taller}</div>
                   <div className={styles.tallerN}>{t.length} <span>autos</span></div>
                   <div style={{marginTop:'10px'}}>
@@ -1140,6 +1210,20 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}><label>N° de presupuesto</label><input value={presupuesto.numero} onChange={e=>setPresupuesto({...presupuesto,numero:e.target.value})} placeholder="001-00001"/></div>
                 <div className={styles.formGroup}><label>Fecha</label><input type="date" value={presupuesto.fecha} onChange={e=>setPresupuesto({...presupuesto,fecha:e.target.value})}/></div>
+                <div className={styles.formGroup} style={{gridColumn:'1/-1',position:'relative'}}>
+                  <label>Buscar cliente existente</label>
+                  <input value={busqPresupuesto} onChange={e=>buscarClientesPresupuesto(e.target.value)} placeholder="Escribí nombre, patente o vehículo..."/>
+                  {sugsPresupuesto.length>0&&<div style={autocompleteSyle}>
+                    {sugsPresupuesto.map(t=>(
+                      <div key={t.id} style={autocompleteItemStyle}
+                        onMouseOver={e=>e.currentTarget.style.background='#F7FAFC'}
+                        onMouseOut={e=>e.currentTarget.style.background='white'}
+                        onClick={()=>seleccionarClientePresupuesto(t)}>
+                        <b>{t.vehiculos?.clientes?.nombre}</b> — {t.vehiculos?.marca_modelo} · {t.vehiculos?.patente}
+                      </div>
+                    ))}
+                  </div>}
+                </div>
                 <div className={styles.formGroup}><label>Cliente</label><input value={presupuesto.cliente} onChange={e=>setPresupuesto({...presupuesto,cliente:e.target.value})} placeholder="Nombre del cliente"/></div>
                 <div className={styles.formGroup}><label>Vehículo</label><input value={presupuesto.vehiculo} onChange={e=>setPresupuesto({...presupuesto,vehiculo:e.target.value})} placeholder="Ej: Volkswagen Amarok V6"/></div>
               </div>
@@ -1182,13 +1266,37 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                   </div>
                 </div>
               ))}
-              <div style={{background:'#F0FDF4',border:'1px solid #86EFAC',borderRadius:'8px',padding:'12px 16px',marginTop:'8px'}}>
-                <div style={{fontSize:'11px',color:'#16A34A',fontWeight:'700',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'.5px'}}>Resumen</div>
+
+              {/* DESCUENTO */}
+              <div style={{background:'#F0FDF4',border:'1px solid #86EFAC',borderRadius:'8px',padding:'12px 16px',marginTop:'4px',marginBottom:'8px'}}>
+                <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px',cursor:'pointer',fontWeight:'600',color:'#16A34A',marginBottom:'10px'}}>
+                  <input type="checkbox" checked={presupuesto.aplicar_descuento} onChange={e=>setPresupuesto({...presupuesto,aplicar_descuento:e.target.checked})}/>
+                  Aplicar descuento
+                </label>
+                {presupuesto.aplicar_descuento&&(
+                  <div className={styles.formGrid}>
+                    <div className={styles.formGroup}>
+                      <label>Concepto del descuento</label>
+                      <input value={presupuesto.descuento_concepto} onChange={e=>setPresupuesto({...presupuesto,descuento_concepto:e.target.value})} placeholder="Ej: Descuento por diagnóstico"/>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Monto a descontar ($)</label>
+                      <input value={presupuesto.descuento_monto} onChange={e=>setPresupuesto({...presupuesto,descuento_monto:formatNum(e.target.value)})} placeholder="100.000"/>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* RESUMEN */}
+              <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'12px 16px',marginTop:'8px'}}>
+                <div style={{fontSize:'11px',color:'#2563EB',fontWeight:'700',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'.5px'}}>Resumen</div>
                 <div style={{display:'flex',gap:'24px',flexWrap:'wrap'}}>
                   {presupuesto.moneda_mano_obra==='USD'&&totalUSD>0&&<div style={{fontSize:'13px',color:'#2D3748'}}><span style={{color:'#718096'}}>Mano de obra: </span><b>USS {formatPeso(totalUSD)}</b></div>}
-                  <div style={{fontSize:'13px',color:'#2D3748'}}><span style={{color:'#718096'}}>Repuestos: </span><b>${formatPeso(presupuesto.items.filter(i=>!i.es_mano_obra&&i.total).reduce((a,i)=>a+(parseFloat(parseNum(i.total))||0),0))}</b></div>
-                  {presupuesto.moneda_mano_obra==='USD'&&dolarBlue&&totalUSD>0&&<div style={{fontSize:'13px',color:'#16A34A',fontWeight:'700'}}>Total estimado: ${formatPeso(Math.round(totalPesos))}</div>}
-                  {presupuesto.moneda_mano_obra==='ARS'&&<div style={{fontSize:'13px',color:'#16A34A',fontWeight:'700'}}>Total: ${formatPeso(Math.round(totalPesos))}</div>}
+                  {presupuesto.items.filter(i=>!i.es_mano_obra&&i.total).length>0&&<div style={{fontSize:'13px',color:'#2D3748'}}><span style={{color:'#718096'}}>Repuestos: </span><b>${formatPeso(presupuesto.items.filter(i=>!i.es_mano_obra&&i.total).reduce((a,i)=>a+(parseFloat(parseNum(i.total.toString()))||0),0))}</b></div>}
+                  {presupuesto.aplicar_descuesto&&presupuesto.descuento_monto&&<div style={{fontSize:'13px',color:'#16A34A'}}><span style={{color:'#718096'}}>Descuento: </span><b>-${formatPeso(parseFloat(parseNum(presupuesto.descuento_monto.toString()))||0)}</b></div>}
+                  <div style={{fontSize:'13px',color:'#2563EB',fontWeight:'700'}}>
+                    {presupuesto.moneda_mano_obra==='USD'&&dolarBlue&&totalUSD>0?`Total estimado: $${formatPeso(Math.round(totalPesos))}`:`Total: $${formatPeso(Math.round(totalPesos))}`}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1197,7 +1305,7 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
               <div className={styles.formGroup}><label>Una por línea (aparecerán con ✅)</label><textarea value={presupuesto.notas} onChange={e=>setPresupuesto({...presupuesto,notas:e.target.value})} placeholder={'Kit de distribución de origen Alemán.\nRepuestos originales. Trabajo garantizado.'} style={{minHeight:'80px'}}/></div>
             </div>
             <div className={styles.formActions}>
-              <button className={styles.btn} onClick={()=>setPresupuesto({numero:'001-00001',fecha:new Date().toISOString().split('T')[0],cliente:'',vehiculo:'',items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],notas:'',moneda_mano_obra:'ARS'})}>Limpiar</button>
+              <button className={styles.btn} onClick={()=>setPresupuesto({numero:'001-00001',fecha:new Date().toISOString().split('T')[0],cliente:'',vehiculo:'',items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],notas:'',moneda_mano_obra:'ARS',descuento_concepto:'Descuento por diagnóstico',descuento_monto:'',aplicar_descuento:false})}>Limpiar</button>
               <button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir presupuesto</button>
             </div>
           </div>
@@ -1219,6 +1327,20 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}><label>N° de recibo</label><input value={recibo.numero} onChange={e=>setRecibo({...recibo,numero:e.target.value})} placeholder="001-00001"/></div>
                 <div className={styles.formGroup}><label>Fecha</label><input type="date" value={recibo.fecha} onChange={e=>setRecibo({...recibo,fecha:e.target.value})}/></div>
+                <div className={styles.formGroup} style={{gridColumn:'1/-1',position:'relative'}}>
+                  <label>Buscar cliente existente</label>
+                  <input value={busqRecibo} onChange={e=>buscarClientesRecibo(e.target.value)} placeholder="Escribí nombre, patente o vehículo..."/>
+                  {sugsRecibo.length>0&&<div style={autocompleteSyle}>
+                    {sugsRecibo.map(t=>(
+                      <div key={t.id} style={autocompleteItemStyle}
+                        onMouseOver={e=>e.currentTarget.style.background='#F7FAFC'}
+                        onMouseOut={e=>e.currentTarget.style.background='white'}
+                        onClick={()=>seleccionarClienteRecibo(t)}>
+                        <b>{t.vehiculos?.clientes?.nombre}</b> — {t.vehiculos?.marca_modelo} · {t.vehiculos?.patente}
+                      </div>
+                    ))}
+                  </div>}
+                </div>
                 <div className={styles.formGroup}><label>Cliente</label><input value={recibo.cliente} onChange={e=>setRecibo({...recibo,cliente:e.target.value})} placeholder="Nombre del cliente"/></div>
                 <div className={styles.formGroup}><label>Vehículo</label><input value={recibo.vehiculo} onChange={e=>setRecibo({...recibo,vehiculo:e.target.value})} placeholder="Ej: VW Amarok V6"/></div>
                 <div className={styles.formGroup}><label>Patente</label><input value={recibo.patente} onChange={e=>setRecibo({...recibo,patente:e.target.value})} placeholder="AB 123 CD"/></div>
@@ -1234,7 +1356,7 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
               </div>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}><label>Monto ({recibo.moneda==='USD'?'USS':'$'})</label><input value={recibo.monto} onChange={e=>setRecibo({...recibo,monto:formatNum(e.target.value)})} placeholder="0"/></div>
-                {recibo.moneda==='USD'&&dolarBlue&&recibo.monto&&<div className={styles.formGroup}><label>Equivalente en pesos (blue venta)</label><input readOnly value={`$${formatPeso(Math.round(parseFloat(parseNum(recibo.monto))*dolarBlue.venta))}`} style={{background:'#F0FDF4',color:'#16A34A',fontWeight:'700'}}/></div>}
+                {recibo.moneda==='USD'&&dolarBlue&&recibo.monto&&<div className={styles.formGroup}><label>Equivalente en pesos (blue venta)</label><input readOnly value={`$${formatPeso(Math.round(parseFloat(parseNum(recibo.monto.toString()))*dolarBlue.venta))}`} style={{background:'#F0FDF4',color:'#16A34A',fontWeight:'700'}}/></div>}
               </div>
               <div className={styles.formGroup} style={{marginTop:'10px'}}><label>Concepto</label><textarea value={recibo.concepto} onChange={e=>setRecibo({...recibo,concepto:e.target.value})} placeholder="Ej: Pago total por reparación de motor..." style={{minHeight:'70px'}}/></div>
               <div className={styles.formGroup} style={{marginTop:'10px'}}><label>Observaciones (opcional)</label><textarea value={recibo.observaciones} onChange={e=>setRecibo({...recibo,observaciones:e.target.value})} placeholder="Notas adicionales..." style={{minHeight:'50px'}}/></div>
