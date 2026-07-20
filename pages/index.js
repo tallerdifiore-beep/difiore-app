@@ -123,7 +123,8 @@ export default function Home({ rol, cerrarSesion }) {
     cliente:'', vehiculo:'',
     items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],
     notas:'', moneda_mano_obra:'ARS',
-    descuento_concepto:'Descuento por diagnóstico', descuento_monto:'', aplicar_descuento:false
+    descuento_concepto:'Descuento por diagnóstico', descuento_monto:'', aplicar_descuento:false,
+    mostrar_transferencia:false, transferencia_repuestos:true, transferencia_mano_obra:false
   })
 
   const [recibo, setRecibo] = useState({
@@ -132,7 +133,6 @@ export default function Home({ rol, cerrarSesion }) {
     concepto:'', monto:'', moneda:'ARS', forma_pago:'Efectivo', observaciones:''
   })
 
-  // Autocomplete presupuesto/recibo
   const [busqPresupuesto, setBusqPresupuesto] = useState('')
   const [busqRecibo, setBusqRecibo] = useState('')
   const [sugsPresupuesto, setSugsPresupuesto] = useState([])
@@ -158,45 +158,32 @@ export default function Home({ rol, cerrarSesion }) {
     setBusqPresupuesto(q)
     if (!q || q.length < 2) { setSugsPresupuesto([]); return }
     const ql = q.toLowerCase()
-    const resultados = trabajos.filter(t =>
+    setSugsPresupuesto(trabajos.filter(t =>
       t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql) ||
       t.vehiculos?.patente?.toLowerCase().includes(ql) ||
       t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)
-    ).slice(0, 6)
-    setSugsPresupuesto(resultados)
+    ).slice(0,6))
   }
 
   function seleccionarClientePresupuesto(t) {
-    setPresupuesto({
-      ...presupuesto,
-      cliente: t.vehiculos?.clientes?.nombre || '',
-      vehiculo: t.vehiculos?.marca_modelo || ''
-    })
-    setBusqPresupuesto('')
-    setSugsPresupuesto([])
+    setPresupuesto({...presupuesto, cliente:t.vehiculos?.clientes?.nombre||'', vehiculo:t.vehiculos?.marca_modelo||''})
+    setBusqPresupuesto(''); setSugsPresupuesto([])
   }
 
   function buscarClientesRecibo(q) {
     setBusqRecibo(q)
     if (!q || q.length < 2) { setSugsRecibo([]); return }
     const ql = q.toLowerCase()
-    const resultados = trabajos.filter(t =>
+    setSugsRecibo(trabajos.filter(t =>
       t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql) ||
       t.vehiculos?.patente?.toLowerCase().includes(ql) ||
       t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)
-    ).slice(0, 6)
-    setSugsRecibo(resultados)
+    ).slice(0,6))
   }
 
   function seleccionarClienteRecibo(t) {
-    setRecibo({
-      ...recibo,
-      cliente: t.vehiculos?.clientes?.nombre || '',
-      vehiculo: t.vehiculos?.marca_modelo || '',
-      patente: t.vehiculos?.patente || ''
-    })
-    setBusqRecibo('')
-    setSugsRecibo([])
+    setRecibo({...recibo, cliente:t.vehiculos?.clientes?.nombre||'', vehiculo:t.vehiculos?.marca_modelo||'', patente:t.vehiculos?.patente||''})
+    setBusqRecibo(''); setSugsRecibo([])
   }
 
   async function cargarDatos() {
@@ -239,33 +226,37 @@ export default function Home({ rol, cerrarSesion }) {
   function formatPeso(v) { return Number(v).toLocaleString('es-AR') }
 
   function calcularTotalesPresupuesto() {
-    let totalPesos = 0, totalUSD = 0
+    let totalRepuestosPesos = 0, totalManoObraPesos = 0, totalUSD = 0
     try {
       presupuesto.items.forEach(item => {
         if (!item.total) return
         const val = parseFloat(parseNum(item.total.toString())) || 0
-        if (item.es_mano_obra && presupuesto.moneda_mano_obra === 'USD') {
-          totalUSD += val
-          if (dolarBlue) totalPesos += val * dolarBlue.venta
+        if (item.es_mano_obra) {
+          if (presupuesto.moneda_mano_obra === 'USD') { totalUSD += val; if(dolarBlue) totalManoObraPesos += val * dolarBlue.venta }
+          else totalManoObraPesos += val
         } else {
-          totalPesos += val
+          totalRepuestosPesos += val
         }
       })
-      if (presupuesto.aplicar_descuento && presupuesto.descuento_monto) {
-        const desc = parseFloat(parseNum(presupuesto.descuento_monto.toString())) || 0
-        totalPesos -= desc
-      }
     } catch(e) {}
-    return { totalPesos: Math.max(0, totalPesos), totalUSD }
+    const descMonto = presupuesto.aplicar_descuento && presupuesto.descuento_monto ? parseFloat(parseNum(presupuesto.descuento_monto.toString()))||0 : 0
+    const totalEfectivo = totalRepuestosPesos + totalManoObraPesos - descMonto
+
+    let totalTransferencia = totalEfectivo
+    if (presupuesto.mostrar_transferencia) {
+      let baseRecargo = 0
+      if (presupuesto.transferencia_repuestos) baseRecargo += totalRepuestosPesos
+      if (presupuesto.transferencia_mano_obra && presupuesto.moneda_mano_obra === 'ARS') baseRecargo += totalManoObraPesos
+      totalTransferencia = totalEfectivo + (baseRecargo * 0.20)
+    }
+
+    return { totalRepuestosPesos, totalManoObraPesos, totalUSD, totalEfectivo: Math.max(0,totalEfectivo), totalTransferencia: Math.max(0,totalTransferencia), descMonto }
   }
 
   function buildHeader(nroCliente) {
     return `<div class="header">
   <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
-  <div class="header-center">
-    <h1>ORDEN DE SERVICIO</h1>
-    <div class="brand">DiFiore<span style="color:#333">Performance</span></div>
-  </div>
+  <div class="header-center"><h1>ORDEN DE SERVICIO</h1><div class="brand">DiFiore<span style="color:#333">Performance</span></div></div>
   <div class="folio">N° CLIENTE<br><span class="folio-num">${nroCliente}</span></div>
 </div>`
   }
@@ -311,8 +302,7 @@ export default function Home({ rol, cerrarSesion }) {
 
   function abrirVentana(html) {
     const w = window.open('','_blank','width=820,height=1000')
-    w.document.write(html)
-    w.document.close()
+    w.document.write(html); w.document.close()
   }
 
   function imprimirOrden(trabajo) {
@@ -348,10 +338,7 @@ ${buildHeader(nroCliente)}
 ${buildDatosVehiculo(trabajo)}
 ${buildTrabajoBox(trabajo.motivo)}
 <div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">RECIBÍ CONFORME</span><div class="firma"></div></div></div>
-<div class="obs-box">
-  <div class="obs-title">OBSERVACIONES FINALES</div>
-  <div class="obs-text">${obs||'—'}</div>
-</div>
+<div class="obs-box"><div class="obs-title">OBSERVACIONES FINALES</div><div class="obs-text">${obs||'—'}</div></div>
 <div class="footer">${footerIconsHTML}</div>
 <script>window.onload=()=>{window.print()}<\/script>
 </body></html>`
@@ -413,14 +400,10 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   }
 
   function imprimirPresupuesto() {
-    const { totalPesos, totalUSD } = calcularTotalesPresupuesto()
+    const { totalRepuestosPesos, totalManoObraPesos, totalUSD, totalEfectivo, totalTransferencia, descMonto } = calcularTotalesPresupuesto()
     const usandoUSD = presupuesto.moneda_mano_obra === 'USD'
     const manoObra = presupuesto.items.find(i=>i.es_mano_obra)
-    const totalRepuestos = presupuesto.items
-      .filter(i=>!i.es_mano_obra&&i.total)
-      .reduce((a,i)=>a+(parseFloat(parseNum(i.total.toString()))||0),0)
-    const descMonto = presupuesto.aplicar_descuento && presupuesto.descuento_monto
-      ? parseFloat(parseNum(presupuesto.descuento_monto.toString()))||0 : 0
+    const mostrarTransferencia = presupuesto.mostrar_transferencia
 
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>
 <style>
@@ -445,13 +428,12 @@ tbody tr:nth-child(even) { background:#f8faff; }
 .footer-box { display:flex; justify-content:space-between; align-items:flex-start; margin-top:16px; }
 .notas { flex:1; padding-right:30px; }
 .notas p { font-size:11px; color:#444; display:flex; gap:6px; margin-bottom:6px; }
-.totales { min-width:240px; border:1px solid #e0e0e0; border-radius:8px; overflow:hidden; }
-.total-row { display:flex; justify-content:space-between; padding:8px 14px; font-size:12px; border-bottom:1px solid #f0f0f0; }
-.total-row:last-child { border:none; }
-.total-row.highlight { background:#1a56db; color:#fff; font-size:15px; font-weight:900; }
-.total-row.highlight2 { background:#0f3fa3; color:#fff; font-size:15px; font-weight:900; }
-.total-row.sub { background:#f8faff; font-size:11px; color:#555; }
-.total-row.desc { background:#f0fdf4; font-size:11px; color:#16A34A; }
+.totales { min-width:260px; }
+.total-transferencia { display:flex; justify-content:space-between; align-items:center; background:#1a56db; color:#fff; border-radius:8px 8px 0 0; padding:12px 16px; font-size:16px; font-weight:900; }
+.total-efectivo { display:flex; justify-content:space-between; align-items:center; background:#15803D; color:#fff; border-radius:0 0 8px 8px; padding:12px 16px; font-size:16px; font-weight:900; margin-bottom:0; }
+.total-unico { display:flex; justify-content:space-between; align-items:center; background:#1a56db; color:#fff; border-radius:8px; padding:12px 16px; font-size:16px; font-weight:900; }
+.total-sub { display:flex; justify-content:space-between; padding:6px 14px; font-size:11px; color:#555; background:#f8faff; border:1px solid #e0e0e0; border-top:none; }
+.total-sub:last-of-type { border-radius:0 0 6px 6px; margin-bottom:8px; }
 .bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
 @media print { body { padding:15px; } @page { margin:0.5cm; } }
 </style></head><body>
@@ -481,13 +463,23 @@ tbody tr:nth-child(even) { background:#f8faff; }
 </table>
 <div class="footer-box">
   <div class="notas">${presupuesto.notas?presupuesto.notas.split('\n').filter(n=>n.trim()).map(n=>`<p>✅ ${n}</p>`).join(''):''}</div>
-  <div>
-    <div class="totales">
-      ${usandoUSD&&manoObra?`<div class="total-row sub"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div>`:''}
-      ${totalRepuestos>0?`<div class="total-row sub"><span>Repuestos</span><span>$${formatPeso(totalRepuestos)}</span></div>`:''}
-      ${descMonto>0?`<div class="total-row desc"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span>-$${formatPeso(descMonto)}</span></div>`:''}
-      ${usandoUSD&&dolarBlue?`<div class="total-row highlight"><span>Total en pesos</span><span>$${formatPeso(Math.round(totalPesos))}</span></div><div class="total-row highlight2"><span>Total en USD</span><span>USS ${manoObra?.total||0}</span></div>`:`<div class="total-row highlight"><span>TOTAL</span><span>$${formatPeso(Math.round(totalPesos))}</span></div>`}
+  <div class="totales">
+    ${usandoUSD&&manoObra?`<div class="total-sub" style="border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div>`:''}
+    ${totalRepuestosPesos>0?`<div class="total-sub" style="${!usandoUSD||!manoObra?'border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0':''}"><span>Repuestos</span><span>$${formatPeso(totalRepuestosPesos)}</span></div>`:''}
+    ${descMonto>0?`<div class="total-sub"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span style="color:#16A34A">-$${formatPeso(descMonto)}</span></div>`:''}
+    ${mostrarTransferencia ? `
+    <div class="total-transferencia" style="margin-top:8px">
+      <span>🏦 Transferencia</span>
+      <span>$${formatPeso(Math.round(totalTransferencia))}</span>
     </div>
+    <div class="total-efectivo">
+      <span>💵 Efectivo (descuento)</span>
+      <span>$${formatPeso(Math.round(totalEfectivo))}</span>
+    </div>` : `
+    <div class="total-unico" style="margin-top:8px">
+      <span>TOTAL</span>
+      <span>$${formatPeso(Math.round(totalEfectivo))}</span>
+    </div>`}
     ${usandoUSD&&dolarBlue?`<div style="font-size:9px;color:#888;text-align:right;margin-top:4px">Dólar blue venta: $${formatPeso(dolarBlue.venta)}</div>`:''}
   </div>
 </div>
@@ -723,9 +715,6 @@ ${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p
 body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; max-width:750px; margin:0 auto; }
 .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; border-bottom:3px solid #1a56db; padding-bottom:16px; }
 .header-logo img { width:160px; }
-.header-info { text-align:right; }
-.header-info h1 { font-size:22px; font-weight:900; color:#1a56db; margin-bottom:4px; }
-.header-info p { font-size:11px; color:#555; }
 .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
 .stat-box { border:2px solid #1a56db; border-radius:10px; padding:16px; text-align:center; }
 .stat-box .num { font-size:36px; font-weight:900; color:#1a56db; }
@@ -743,11 +732,11 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
 </style></head><body>
 <div class="header">
   <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
-  <div class="header-info">
-    <h1>INFORME MENSUAL</h1>
+  <div style="text-align:right">
+    <h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">INFORME MENSUAL</h1>
     <p style="font-size:14px;font-weight:700;color:#333;margin-bottom:4px">${nombreMes.toUpperCase()}</p>
-    <p>Generado: ${new Date().toLocaleDateString('es-AR')}</p>
-    <p>Malvinas 2084 — Mar del Plata</p>
+    <p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p>
+    <p style="font-size:11px;color:#555">Malvinas 2084 — Mar del Plata</p>
   </div>
 </div>
 <div class="stats">
@@ -791,21 +780,15 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
   const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠'}
   const trabajosTaller=tallerVista?trabajos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(a.fecha_ingreso)-new Date(b.fecha_ingreso)):[]
   const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca):[]
-  const {totalPesos,totalUSD}=calcularTotalesPresupuesto()
+  const {totalEfectivo,totalTransferencia,totalUSD,descMonto}=calcularTotalesPresupuesto()
   const navLinks=[
     {color:'#E1306C',icon:<IgIcon/>,href:'https://www.instagram.com/di_fiore_mecanica/',label:'@di_fiore_mecanica'},
     {color:'#1877F2',icon:<FbIcon/>,href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr',label:'di_fiore_mecanica'},
     {color:'#25D366',icon:<WaIcon/>,href:'tel:+542235299700',label:'223 529-9700'},
     {color:'#EA4335',icon:<MapIcon/>,href:'https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1',label:'Malvinas 2084, MdP'},
   ]
-
-  const autocompleteSyle = {
-    position:'absolute',top:'100%',left:0,right:0,background:'white',border:'1px solid #CBD5E0',
-    borderRadius:'6px',zIndex:100,boxShadow:'0 4px 12px rgba(0,0,0,.1)',maxHeight:'200px',overflowY:'auto'
-  }
-  const autocompleteItemStyle = {
-    padding:'8px 12px',cursor:'pointer',fontSize:'13px',borderBottom:'1px solid #F7FAFC'
-  }
+  const autocompleteSyle={position:'absolute',top:'100%',left:0,right:0,background:'white',border:'1px solid #CBD5E0',borderRadius:'6px',zIndex:100,boxShadow:'0 4px 12px rgba(0,0,0,.1)',maxHeight:'200px',overflowY:'auto'}
+  const autocompleteItemStyle={padding:'8px 12px',cursor:'pointer',fontSize:'13px',borderBottom:'1px solid #F7FAFC'}
   return (
     <div className={styles.app}>
       <button className={styles.menuBtn} onClick={()=>setSidebarOpen(!sidebarOpen)}>☰</button>
@@ -818,7 +801,6 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
         <div className={styles.modalTitle}>💬 Enviar WhatsApp</div>
         <div className={styles.modalSub}>{modalWsp.trabajo?.vehiculos?.clientes?.nombre} · {modalWsp.trabajo?.vehiculos?.clientes?.telefono}</div>
         <div className={styles.formGroup} style={{marginTop:'1rem'}}><label>Mensaje</label><textarea value={msgWsp} onChange={e=>setMsgWsp(e.target.value)} style={{minHeight:'100px'}}/></div>
-        <div style={{fontSize:'11px',color:'#718096',marginTop:'6px'}}>Se enviará también nombre, vehículo y patente.</div>
         <div className={styles.modalActions}>
           <button className={styles.btn} onClick={()=>{setModalWsp(null);setSeccion('clientes')}}>Cancelar</button>
           <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#25D366',color:'#fff',border:'none',fontFamily:'inherit',fontWeight:'600'}} onClick={enviarWsp}>Enviar WhatsApp</button>
@@ -966,9 +948,7 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
               <h1 className={styles.pageTitle}>Dashboard</h1>
               <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
                 {dolarBlue&&<div style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0',display:'flex',gap:'10px'}}>
-                  <span>💵 Compra: <b>${formatPeso(dolarBlue.compra)}</b></span>
-                  <span>|</span>
-                  <span>Venta: <b>${formatPeso(dolarBlue.venta)}</b></span>
+                  <span>💵 Compra: <b>${formatPeso(dolarBlue.compra)}</b></span><span>|</span><span>Venta: <b>${formatPeso(dolarBlue.venta)}</b></span>
                 </div>}
                 <button className={styles.btnPrimary} onClick={cargarDatos}>↻ Actualizar</button>
               </div>
@@ -1228,6 +1208,7 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                 <div className={styles.formGroup}><label>Vehículo</label><input value={presupuesto.vehiculo} onChange={e=>setPresupuesto({...presupuesto,vehiculo:e.target.value})} placeholder="Ej: Volkswagen Amarok V6"/></div>
               </div>
             </div>
+
             <div className={styles.card}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
                 <div className={styles.cardTitle} style={{margin:0}}>Ítems del presupuesto</div>
@@ -1275,37 +1256,59 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                 </label>
                 {presupuesto.aplicar_descuento&&(
                   <div className={styles.formGrid}>
-                    <div className={styles.formGroup}>
-                      <label>Concepto del descuento</label>
-                      <input value={presupuesto.descuento_concepto} onChange={e=>setPresupuesto({...presupuesto,descuento_concepto:e.target.value})} placeholder="Ej: Descuento por diagnóstico"/>
-                    </div>
-                    <div className={styles.formGroup}>
-                      <label>Monto a descontar ($)</label>
-                      <input value={presupuesto.descuento_monto} onChange={e=>setPresupuesto({...presupuesto,descuento_monto:formatNum(e.target.value)})} placeholder="100.000"/>
-                    </div>
+                    <div className={styles.formGroup}><label>Concepto del descuento</label><input value={presupuesto.descuento_concepto} onChange={e=>setPresupuesto({...presupuesto,descuento_concepto:e.target.value})} placeholder="Ej: Descuento por diagnóstico"/></div>
+                    <div className={styles.formGroup}><label>Monto a descontar ($)</label><input value={presupuesto.descuento_monto} onChange={e=>setPresupuesto({...presupuesto,descuento_monto:formatNum(e.target.value)})} placeholder="100.000"/></div>
                   </div>
                 )}
               </div>
 
-              {/* RESUMEN */}
-              <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'12px 16px',marginTop:'8px'}}>
-                <div style={{fontSize:'11px',color:'#2563EB',fontWeight:'700',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'.5px'}}>Resumen</div>
-                <div style={{display:'flex',gap:'24px',flexWrap:'wrap'}}>
-                  {presupuesto.moneda_mano_obra==='USD'&&totalUSD>0&&<div style={{fontSize:'13px',color:'#2D3748'}}><span style={{color:'#718096'}}>Mano de obra: </span><b>USS {formatPeso(totalUSD)}</b></div>}
-                  {presupuesto.items.filter(i=>!i.es_mano_obra&&i.total).length>0&&<div style={{fontSize:'13px',color:'#2D3748'}}><span style={{color:'#718096'}}>Repuestos: </span><b>${formatPeso(presupuesto.items.filter(i=>!i.es_mano_obra&&i.total).reduce((a,i)=>a+(parseFloat(parseNum(i.total.toString()))||0),0))}</b></div>}
-                  {presupuesto.aplicar_descuesto&&presupuesto.descuento_monto&&<div style={{fontSize:'13px',color:'#16A34A'}}><span style={{color:'#718096'}}>Descuento: </span><b>-${formatPeso(parseFloat(parseNum(presupuesto.descuento_monto.toString()))||0)}</b></div>}
-                  <div style={{fontSize:'13px',color:'#2563EB',fontWeight:'700'}}>
-                    {presupuesto.moneda_mano_obra==='USD'&&dolarBlue&&totalUSD>0?`Total estimado: $${formatPeso(Math.round(totalPesos))}`:`Total: $${formatPeso(Math.round(totalPesos))}`}
+              {/* TRANSFERENCIA */}
+              <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'12px 16px',marginBottom:'8px'}}>
+                <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px',cursor:'pointer',fontWeight:'600',color:'#2563EB',marginBottom:'10px'}}>
+                  <input type="checkbox" checked={presupuesto.mostrar_transferencia} onChange={e=>setPresupuesto({...presupuesto,mostrar_transferencia:e.target.checked})}/>
+                  Mostrar precio transferencia / efectivo (descuento)
+                </label>
+                {presupuesto.mostrar_transferencia&&(
+                  <div>
+                    <div style={{fontSize:'12px',color:'#555',marginBottom:'8px'}}>Aplicar recargo del 20% sobre:</div>
+                    <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
+                      <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}>
+                        <input type="checkbox" checked={presupuesto.transferencia_repuestos} onChange={e=>setPresupuesto({...presupuesto,transferencia_repuestos:e.target.checked})}/> Repuestos
+                      </label>
+                      <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}>
+                        <input type="checkbox" checked={presupuesto.transferencia_mano_obra} disabled={presupuesto.moneda_mano_obra==='USD'} onChange={e=>setPresupuesto({...presupuesto,transferencia_mano_obra:e.target.checked})}/> Mano de obra en pesos
+                        {presupuesto.moneda_mano_obra==='USD'&&<span style={{fontSize:'11px',color:'#A0AEC0'}}>(solo aplica en ARS)</span>}
+                      </label>
+                    </div>
+                    {presupuesto.mostrar_transferencia&&(
+                      <div style={{marginTop:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+                        <div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                          <span style={{fontSize:'12px',fontWeight:'600'}}>🏦 Transferencia</span>
+                          <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalTransferencia))}</span>
+                        </div>
+                        <div style={{background:'#15803D',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                          <span style={{fontSize:'12px',fontWeight:'600'}}>💵 Efectivo (descuento)</span>
+                          <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalEfectivo))}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+                {!presupuesto.mostrar_transferencia&&(
+                  <div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'4px'}}>
+                    <span style={{fontSize:'12px',fontWeight:'600'}}>TOTAL</span>
+                    <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalEfectivo))}</span>
+                  </div>
+                )}
               </div>
             </div>
+
             <div className={styles.card}>
               <div className={styles.cardTitle}>Notas / Observaciones</div>
               <div className={styles.formGroup}><label>Una por línea (aparecerán con ✅)</label><textarea value={presupuesto.notas} onChange={e=>setPresupuesto({...presupuesto,notas:e.target.value})} placeholder={'Kit de distribución de origen Alemán.\nRepuestos originales. Trabajo garantizado.'} style={{minHeight:'80px'}}/></div>
             </div>
             <div className={styles.formActions}>
-              <button className={styles.btn} onClick={()=>setPresupuesto({numero:'001-00001',fecha:new Date().toISOString().split('T')[0],cliente:'',vehiculo:'',items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],notas:'',moneda_mano_obra:'ARS',descuento_concepto:'Descuento por diagnóstico',descuento_monto:'',aplicar_descuento:false})}>Limpiar</button>
+              <button className={styles.btn} onClick={()=>setPresupuesto({numero:'001-00001',fecha:new Date().toISOString().split('T')[0],cliente:'',vehiculo:'',items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],notas:'',moneda_mano_obra:'ARS',descuento_concepto:'Descuento por diagnóstico',descuento_monto:'',aplicar_descuento:false,mostrar_transferencia:false,transferencia_repuestos:true,transferencia_mano_obra:false})}>Limpiar</button>
               <button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir presupuesto</button>
             </div>
           </div>
@@ -1471,9 +1474,7 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                 <tbody>
                   {repuestos.map(r=>(
                     <tr key={r.id}>
-                      <td>{r.nombre}</td>
-                      <td>${formatPeso(r.valor)}</td>
-                      <td>{r.lugar||'—'}</td>
+                      <td>{r.nombre}</td><td>${formatPeso(r.valor)}</td><td>{r.lugar||'—'}</td>
                       <td style={{fontSize:'12px',color:'#718096'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>
                       {admin&&<td style={{display:'flex',gap:'4px',cursor:'default'}}>
                         <button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:formatNum(r.valor.toString()),lugar:r.lugar||'',fecha:r.fecha});setModalEditarRepuesto(true)}}>✏️</button>
