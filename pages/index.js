@@ -10,6 +10,16 @@ const FbIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="curre
 const WaIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 const MapIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.402 16.199 0 12 0zm0 11c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/></svg>
 
+function formatNum(val) {
+  if (!val && val !== 0) return ''
+  const n = val.toString().replace(/\D/g,'')
+  return n.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
+function parseNum(val) {
+  return val.toString().replace(/\./g,'')
+}
+
 export default function Home({ rol, cerrarSesion }) {
   const admin = rol === 'admin'
 
@@ -24,6 +34,8 @@ export default function Home({ rol, cerrarSesion }) {
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [dolarBlue, setDolarBlue] = useState(null)
+  const [mesInforme, setMesInforme] = useState(new Date().toISOString().slice(0,7))
+
   const [form, setForm] = useState({
     nombre: '', telefono: '', email: '',
     marca_modelo: '', patente: '', anio: '', kilometraje: '', color: '',
@@ -56,26 +68,16 @@ export default function Home({ rol, cerrarSesion }) {
   const [subiendo, setSubiendo] = useState(false)
 
   const [presupuesto, setPresupuesto] = useState({
-    numero: '001-00001',
-    fecha: new Date().toISOString().split('T')[0],
-    cliente: '',
-    vehiculo: '',
+    numero: '001-00001', fecha: new Date().toISOString().split('T')[0],
+    cliente: '', vehiculo: '', telefono: '',
     items: [{ descripcion: '', precio_unitario: '', total: '', es_mano_obra: false }],
-    notas: '',
-    moneda_mano_obra: 'ARS'
+    notas: '', moneda_mano_obra: 'ARS'
   })
 
   const [recibo, setRecibo] = useState({
-    numero: '001-00001',
-    fecha: new Date().toISOString().split('T')[0],
-    cliente: '',
-    vehiculo: '',
-    patente: '',
-    concepto: '',
-    monto: '',
-    moneda: 'ARS',
-    forma_pago: 'Efectivo',
-    observaciones: ''
+    numero: '001-00001', fecha: new Date().toISOString().split('T')[0],
+    cliente: '', vehiculo: '', patente: '', telefono: '',
+    concepto: '', monto: '', moneda: 'ARS', forma_pago: 'Efectivo', observaciones: ''
   })
 
   const fileRef = useRef()
@@ -89,10 +91,8 @@ export default function Home({ rol, cerrarSesion }) {
       try {
         const res = await fetch('https://dolarapi.com/v1/dolares/blue')
         const data = await res.json()
-        setDolarBlue(data.venta)
-      } catch (e) {
-        setDolarBlue(null)
-      }
+        setDolarBlue({ compra: data.compra, venta: data.venta })
+      } catch (e) { setDolarBlue(null) }
     }
     fetchDolar()
   }, [])
@@ -144,14 +144,13 @@ export default function Home({ rol, cerrarSesion }) {
   function formatPeso(valor) { return Number(valor).toLocaleString('es-AR') }
 
   function calcularTotalesPresupuesto() {
-    let totalPesos = 0
-    let totalUSD = 0
+    let totalPesos = 0, totalUSD = 0
     presupuesto.items.forEach(item => {
       if (!item.total) return
-      const val = parseFloat(item.total.toString().replace(/\./g,'').replace(',','.')) || 0
+      const val = parseFloat(parseNum(item.total)) || 0
       if (item.es_mano_obra && presupuesto.moneda_mano_obra === 'USD') {
         totalUSD += val
-        if (dolarBlue) totalPesos += val * dolarBlue
+        if (dolarBlue) totalPesos += val * dolarBlue.venta
       } else {
         totalPesos += val
       }
@@ -159,10 +158,53 @@ export default function Home({ rol, cerrarSesion }) {
     return { totalPesos, totalUSD }
   }
 
+  function enviarPresupuestoWsp() {
+    let tel = presupuesto.telefono?.replace(/\D/g,'')
+    if (!tel) { alert('Ingresá el teléfono del cliente para enviar por WhatsApp'); return }
+    if (!tel.startsWith('54')) tel = '54' + tel
+    const { totalPesos, totalUSD } = calcularTotalesPresupuesto()
+    const usandoUSD = presupuesto.moneda_mano_obra === 'USD'
+    let msg = `*PRESUPUESTO N° ${presupuesto.numero} — DiFiore Performance*\n`
+    msg += `Fecha: ${new Date(presupuesto.fecha + 'T12:00:00').toLocaleDateString('es-AR')}\n\n`
+    msg += `*Cliente:* ${presupuesto.cliente || '—'}\n`
+    msg += `*Vehículo:* ${presupuesto.vehiculo || '—'}\n\n`
+    msg += `*Detalle:*\n`
+    presupuesto.items.filter(i => i.descripcion).forEach(item => {
+      const simbolo = item.es_mano_obra ? (usandoUSD ? 'USS' : '$') : '$'
+      msg += `• ${item.descripcion}${item.total ? `: ${simbolo} ${item.total}` : ''}\n`
+    })
+    if (usandoUSD && totalUSD > 0) msg += `\n*Mano de obra:* USS ${formatPeso(totalUSD)}`
+    msg += `\n*Total repuestos:* $${formatPeso(presupuesto.items.filter(i => !i.es_mano_obra && i.total).reduce((a,i) => a + (parseFloat(parseNum(i.total)) || 0), 0))}`
+    if (usandoUSD && dolarBlue && totalUSD > 0) msg += `\n*Total estimado en pesos:* $${formatPeso(Math.round(totalPesos))}`
+    if (presupuesto.notas) msg += `\n\n${presupuesto.notas.split('\n').filter(n => n.trim()).map(n => `✅ ${n}`).join('\n')}`
+    msg += `\n\n_Di Fiore Performance — Malvinas 2084, MdP_`
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
+  function enviarReciboWsp() {
+    let tel = recibo.telefono?.replace(/\D/g,'')
+    if (!tel) { alert('Ingresá el teléfono del cliente para enviar por WhatsApp'); return }
+    if (!tel.startsWith('54')) tel = '54' + tel
+    const esUSD = recibo.moneda === 'USD'
+    const montoEnPesos = esUSD && dolarBlue ? parseFloat(parseNum(recibo.monto)) * dolarBlue.venta : null
+    let msg = `*RECIBO N° ${recibo.numero} — DiFiore Performance*\n`
+    msg += `Fecha: ${new Date(recibo.fecha + 'T12:00:00').toLocaleDateString('es-AR')}\n\n`
+    msg += `*Cliente:* ${recibo.cliente || '—'}\n`
+    msg += `*Vehículo:* ${recibo.vehiculo || '—'} | Patente: ${recibo.patente || '—'}\n`
+    msg += `*Forma de pago:* ${recibo.forma_pago}\n\n`
+    msg += `*Monto recibido:* ${esUSD ? 'USS' : '$'} ${recibo.monto ? formatPeso(parseFloat(parseNum(recibo.monto))) : '0'}`
+    if (esUSD && montoEnPesos) msg += ` (≈ $${formatPeso(Math.round(montoEnPesos))})`
+    msg += `\n\n*Concepto:* ${recibo.concepto || '—'}`
+    if (recibo.observaciones) msg += `\n\n*Observaciones:* ${recibo.observaciones}`
+    msg += `\n\n_Di Fiore Performance — Malvinas 2084, MdP_`
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
   function imprimirPresupuesto() {
     const { totalPesos, totalUSD } = calcularTotalesPresupuesto()
     const usandoUSD = presupuesto.moneda_mano_obra === 'USD'
     const manoObra = presupuesto.items.find(i => i.es_mano_obra)
+    const totalRepuestos = presupuesto.items.filter(i => !i.es_mano_obra && i.total).reduce((a,i) => a + (parseFloat(parseNum(i.total)) || 0), 0)
 
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>
 <style>
@@ -178,23 +220,22 @@ body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; m
 .cliente-box label { font-size:9px; font-weight:700; color:#1a56db; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:3px; }
 .cliente-box span { font-size:14px; font-weight:700; color:#1a1a1a; }
 table { width:100%; border-collapse:collapse; margin-bottom:20px; }
-thead th { background:#1a56db; color:#fff; padding:10px 12px; text-align:left; font-size:11px; font-weight:700; letter-spacing:.5px; }
-thead th:last-child { text-align:right; }
-thead th:nth-child(2) { text-align:right; }
+thead th { background:#1a56db; color:#fff; padding:10px 12px; text-align:left; font-size:11px; font-weight:700; }
+thead th:nth-child(2),thead th:nth-child(3) { text-align:right; }
 tbody td { padding:10px 12px; border-bottom:1px solid #f0f0f0; font-size:12px; vertical-align:top; }
-tbody td:nth-child(2) { text-align:right; }
-tbody td:last-child { text-align:right; font-weight:600; }
+tbody td:nth-child(2),tbody td:nth-child(3) { text-align:right; font-weight:600; }
 tbody tr:nth-child(even) { background:#f8faff; }
 .footer-box { display:flex; justify-content:space-between; align-items:flex-start; margin-top:16px; }
 .notas { flex:1; padding-right:30px; }
-.notas p { font-size:11px; color:#444; display:flex; align-items:flex-start; gap:6px; margin-bottom:6px; }
+.notas p { font-size:11px; color:#444; display:flex; gap:6px; margin-bottom:6px; }
 .totales { min-width:240px; border:1px solid #e0e0e0; border-radius:8px; overflow:hidden; }
 .total-row { display:flex; justify-content:space-between; padding:8px 14px; font-size:12px; border-bottom:1px solid #f0f0f0; }
-.total-row:last-child { border-bottom:none; }
+.total-row:last-child { border:none; }
 .total-row.highlight { background:#1a56db; color:#fff; font-size:15px; font-weight:900; }
+.total-row.highlight2 { background:#0f3fa3; color:#fff; font-size:15px; font-weight:900; }
 .total-row.sub { background:#f8faff; font-size:11px; color:#555; }
-.dolar-info { font-size:9px; color:#888; text-align:right; margin-top:4px; padding-right:14px; }
-.bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; letter-spacing:.5px; }
+.dolar-info { font-size:9px; color:#888; text-align:right; margin-top:4px; padding-right:4px; }
+.bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
 @media print { body { padding:15px; } }
 </style></head><body>
 <div class="header">
@@ -212,21 +253,11 @@ tbody tr:nth-child(even) { background:#f8faff; }
   <div><label>Vehículo</label><span>${presupuesto.vehiculo || '—'}</span></div>
 </div>
 <table>
-  <thead>
-    <tr>
-      <th style="width:50%">DESCRIPCIÓN</th>
-      <th style="width:25%">PRECIO UNITARIO</th>
-      <th style="width:25%">TOTAL</th>
-    </tr>
-  </thead>
+  <thead><tr><th style="width:50%">DESCRIPCIÓN</th><th style="width:25%">PRECIO UNITARIO</th><th style="width:25%">TOTAL</th></tr></thead>
   <tbody>
     ${presupuesto.items.filter(i => i.descripcion).map(item => {
       const simbolo = item.es_mano_obra ? (usandoUSD ? 'USS' : '$') : '$'
-      return `<tr>
-        <td>${item.descripcion}</td>
-        <td>${item.precio_unitario ? `${simbolo} ${item.precio_unitario}` : ''}</td>
-        <td>${item.total ? `${simbolo} ${item.total}` : ''}</td>
-      </tr>`
+      return `<tr><td>${item.descripcion}</td><td>${item.precio_unitario ? `${simbolo} ${item.precio_unitario}` : ''}</td><td>${item.total ? `${simbolo} ${item.total}` : ''}</td></tr>`
     }).join('')}
   </tbody>
 </table>
@@ -236,27 +267,23 @@ tbody tr:nth-child(even) { background:#f8faff; }
   </div>
   <div>
     <div class="totales">
-      ${usandoUSD && manoObra ? `
-      <div class="total-row sub"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div>
-      <div class="total-row sub"><span>Repuestos</span><span>$ ${formatPeso(presupuesto.items.filter(i => !i.es_mano_obra && i.total).reduce((a,i) => a + (parseFloat(i.total.toString().replace(/\./g,'').replace(',','.')) || 0), 0))}</span></div>` : ''}
-      ${usandoUSD && dolarBlue ? `<div class="total-row highlight"><span>Total en pesos</span><span>$ ${formatPeso(Math.round(totalPesos))}</span></div>
-      <div class="total-row highlight" style="background:#0f3fa3"><span>Total en USD</span><span>USS ${manoObra?.total || 0}</span></div>` :
-      `<div class="total-row highlight"><span>TOTAL</span><span>$ ${formatPeso(Math.round(totalPesos))}</span></div>`}
+      ${usandoUSD && manoObra ? `<div class="total-row sub"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div><div class="total-row sub"><span>Repuestos</span><span>$ ${formatPeso(totalRepuestos)}</span></div>` : ''}
+      ${usandoUSD && dolarBlue ? `<div class="total-row highlight"><span>Total en pesos</span><span>$ ${formatPeso(Math.round(totalPesos))}</span></div><div class="total-row highlight2"><span>Total en USD</span><span>USS ${manoObra?.total || 0}</span></div>` : `<div class="total-row highlight"><span>TOTAL</span><span>$ ${formatPeso(Math.round(totalPesos))}</span></div>`}
     </div>
-    ${usandoUSD && dolarBlue ? `<div class="dolar-info">Dólar blue: $${formatPeso(dolarBlue)}</div>` : ''}
+    ${usandoUSD && dolarBlue ? `<div class="dolar-info">Dólar blue venta: $${formatPeso(dolarBlue.venta)}</div>` : ''}
   </div>
 </div>
 <div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600 — ¡Gracias por confiar en nosotros!</div>
 <script>window.onload=()=>{window.print()}<\/script>
 </body></html>`
     const w = window.open('','_blank','width=820,height=1000')
-    w.document.write(html)
-    w.document.close()
+    w.document.write(html); w.document.close()
   }
 
   function imprimirRecibo() {
     const esUSD = recibo.moneda === 'USD'
-    const montoEnPesos = esUSD && dolarBlue ? parseFloat(recibo.monto) * dolarBlue : null
+    const montoNum = parseFloat(parseNum(recibo.monto)) || 0
+    const montoEnPesos = esUSD && dolarBlue ? montoNum * dolarBlue.venta : null
 
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibo</title>
 <style>
@@ -286,12 +313,7 @@ body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; m
 </style></head><body>
 <div class="header">
   <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
-  <div class="header-info">
-    <h1>RECIBO</h1>
-    <p>N° ${recibo.numero}</p>
-    <p>Fecha: ${new Date(recibo.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</p>
-    <p>Malvinas 2084 — Mar del Plata 7600</p>
-  </div>
+  <div class="header-info"><h1>RECIBO</h1><p>N° ${recibo.numero}</p><p>Fecha: ${new Date(recibo.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</p><p>Malvinas 2084 — Mar del Plata 7600</p></div>
 </div>
 <div class="datos">
   <div class="dato"><label>Cliente</label><span>${recibo.cliente || '—'}</span></div>
@@ -301,13 +323,10 @@ body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; m
 </div>
 <div class="monto-box">
   <label>MONTO RECIBIDO</label>
-  <div class="monto">${esUSD ? 'USS' : '$'} ${recibo.monto ? formatPeso(parseFloat(recibo.monto)) : '0'}</div>
-  ${esUSD && montoEnPesos ? `<div class="monto-sub">≈ $${formatPeso(Math.round(montoEnPesos))} (Dólar blue $${formatPeso(dolarBlue)})</div>` : ''}
+  <div class="monto">${esUSD ? 'USS' : '$'} ${montoNum ? formatPeso(montoNum) : '0'}</div>
+  ${esUSD && montoEnPesos ? `<div class="monto-sub">≈ $${formatPeso(Math.round(montoEnPesos))} (Dólar blue $${formatPeso(dolarBlue.venta)})</div>` : ''}
 </div>
-<div class="concepto-box">
-  <label>Concepto</label>
-  <p>${recibo.concepto || '—'}</p>
-</div>
+<div class="concepto-box"><label>Concepto</label><p>${recibo.concepto || '—'}</p></div>
 ${recibo.observaciones ? `<div class="concepto-box"><label>Observaciones</label><p>${recibo.observaciones}</p></div>` : ''}
 <div class="firma-box">
   <div class="firma"><div class="firma-line"></div><span>Firma del cliente</span></div>
@@ -317,11 +336,10 @@ ${recibo.observaciones ? `<div class="concepto-box"><label>Observaciones</label>
 <script>window.onload=()=>{window.print()}<\/script>
 </body></html>`
     const w = window.open('','_blank','width=820,height=900')
-    w.document.write(html)
-    w.document.close()
+    w.document.write(html); w.document.close()
   }
 
-  function imprimirOrden(trabajo) {
+  function imprimirOrdenConObservaciones(trabajo, obs) {
     const c = trabajo.vehiculos?.clientes
     const v = trabajo.vehiculos
     const fecha = (f) => f ? new Date(f).toLocaleDateString('es-AR') : '___/___/______'
@@ -332,8 +350,7 @@ ${recibo.observaciones ? `<div class="concepto-box"><label>Observaciones</label>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:12px; max-width:720px; margin:0 auto; }
 .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; border-bottom:2px solid #000; padding-bottom:6px; }
-.header-logo { width:130px; }
-.header-logo img { width:100%; }
+.header-logo { width:130px; } .header-logo img { width:100%; }
 .header-center { text-align:center; flex:1; }
 .header-center h1 { font-size:15px; font-weight:900; letter-spacing:1px; margin-bottom:2px; }
 .header-center .brand { font-size:12px; font-weight:900; color:#1a56db; letter-spacing:2px; }
@@ -345,7 +362,6 @@ body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:12px; m
 .field label { font-size:9px; color:#444; display:block; }
 .field .val { border-bottom:1px solid #000; min-height:15px; font-size:11px; font-weight:600; padding:1px 0; }
 .section-title { background:#222; color:#fff; text-align:center; font-weight:bold; font-size:10px; padding:3px; margin:6px 0 4px; letter-spacing:1px; }
-.linea { border-bottom:1px solid #bbb; height:20px; margin-bottom:1px; }
 .motivo-text { font-size:13px; font-weight:500; border-bottom:1px solid #000; padding:4px; line-height:1.6; min-height:20px; }
 .grua-seg { display:flex; gap:16px; margin-bottom:4px; }
 .grua-item { display:flex; gap:8px; align-items:center; font-size:10px; }
@@ -354,13 +370,10 @@ body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:12px; m
 .acepto { text-align:center; margin-top:8px; font-size:10px; letter-spacing:2px; }
 .acepto-line { display:flex; justify-content:center; align-items:center; gap:20px; margin-top:5px; }
 .firma { border-bottom:1px solid #000; width:150px; }
-.tc { margin-top:8px; border-top:2px solid #000; padding-top:6px; }
-.tc-title { font-size:10px; font-weight:900; letter-spacing:1px; margin-bottom:5px; text-align:center; background:#222; color:#fff; padding:4px; }
-.tc-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 14px; }
-.tc-item { font-size:9px; line-height:1.45; margin-bottom:4px; }
-.tc-item b { display:block; font-size:9px; text-transform:uppercase; }
-.footer { margin-top:6px; border-top:1px solid #ccc; padding-top:5px; display:flex; justify-content:space-between; align-items:center; font-size:9px; color:#444; flex-wrap:wrap; gap:6px; }
-.footer-icons { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.obs-box { margin-top:10px; border-top:2px solid #000; padding-top:8px; }
+.obs-title { font-size:11px; font-weight:900; letter-spacing:1px; margin-bottom:8px; text-align:center; background:#222; color:#fff; padding:4px; }
+.obs-text { font-size:12px; line-height:1.7; padding:8px; border:1px solid #ddd; border-radius:4px; background:#f9f9f9; min-height:60px; }
+.footer { margin-top:8px; border-top:1px solid #ccc; padding-top:5px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:9px; color:#444; }
 .footer-icon { display:flex; align-items:center; gap:4px; text-decoration:none; color:#444; }
 @media print { body { padding:6px; } }
 </style></head><body>
@@ -391,7 +404,101 @@ body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:12px; m
     </div>
   </div>
   <div>
-    <div style="font-weight:900;margin-bottom:5px;font-size:10px;letter-spacing:.5px;">DATOS DEL CLIENTE</div>
+    <div style="font-weight:900;margin-bottom:5px;font-size:10px;">DATOS DEL CLIENTE</div>
+    <div class="field"><label>Ingreso:</label><div class="val">${fecha(trabajo.fecha_ingreso)}</div></div>
+    <div class="field"><label>Salida:</label><div class="val">${fecha(trabajo.fecha_salida)}</div></div>
+    <div class="field"><label>Nombre:</label><div class="val">${c?.nombre || ''}</div></div>
+    <div class="field"><label>Teléfono:</label><div class="val">${c?.telefono || ''}</div></div>
+    <div class="field"><label>Email:</label><div class="val">${c?.email || ''}</div></div>
+  </div>
+</div>
+<div class="section-title">TRABAJO REALIZADO</div>
+<div class="motivo-text">${trabajo.motivo || ''}</div>
+<div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">RECIBÍ CONFORME</span><div class="firma"></div></div></div>
+<div class="obs-box">
+  <div class="obs-title">OBSERVACIONES FINALES</div>
+  <div class="obs-text">${obs || '—'}</div>
+</div>
+<div class="footer">
+  <a class="footer-icon" href="https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1"><svg width="12" height="12" viewBox="0 0 24 24" fill="#EA4335"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.402 16.199 0 12 0zm0 11c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/></svg>Malvinas 2084, MdP</a>
+  <a class="footer-icon" href="tel:+542235299700"><svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>223 529-9700</a>
+  <a class="footer-icon" href="https://www.instagram.com/di_fiore_mecanica/"><svg width="12" height="12" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>@di_fiore_mecanica</a>
+  <a class="footer-icon" href="https://www.facebook.com/share/19VHZRovXq/"><svg width="12" height="12" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>di_fiore_mecanica</a>
+</div>
+<script>window.onload=()=>{window.print()}<\/script>
+</body></html>`
+    const w = window.open('','_blank','width=820,height=1000')
+    w.document.write(html); w.document.close()
+  }
+
+  function imprimirOrden(trabajo) {
+    const c = trabajo.vehiculos?.clientes
+    const v = trabajo.vehiculos
+    const fecha = (f) => f ? new Date(f).toLocaleDateString('es-AR') : '___/___/______'
+    const nroCliente = trabajo.numero_cliente || '—'
+
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:12px; max-width:720px; margin:0 auto; }
+.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; border-bottom:2px solid #000; padding-bottom:6px; }
+.header-logo { width:130px; } .header-logo img { width:100%; }
+.header-center { text-align:center; flex:1; }
+.header-center h1 { font-size:15px; font-weight:900; letter-spacing:1px; margin-bottom:2px; }
+.header-center .brand { font-size:12px; font-weight:900; color:#1a56db; letter-spacing:2px; }
+.header-center .sub { font-size:8px; letter-spacing:3px; color:#555; }
+.folio { text-align:right; font-size:9px; font-weight:bold; }
+.folio-num { font-size:20px; font-weight:900; border-bottom:2px solid #000; display:inline-block; min-width:60px; text-align:center; }
+.body { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; margin:8px 0; }
+.field { margin-bottom:5px; }
+.field label { font-size:9px; color:#444; display:block; }
+.field .val { border-bottom:1px solid #000; min-height:15px; font-size:11px; font-weight:600; padding:1px 0; }
+.section-title { background:#222; color:#fff; text-align:center; font-weight:bold; font-size:10px; padding:3px; margin:6px 0 4px; letter-spacing:1px; }
+.motivo-text { font-size:13px; font-weight:500; border-bottom:1px solid #000; padding:4px; line-height:1.6; min-height:20px; }
+.grua-seg { display:flex; gap:16px; margin-bottom:4px; }
+.grua-item { display:flex; gap:8px; align-items:center; font-size:10px; }
+.checkbox { display:inline-flex; align-items:center; gap:4px; }
+.box { width:11px; height:11px; border:1.5px solid #000; display:inline-block; vertical-align:middle; text-align:center; line-height:11px; font-size:9px; font-weight:bold; }
+.acepto { text-align:center; margin-top:8px; font-size:10px; letter-spacing:2px; }
+.acepto-line { display:flex; justify-content:center; align-items:center; gap:20px; margin-top:5px; }
+.firma { border-bottom:1px solid #000; width:150px; }
+.tc { margin-top:8px; border-top:2px solid #000; padding-top:6px; }
+.tc-title { font-size:11px; font-weight:900; letter-spacing:1px; margin-bottom:6px; text-align:center; background:#222; color:#fff; padding:4px; }
+.tc-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px 16px; }
+.tc-item { font-size:9.5px; line-height:1.5; margin-bottom:5px; }
+.tc-item b { display:block; font-size:9.5px; text-transform:uppercase; margin-bottom:1px; }
+.footer { margin-top:8px; border-top:1px solid #ccc; padding-top:5px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:9px; color:#444; }
+.footer-icon { display:flex; align-items:center; gap:4px; text-decoration:none; color:#444; }
+@media print { body { padding:6px; } }
+</style></head><body>
+<div class="header">
+  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
+  <div class="header-center">
+    <h1>ORDEN DE SERVICIO</h1>
+    <div class="brand">DiFiore<span style="color:#333">Performance</span></div>
+    <div class="sub">MECÁNICA AUTOMOTRIZ · MAR DEL PLATA</div>
+  </div>
+  <div class="folio">N° CLIENTE<br><span class="folio-num">${nroCliente}</span></div>
+</div>
+<div class="body">
+  <div>
+    <div class="field"><label>Marca / Modelo:</label><div class="val">${v?.marca_modelo || ''}</div></div>
+    <div class="field"><label>Color:</label><div class="val">${v?.color || ''}</div></div>
+    <div class="field"><label>Kilometraje:</label><div class="val">${v?.kilometraje || ''}</div></div>
+    <div class="field"><label>Patente:</label><div class="val">${v?.patente || ''}</div></div>
+    <div class="grua-seg">
+      <div class="grua-item"><span>Grúa:</span>
+        <span class="checkbox"><span class="box">${trabajo.llego_en_grua ? '✓' : ''}</span> Sí</span>
+        <span class="checkbox"><span class="box">${!trabajo.llego_en_grua ? '✓' : ''}</span> No</span>
+      </div>
+      <div class="grua-item"><span>Seguro:</span>
+        <span class="checkbox"><span class="box">${trabajo.tiene_seguro ? '✓' : ''}</span> Sí</span>
+        <span class="checkbox"><span class="box">${!trabajo.tiene_seguro ? '✓' : ''}</span> No</span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div style="font-weight:900;margin-bottom:5px;font-size:10px;">DATOS DEL CLIENTE</div>
     <div class="field"><label>Ingreso:</label><div class="val">${fecha(trabajo.fecha_ingreso)}</div></div>
     <div class="field"><label>Salida estimada:</label><div class="val">${fecha(trabajo.fecha_salida)}</div></div>
     <div class="field"><label>Nombre:</label><div class="val">${c?.nombre || ''}</div></div>
@@ -401,7 +508,6 @@ body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:12px; m
 </div>
 <div class="section-title">TRABAJO A REALIZAR / DESCRIPCIÓN DEL PROBLEMA</div>
 <div class="motivo-text">${trabajo.motivo || ''}</div>
-${Array(6).fill('<div class="linea"></div>').join('')}
 <div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">A C E P T O</span><div class="firma"></div></div></div>
 <div class="tc">
   <div class="tc-title">TÉRMINOS Y CONDICIONES — DI FIORE MECÁNICA</div>
@@ -415,37 +521,22 @@ ${Array(6).fill('<div class="linea"></div>').join('')}
     <div class="tc-item"><b>7. Garantía (30 días desde la entrega)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. NO TRABAJAMOS DE OTRA MANERA.</div>
     <div class="tc-item"><b>8. Entrega</b>El cliente podrá retirar su vehículo hasta las 17hs con previa coordinación.</div>
   </div>
-  <div style="display:flex;gap:30px;margin-top:6px;font-size:9px;">
+  <div style="display:flex;gap:30px;margin-top:8px;font-size:9px;">
     <div>Fecha: ___________________</div>
     <div>Patente: ___________________</div>
     <div style="flex:1;text-align:right;">Firma y aclaración: ___________________</div>
   </div>
 </div>
 <div class="footer">
-  <div class="footer-icons">
-    <a class="footer-icon" href="https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="#EA4335"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.402 16.199 0 12 0zm0 11c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/></svg>
-      Malvinas Argentinas 2084, MdP
-    </a>
-    <a class="footer-icon" href="tel:+542235299700">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-      223 529-9700
-    </a>
-    <a class="footer-icon" href="https://www.instagram.com/di_fiore_mecanica/">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-      @di_fiore_mecanica
-    </a>
-    <a class="footer-icon" href="https://www.facebook.com/share/19VHZRovXq/">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-      di_fiore_mecanica
-    </a>
-  </div>
+  <a class="footer-icon" href="https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1"><svg width="12" height="12" viewBox="0 0 24 24" fill="#EA4335"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.402 16.199 0 12 0zm0 11c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/></svg>Malvinas Argentinas 2084, MdP</a>
+  <a class="footer-icon" href="tel:+542235299700"><svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>223 529-9700</a>
+  <a class="footer-icon" href="https://www.instagram.com/di_fiore_mecanica/"><svg width="12" height="12" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>@di_fiore_mecanica</a>
+  <a class="footer-icon" href="https://www.facebook.com/share/19VHZRovXq/"><svg width="12" height="12" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>di_fiore_mecanica</a>
 </div>
 <script>window.onload=()=>{window.print()}<\/script>
 </body></html>`
     const w = window.open('','_blank','width=820,height=1000')
-    w.document.write(html)
-    w.document.close()
+    w.document.write(html); w.document.close()
   }
 
   function imprimirRepuestos(trabajo, lista) {
@@ -466,7 +557,7 @@ body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:15px; m
 .folio { text-align:right; font-size:9px; font-weight:bold; }
 .folio-num { font-size:22px; font-weight:900; border-bottom:2px solid #000; display:inline-block; min-width:60px; text-align:center; }
 .info { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:10px 0; padding:8px; border:1px solid #ddd; border-radius:4px; background:#f9f9f9; }
-.info-item label { font-size:9px; color:#555; display:block; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; }
+.info-item label { font-size:9px; color:#555; display:block; font-weight:bold; text-transform:uppercase; }
 .info-item span { font-size:12px; font-weight:700; }
 table { width:100%; border-collapse:collapse; margin-bottom:12px; }
 thead th { background:#222; color:#fff; padding:7px 10px; text-align:left; font-size:10px; font-weight:bold; }
@@ -505,8 +596,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
 <script>window.onload=()=>{window.print()}<\/script>
 </body></html>`
     const w = window.open('','_blank','width=820,height=900')
-    w.document.write(html)
-    w.document.close()
+    w.document.write(html); w.document.close()
   }
 
   function abrirWsp(trabajo) {
@@ -539,7 +629,10 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
       mecanico: formReingreso.mecanico, taller: formReingreso.taller, llego_en_grua: formReingreso.llego_en_grua,
       tiene_seguro: trabajo.tiene_seguro, fecha_ingreso: fechaIngreso
     }).select('*, vehiculos(*, clientes(*))').single()
-    if (nuevoTrabajo) await agregarHistorial(nuevoTrabajo.id, 'reingreso', `Reingreso al taller ${formReingreso.taller}. Motivo: ${formReingreso.motivo}`)
+    if (nuevoTrabajo) {
+      await agregarHistorial(nuevoTrabajo.id, 'reingreso', `Reingreso al taller ${formReingreso.taller}. Motivo: ${formReingreso.motivo}`)
+      await agregarHistorial(nuevoTrabajo.id, 'estado', `Historial anterior: el vehículo ya había ingresado previamente al taller (trabajo N° ${trabajo.id.slice(0,8)}).`)
+    }
     setModalReingreso(null)
     setFormReingreso({ motivo: '', mecanico: '', taller: 'Malvinas 2084', estado: 'Diagnóstico', llego_en_grua: false, fecha_ingreso_manual: '' })
     cargarDatos()
@@ -577,9 +670,14 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   async function registrarSalida() {
     await supabase.from('trabajos').update({ estado: 'Salio', fecha_salida: new Date().toISOString(), observacion_final: observacionFinal }).eq('id', modalSalida.id)
     await agregarHistorial(modalSalida.id, 'salida', `Vehículo retirado. ${observacionFinal ? 'Obs: ' + observacionFinal : ''}`)
-    setModalSalida(null); setObservacionFinal('')
-    if (clienteDetalle?.id === modalSalida.id) { setSeccion('clientes'); setClienteDetalle(null) }
+    const trabajoActualizado = { ...modalSalida, estado: 'Salio', fecha_salida: new Date().toISOString(), observacion_final: observacionFinal }
+    setModalSalida(null)
+    setObservacionFinal('')
+    if (clienteDetalle?.id === trabajoActualizado.id) { setSeccion('clientes'); setClienteDetalle(null) }
     cargarDatos()
+    if (observacionFinal && window.confirm('¿Querés imprimir la orden con las observaciones finales?')) {
+      imprimirOrdenConObservaciones(trabajoActualizado, observacionFinal)
+    }
   }
 
   async function borrarCliente(trabajo) {
@@ -623,14 +721,14 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
 
   async function guardarRepuesto() {
     const trabajoId = modalRepuesto.id
-    await supabase.from('repuestos').insert({ trabajo_id: trabajoId, nombre: formRepuesto.nombre, valor: parseFloat(formRepuesto.valor) || 0, lugar: formRepuesto.lugar, fecha: formRepuesto.fecha })
+    await supabase.from('repuestos').insert({ trabajo_id: trabajoId, nombre: formRepuesto.nombre, valor: parseFloat(parseNum(formRepuesto.valor)) || 0, lugar: formRepuesto.lugar, fecha: formRepuesto.fecha })
     setModalRepuesto(null)
     setFormRepuesto({ nombre: '', valor: '', lugar: '', fecha: new Date().toISOString().split('T')[0] })
     await cargarRepuestos(trabajoId)
   }
 
   async function guardarEdicionRepuesto() {
-    await supabase.from('repuestos').update({ nombre: formEditarRepuesto.nombre, valor: parseFloat(formEditarRepuesto.valor) || 0, lugar: formEditarRepuesto.lugar, fecha: formEditarRepuesto.fecha }).eq('id', formEditarRepuesto.id)
+    await supabase.from('repuestos').update({ nombre: formEditarRepuesto.nombre, valor: parseFloat(parseNum(formEditarRepuesto.valor)) || 0, lugar: formEditarRepuesto.lugar, fecha: formEditarRepuesto.fecha }).eq('id', formEditarRepuesto.id)
     setModalEditarRepuesto(null)
     await cargarRepuestos(clienteDetalle.id)
   }
@@ -700,6 +798,96 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
     return styles.badgeGray
   }
 
+  // INFORME MENSUAL
+  function generarInforme() {
+    const [anio, mes] = mesInforme.split('-').map(Number)
+    const inicio = new Date(anio, mes - 1, 1)
+    const fin = new Date(anio, mes, 0, 23, 59, 59)
+    const ingresados = trabajos.filter(t => { const d = new Date(t.fecha_ingreso); return d >= inicio && d <= fin })
+    const salidos = trabajos.filter(t => { if (!t.fecha_salida) return false; const d = new Date(t.fecha_salida); return d >= inicio && d <= fin })
+    const marcasCount = {}
+    ingresados.forEach(t => { const m = getMarca(t.vehiculos?.marca_modelo); marcasCount[m] = (marcasCount[m]||0)+1 })
+    const marcaTop = Object.entries(marcasCount).sort((a,b)=>b[1]-a[1])[0]
+    const nombreMes = new Date(anio, mes-1, 1).toLocaleDateString('es-AR', {month:'long',year:'numeric'})
+    return { ingresados, salidos, marcaTop, marcasCount, nombreMes, anio, mes }
+  }
+
+  function imprimirInforme() {
+    const { ingresados, salidos, marcaTop, marcasCount, nombreMes } = generarInforme()
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Mensual</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; max-width:750px; margin:0 auto; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; border-bottom:3px solid #1a56db; padding-bottom:16px; }
+.header-logo img { width:160px; }
+.header-info { text-align:right; }
+.header-info h1 { font-size:22px; font-weight:900; color:#1a56db; margin-bottom:4px; }
+.header-info p { font-size:11px; color:#555; }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+.stat-box { border:2px solid #1a56db; border-radius:10px; padding:16px; text-align:center; }
+.stat-box .num { font-size:36px; font-weight:900; color:#1a56db; }
+.stat-box .lbl { font-size:10px; color:#555; text-transform:uppercase; letter-spacing:.5px; margin-top:4px; }
+.section { margin-bottom:20px; }
+.section-title { background:#222; color:#fff; font-weight:bold; font-size:11px; padding:6px 12px; margin-bottom:8px; letter-spacing:1px; }
+table { width:100%; border-collapse:collapse; }
+thead th { background:#f0f0f0; padding:8px 10px; text-align:left; font-size:10px; font-weight:700; border-bottom:2px solid #ccc; }
+tbody td { padding:8px 10px; border-bottom:1px solid #eee; font-size:11px; }
+tbody tr:nth-child(even) { background:#f9f9f9; }
+.marcas { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.marca-item { border:1px solid #e0e0e0; border-radius:6px; padding:10px; display:flex; justify-content:space-between; align-items:center; }
+.marca-item span { font-size:13px; color:#555; }
+.marca-item b { font-size:18px; color:#1a56db; }
+.bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
+@media print { body { padding:15px; } }
+</style></head><body>
+<div class="header">
+  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
+  <div class="header-info">
+    <h1>INFORME MENSUAL</h1>
+    <p style="font-size:14px;font-weight:700;color:#333;margin-bottom:4px">${nombreMes.toUpperCase()}</p>
+    <p>Generado: ${new Date().toLocaleDateString('es-AR')}</p>
+    <p>Malvinas 2084 — Mar del Plata</p>
+  </div>
+</div>
+<div class="stats">
+  <div class="stat-box"><div class="num">${ingresados.length}</div><div class="lbl">Vehículos ingresados</div></div>
+  <div class="stat-box"><div class="num">${salidos.length}</div><div class="lbl">Vehículos entregados</div></div>
+  <div class="stat-box" style="border-color:#16A34A"><div class="num" style="color:#16A34A">${marcaTop ? marcaTop[0] : '—'}</div><div class="lbl">Marca más frecuente${marcaTop ? ` (${marcaTop[1]})` : ''}</div></div>
+</div>
+<div class="section">
+  <div class="section-title">VEHÍCULOS INGRESADOS (${ingresados.length})</div>
+  <table>
+    <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead>
+    <tbody>
+      ${ingresados.map((t,i) => `<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>`).join('')}
+      ${ingresados.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin ingresos este mes</td></tr>' : ''}
+    </tbody>
+  </table>
+</div>
+<div class="section">
+  <div class="section-title">VEHÍCULOS ENTREGADOS (${salidos.length})</div>
+  <table>
+    <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead>
+    <tbody>
+      ${salidos.map((t,i) => `<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>`).join('')}
+      ${salidos.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin entregas este mes</td></tr>' : ''}
+    </tbody>
+  </table>
+</div>
+<div class="section">
+  <div class="section-title">MARCAS ATENDIDAS</div>
+  <div class="marcas">
+    ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([marca,n]) => `<div class="marca-item"><span>${marca}</span><b>${n}</b></div>`).join('')}
+    ${Object.keys(marcasCount).length === 0 ? '<p style="color:#999;font-size:12px;padding:8px">Sin datos</p>' : ''}
+  </div>
+</div>
+<div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div>
+<script>window.onload=()=>{window.print()}<\/script>
+</body></html>`
+    const w = window.open('','_blank','width=820,height=1000')
+    w.document.write(html); w.document.close()
+  }
+
   const trabajosActivos = trabajos.filter(t => t.estado !== 'Salio')
   const trabajosEntregados = trabajos.filter(t => t.estado === 'Salio').sort((a,b) => new Date(b.fecha_salida||b.fecha_ingreso) - new Date(a.fecha_salida||a.fecha_ingreso))
   const conteoMarcas = trabajosActivos.reduce((acc, t) => {
@@ -766,6 +954,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
           <div className={styles.modal}>
             <div className={styles.modalTitle}>🔄 Registrar reingreso</div>
             <div className={styles.modalSub}><b>{modalReingreso.vehiculos?.marca_modelo}</b> — {modalReingreso.vehiculos?.clientes?.nombre}</div>
+            <div style={{fontSize:'11px',color:'#2563EB',background:'#EFF6FF',padding:'8px 12px',borderRadius:'6px',marginTop:'8px'}}>ℹ️ El historial anterior del vehículo se conserva.</div>
             <div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}>
               <div className={styles.formGroup}><label>Motivo</label><textarea value={formReingreso.motivo} onChange={e => setFormReingreso({...formReingreso, motivo: e.target.value})} placeholder="Describí el problema..."/></div>
               <div className={styles.formGrid}>
@@ -908,7 +1097,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}>
               <div className={styles.formGroup}><label>Repuesto *</label><input value={formRepuesto.nombre} onChange={e => setFormRepuesto({...formRepuesto, nombre: e.target.value})} placeholder="Ej: Filtro de aceite..."/></div>
               <div className={styles.formGrid}>
-                <div className={styles.formGroup}><label>Valor ($)</label><input type="number" value={formRepuesto.valor} onChange={e => setFormRepuesto({...formRepuesto, valor: e.target.value})} placeholder="0"/></div>
+                <div className={styles.formGroup}><label>Valor ($)</label><input value={formRepuesto.valor} onChange={e => setFormRepuesto({...formRepuesto, valor: formatNum(e.target.value)})} placeholder="0"/></div>
                 <div className={styles.formGroup}><label>Fecha</label><input type="date" value={formRepuesto.fecha} onChange={e => setFormRepuesto({...formRepuesto, fecha: e.target.value})}/></div>
               </div>
               <div className={styles.formGroup}><label>Lugar</label><input value={formRepuesto.lugar} onChange={e => setFormRepuesto({...formRepuesto, lugar: e.target.value})} placeholder="Ej: Casa del repuesto..."/></div>
@@ -929,7 +1118,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}>
               <div className={styles.formGroup}><label>Repuesto</label><input value={formEditarRepuesto.nombre} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, nombre: e.target.value})}/></div>
               <div className={styles.formGrid}>
-                <div className={styles.formGroup}><label>Valor ($)</label><input type="number" value={formEditarRepuesto.valor} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, valor: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Valor ($)</label><input value={formEditarRepuesto.valor} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, valor: formatNum(e.target.value)})}/></div>
                 <div className={styles.formGroup}><label>Fecha</label><input type="date" value={formEditarRepuesto.fecha} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, fecha: e.target.value})}/></div>
               </div>
               <div className={styles.formGroup}><label>Lugar</label><input value={formEditarRepuesto.lugar||''} onChange={e => setFormEditarRepuesto({...formEditarRepuesto, lugar: e.target.value})}/></div>
@@ -978,6 +1167,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             { id: 'nuevo', label: 'Nuevo cliente' },
             { id: 'presupuesto', label: 'Presupuesto' },
             { id: 'recibo', label: 'Recibo' },
+            { id: 'informe', label: 'Informe mensual' },
           ] : []),
         ].map(item => (
           <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => { setSeccion(item.id); setTallerVista(null); setVistaStats(null); setVistaMarca(null); setVerEntregados(false); setSidebarOpen(false) }}>
@@ -1008,8 +1198,14 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
           <div>
             <div className={styles.topBar}>
               <h1 className={styles.pageTitle}>Dashboard</h1>
-              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                {dolarBlue && <span style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0'}}>💵 Blue: ${formatPeso(dolarBlue)}</span>}
+              <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+                {dolarBlue && (
+                  <div style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0',display:'flex',gap:'10px'}}>
+                    <span>💵 Compra: <b>${formatPeso(dolarBlue.compra)}</b></span>
+                    <span>|</span>
+                    <span>Venta: <b>${formatPeso(dolarBlue.venta)}</b></span>
+                  </div>
+                )}
                 <button className={styles.btnPrimary} onClick={cargarDatos}>↻ Actualizar</button>
               </div>
             </div>
@@ -1316,8 +1512,9 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
           <div>
             <div className={styles.topBar}>
               <h1 className={styles.pageTitle}>Nuevo presupuesto</h1>
-              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                {dolarBlue && <span style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0'}}>💵 Blue: ${formatPeso(dolarBlue)}</span>}
+              <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+                {dolarBlue && <span style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0'}}>💵 Venta: ${formatPeso(dolarBlue.venta)} | Compra: ${formatPeso(dolarBlue.compra)}</span>}
+                <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#25D366',color:'#fff',border:'none',fontFamily:'inherit',fontWeight:'600'}} onClick={enviarPresupuestoWsp}>💬 WhatsApp</button>
                 <button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir</button>
               </div>
             </div>
@@ -1329,6 +1526,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                 <div className={styles.formGroup}><label>Fecha</label><input type="date" value={presupuesto.fecha} onChange={e => setPresupuesto({...presupuesto, fecha: e.target.value})}/></div>
                 <div className={styles.formGroup}><label>Cliente</label><input value={presupuesto.cliente} onChange={e => setPresupuesto({...presupuesto, cliente: e.target.value})} placeholder="Nombre del cliente"/></div>
                 <div className={styles.formGroup}><label>Vehículo</label><input value={presupuesto.vehiculo} onChange={e => setPresupuesto({...presupuesto, vehiculo: e.target.value})} placeholder="Ej: Volkswagen Amarok V6"/></div>
+                <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Teléfono (para WhatsApp)</label><input value={presupuesto.telefono} onChange={e => setPresupuesto({...presupuesto, telefono: e.target.value})} placeholder="223 000-0000"/></div>
               </div>
             </div>
             <div className={styles.card}>
@@ -1344,7 +1542,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                 <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}>
                   <input type="radio" value="USD" checked={presupuesto.moneda_mano_obra === 'USD'} onChange={e => setPresupuesto({...presupuesto, moneda_mano_obra: e.target.value})}/> USS Dólar
                 </label>
-                {presupuesto.moneda_mano_obra === 'USD' && dolarBlue && <span style={{fontSize:'11px',color:'#718096'}}>Cotización blue: ${formatPeso(dolarBlue)}</span>}
+                {presupuesto.moneda_mano_obra === 'USD' && dolarBlue && <span style={{fontSize:'11px',color:'#718096'}}>Blue venta: ${formatPeso(dolarBlue.venta)}</span>}
               </div>
               {presupuesto.items.map((item, idx) => (
                 <div key={idx} style={{background:'#F7FAFC',border:'1px solid #E2E8F0',borderRadius:'8px',padding:'12px',marginBottom:'10px'}}>
@@ -1374,7 +1572,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                       <label>Precio unitario {item.es_mano_obra ? `(${presupuesto.moneda_mano_obra === 'USD' ? 'USS' : '$'})` : '(opcional)'}</label>
                       <input value={item.precio_unitario} onChange={e => {
                         const items = [...presupuesto.items]
-                        items[idx] = {...items[idx], precio_unitario: e.target.value}
+                        items[idx] = {...items[idx], precio_unitario: formatNum(e.target.value)}
                         setPresupuesto({...presupuesto, items})
                       }} placeholder="0"/>
                     </div>
@@ -1382,7 +1580,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                       <label>Total {item.es_mano_obra ? `(${presupuesto.moneda_mano_obra === 'USD' ? 'USS' : '$'})` : '($)'}</label>
                       <input value={item.total} onChange={e => {
                         const items = [...presupuesto.items]
-                        items[idx] = {...items[idx], total: e.target.value}
+                        items[idx] = {...items[idx], total: formatNum(e.target.value)}
                         setPresupuesto({...presupuesto, items})
                       }} placeholder="0"/>
                     </div>
@@ -1393,7 +1591,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                 <div style={{fontSize:'11px',color:'#16A34A',fontWeight:'700',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'.5px'}}>Resumen</div>
                 <div style={{display:'flex',gap:'24px',flexWrap:'wrap'}}>
                   {presupuesto.moneda_mano_obra === 'USD' && totalUSD > 0 && <div style={{fontSize:'13px',color:'#2D3748'}}><span style={{color:'#718096'}}>Mano de obra: </span><b>USS {formatPeso(totalUSD)}</b></div>}
-                  <div style={{fontSize:'13px',color:'#2D3748'}}><span style={{color:'#718096'}}>Repuestos: </span><b>${formatPeso(presupuesto.items.filter(i => !i.es_mano_obra && i.total).reduce((a,i) => a + (parseFloat(i.total.toString().replace(/\./g,'').replace(',','.')) || 0), 0))}</b></div>
+                  <div style={{fontSize:'13px',color:'#2D3748'}}><span style={{color:'#718096'}}>Repuestos: </span><b>${formatPeso(presupuesto.items.filter(i => !i.es_mano_obra && i.total).reduce((a,i) => a + (parseFloat(parseNum(i.total)) || 0), 0))}</b></div>
                   {presupuesto.moneda_mano_obra === 'USD' && dolarBlue && totalUSD > 0 && <div style={{fontSize:'13px',color:'#16A34A',fontWeight:'700'}}>Total estimado: ${formatPeso(Math.round(totalPesos))}</div>}
                   {presupuesto.moneda_mano_obra === 'ARS' && <div style={{fontSize:'13px',color:'#16A34A',fontWeight:'700'}}>Total: ${formatPeso(Math.round(totalPesos))}</div>}
                 </div>
@@ -1407,7 +1605,8 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
               </div>
             </div>
             <div className={styles.formActions}>
-              <button className={styles.btn} onClick={() => setPresupuesto({ numero: '001-00001', fecha: new Date().toISOString().split('T')[0], cliente: '', vehiculo: '', items: [{ descripcion: '', precio_unitario: '', total: '', es_mano_obra: false }], notas: '', moneda_mano_obra: 'ARS' })}>Limpiar</button>
+              <button className={styles.btn} onClick={() => setPresupuesto({ numero: '001-00001', fecha: new Date().toISOString().split('T')[0], cliente: '', vehiculo: '', telefono: '', items: [{ descripcion: '', precio_unitario: '', total: '', es_mano_obra: false }], notas: '', moneda_mano_obra: 'ARS' })}>Limpiar</button>
+              <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#25D366',color:'#fff',border:'none',fontFamily:'inherit',fontWeight:'600'}} onClick={enviarPresupuestoWsp}>💬 Enviar por WhatsApp</button>
               <button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir presupuesto</button>
             </div>
           </div>
@@ -1418,8 +1617,9 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
           <div>
             <div className={styles.topBar}>
               <h1 className={styles.pageTitle}>Nuevo recibo</h1>
-              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                {dolarBlue && <span style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0'}}>💵 Blue: ${formatPeso(dolarBlue)}</span>}
+              <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+                {dolarBlue && <span style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0'}}>💵 Venta: ${formatPeso(dolarBlue.venta)}</span>}
+                <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#25D366',color:'#fff',border:'none',fontFamily:'inherit',fontWeight:'600'}} onClick={enviarReciboWsp}>💬 WhatsApp</button>
                 <button className={styles.btnPrimary} onClick={imprimirRecibo}>🖨️ Imprimir</button>
               </div>
             </div>
@@ -1432,7 +1632,8 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                 <div className={styles.formGroup}><label>Cliente</label><input value={recibo.cliente} onChange={e => setRecibo({...recibo, cliente: e.target.value})} placeholder="Nombre del cliente"/></div>
                 <div className={styles.formGroup}><label>Vehículo</label><input value={recibo.vehiculo} onChange={e => setRecibo({...recibo, vehiculo: e.target.value})} placeholder="Ej: VW Amarok V6"/></div>
                 <div className={styles.formGroup}><label>Patente</label><input value={recibo.patente} onChange={e => setRecibo({...recibo, patente: e.target.value})} placeholder="AB 123 CD"/></div>
-                <div className={styles.formGroup}><label>Forma de pago</label>
+                <div className={styles.formGroup}><label>Teléfono (para WhatsApp)</label><input value={recibo.telefono} onChange={e => setRecibo({...recibo, telefono: e.target.value})} placeholder="223 000-0000"/></div>
+                <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Forma de pago</label>
                   <select value={recibo.forma_pago} onChange={e => setRecibo({...recibo, forma_pago: e.target.value})}>
                     <option>Efectivo</option><option>Transferencia</option><option>Tarjeta de débito</option><option>Tarjeta de crédito</option><option>Cheque</option>
                   </select>
@@ -1453,22 +1654,103 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
                   <label>Monto ({recibo.moneda === 'USD' ? 'USS' : '$'})</label>
-                  <input type="number" value={recibo.monto} onChange={e => setRecibo({...recibo, monto: e.target.value})} placeholder="0"/>
+                  <input value={recibo.monto} onChange={e => setRecibo({...recibo, monto: formatNum(e.target.value)})} placeholder="0"/>
                 </div>
                 {recibo.moneda === 'USD' && dolarBlue && recibo.monto && (
                   <div className={styles.formGroup}>
-                    <label>Equivalente en pesos (blue)</label>
-                    <input readOnly value={`$${formatPeso(Math.round(parseFloat(recibo.monto) * dolarBlue))}`} style={{background:'#F0FDF4',color:'#16A34A',fontWeight:'700'}}/>
+                    <label>Equivalente en pesos (blue venta)</label>
+                    <input readOnly value={`$${formatPeso(Math.round(parseFloat(parseNum(recibo.monto)) * dolarBlue.venta))}`} style={{background:'#F0FDF4',color:'#16A34A',fontWeight:'700'}}/>
                   </div>
                 )}
               </div>
-              <div className={styles.formGroup} style={{marginTop:'10px'}}><label>Concepto</label><textarea value={recibo.concepto} onChange={e => setRecibo({...recibo, concepto: e.target.value})} placeholder="Ej: Pago total por reparación de motor, cambio de distribución..." style={{minHeight:'70px'}}/></div>
+              <div className={styles.formGroup} style={{marginTop:'10px'}}><label>Concepto</label><textarea value={recibo.concepto} onChange={e => setRecibo({...recibo, concepto: e.target.value})} placeholder="Ej: Pago total por reparación de motor..." style={{minHeight:'70px'}}/></div>
               <div className={styles.formGroup} style={{marginTop:'10px'}}><label>Observaciones (opcional)</label><textarea value={recibo.observaciones} onChange={e => setRecibo({...recibo, observaciones: e.target.value})} placeholder="Notas adicionales..." style={{minHeight:'50px'}}/></div>
             </div>
             <div className={styles.formActions}>
-              <button className={styles.btn} onClick={() => setRecibo({ numero: '001-00001', fecha: new Date().toISOString().split('T')[0], cliente: '', vehiculo: '', patente: '', concepto: '', monto: '', moneda: 'ARS', forma_pago: 'Efectivo', observaciones: '' })}>Limpiar</button>
+              <button className={styles.btn} onClick={() => setRecibo({ numero: '001-00001', fecha: new Date().toISOString().split('T')[0], cliente: '', vehiculo: '', patente: '', telefono: '', concepto: '', monto: '', moneda: 'ARS', forma_pago: 'Efectivo', observaciones: '' })}>Limpiar</button>
+              <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#25D366',color:'#fff',border:'none',fontFamily:'inherit',fontWeight:'600'}} onClick={enviarReciboWsp}>💬 Enviar por WhatsApp</button>
               <button className={styles.btnPrimary} onClick={imprimirRecibo}>🖨️ Imprimir recibo</button>
             </div>
+          </div>
+        )}
+
+        {/* INFORME MENSUAL */}
+        {seccion === 'informe' && admin && (
+          <div>
+            <div className={styles.topBar}>
+              <h1 className={styles.pageTitle}>Informe mensual</h1>
+              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                <input type="month" value={mesInforme} onChange={e => setMesInforme(e.target.value)} style={{padding:'8px 12px',borderRadius:'6px',border:'1px solid #CBD5E0',fontSize:'13px',fontFamily:'inherit'}}/>
+                <button className={styles.btnPrimary} onClick={imprimirInforme}>🖨️ Imprimir informe</button>
+              </div>
+            </div>
+            <div className={styles.divider}></div>
+            {(() => {
+              const { ingresados, salidos, marcaTop, marcasCount, nombreMes } = generarInforme()
+              return (
+                <div>
+                  <div style={{marginBottom:'12px',fontSize:'14px',fontWeight:'600',color:'#718096',textTransform:'capitalize'}}>{nombreMes}</div>
+                  <div className={styles.stats} style={{marginBottom:'1.5rem'}}>
+                    <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{ingresados.length}</div><div className={styles.statL}>Ingresados</div></div>
+                    <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{salidos.length}</div><div className={styles.statL}>Entregados</div></div>
+                    <div className={styles.stat} style={{cursor:'default',borderColor:'#16A34A'}}><div className={styles.statN} style={{fontSize:'18px',color:'#16A34A'}}>{marcaTop ? marcaTop[0] : '—'}</div><div className={styles.statL}>Marca más frecuente{marcaTop ? ` (${marcaTop[1]})` : ''}</div></div>
+                    <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{fontSize:'16px'}}>{Object.keys(marcasCount).length}</div><div className={styles.statL}>Marcas distintas</div></div>
+                  </div>
+                  <div className={styles.card}>
+                    <div className={styles.cardTitle}>Vehículos ingresados ({ingresados.length})</div>
+                    {ingresados.length === 0 ? <div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin ingresos este mes</div> : (
+                      <table className={styles.table}>
+                        <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead>
+                        <tbody>
+                          {ingresados.map((t,i) => (
+                            <tr key={t.id} onClick={() => verDetalle(t)}>
+                              <td style={{color:'#A0AEC0'}}>{i+1}</td>
+                              <td><b>{t.vehiculos?.marca_modelo}</b></td>
+                              <td>{t.vehiculos?.clientes?.nombre}</td>
+                              <td>{t.vehiculos?.patente}</td>
+                              <td>{t.taller}</td>
+                              <td style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                  <div className={styles.card}>
+                    <div className={styles.cardTitle}>Vehículos entregados ({salidos.length})</div>
+                    {salidos.length === 0 ? <div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin entregas este mes</div> : (
+                      <table className={styles.table}>
+                        <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead>
+                        <tbody>
+                          {salidos.map((t,i) => (
+                            <tr key={t.id} onClick={() => verDetalle(t)}>
+                              <td style={{color:'#A0AEC0'}}>{i+1}</td>
+                              <td><b>{t.vehiculos?.marca_modelo}</b></td>
+                              <td>{t.vehiculos?.clientes?.nombre}</td>
+                              <td>{t.vehiculos?.patente}</td>
+                              <td>{t.taller}</td>
+                              <td style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                  <div className={styles.card}>
+                    <div className={styles.cardTitle}>Marcas atendidas</div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'8px'}}>
+                      {Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([marca,n]) => (
+                        <div key={marca} style={{background:'#F7FAFC',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',border:'1px solid #E2E8F0'}}>
+                          <span style={{fontSize:'13px',color:'#4A5568',fontWeight:'500'}}>{marca}</span>
+                          <span style={{fontSize:'20px',fontWeight:'700',color:'#2563EB'}}>{n}</span>
+                        </div>
+                      ))}
+                      {Object.keys(marcasCount).length === 0 && <div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -1539,7 +1821,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                         <td>{r.lugar || '—'}</td>
                         <td style={{fontSize:'12px',color:'#718096'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>
                         {admin && <td style={{display:'flex',gap:'4px',cursor:'default'}}>
-                          <button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={() => { setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:r.valor,lugar:r.lugar||'',fecha:r.fecha}); setModalEditarRepuesto(true) }}>✏️</button>
+                          <button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={() => { setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:formatNum(r.valor.toString()),lugar:r.lugar||'',fecha:r.fecha}); setModalEditarRepuesto(true) }}>✏️</button>
                           <button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={() => borrarRepuesto(r)}>🗑️</button>
                         </td>}
                       </tr>
