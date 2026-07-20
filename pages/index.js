@@ -10,14 +10,14 @@ const FbIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="curre
 const WaIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 const MapIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.402 16.199 0 12 0zm0 11c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/></svg>
 
-export default function Home({ rol }) {
+export default function Home({ rol, cerrarSesion }) {
   const admin = rol === 'admin'
 
   const [seccion, setSeccion] = useState('dashboard')
   const [tallerVista, setTallerVista] = useState(null)
   const [vistaStats, setVistaStats] = useState(null)
   const [vistaMarca, setVistaMarca] = useState(null)
-  const [verSalidos, setVerSalidos] = useState(false)
+  const [verEntregados, setVerEntregados] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [clientes, setClientes] = useState([])
   const [trabajos, setTrabajos] = useState([])
@@ -53,6 +53,18 @@ export default function Home({ rol }) {
   const [formRepuesto, setFormRepuesto] = useState({ nombre: '', valor: '', lugar: '', fecha: new Date().toISOString().split('T')[0] })
   const [formActualizar, setFormActualizar] = useState({ tipo: 'estado', descripcion: '', taller_nuevo: 'Malvinas 3906' })
   const [subiendo, setSubiendo] = useState(false)
+
+  // PRESUPUESTO
+  const [presupuesto, setPresupuesto] = useState({
+    numero: '001-00001',
+    fecha: new Date().toISOString().split('T')[0],
+    cliente: '',
+    vehiculo: '',
+    items: [{ descripcion: '', precio_unitario: '', total: '', es_mano_obra: false }],
+    notas: '',
+    moneda_mano_obra: 'USD'
+  })
+
   const fileRef = useRef()
   const fileNuevoRef = useRef()
   const fileFotosRef = useRef()
@@ -104,6 +116,108 @@ export default function Home({ rol }) {
   }
 
   function formatPeso(valor) { return Number(valor).toLocaleString('es-AR') }
+
+  function imprimirPresupuesto() {
+    const totalPesos = presupuesto.items
+      .filter(i => !i.es_mano_obra && i.total)
+      .reduce((a, i) => a + Number(i.total.toString().replace(/\./g,'').replace(',','.') || 0), 0)
+
+    const manoObra = presupuesto.items.find(i => i.es_mano_obra)
+
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; max-width:750px; margin:0 auto; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:30px; }
+.header-logo img { width:160px; }
+.header-info { text-align:right; }
+.header-info h1 { font-size:28px; font-weight:900; color:#1a56db; letter-spacing:2px; margin-bottom:4px; }
+.header-info p { font-size:11px; color:#555; }
+.divider { height:3px; background:linear-gradient(to right,#1a56db,#93c5fd); margin-bottom:20px; border-radius:2px; }
+.cliente-box { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; padding:12px 0; border-bottom:1px solid #e0e0e0; }
+.cliente-box label { font-size:9px; font-weight:700; color:#1a56db; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:3px; }
+.cliente-box span { font-size:14px; font-weight:700; color:#1a1a1a; }
+table { width:100%; border-collapse:collapse; margin-bottom:20px; }
+thead th { background:#1a56db; color:#fff; padding:10px 12px; text-align:left; font-size:11px; font-weight:700; letter-spacing:.5px; }
+thead th:last-child { text-align:right; }
+tbody td { padding:10px 12px; border-bottom:1px solid #f0f0f0; font-size:12px; }
+tbody td:last-child { text-align:right; font-weight:600; }
+tbody tr:nth-child(even) { background:#f8faff; }
+.td-desc { font-weight:600; }
+.td-sub { font-size:10px; color:#666; font-weight:400; margin-top:2px; }
+.footer-box { display:flex; justify-content:space-between; align-items:flex-start; margin-top:20px; }
+.notas { flex:1; padding-right:30px; }
+.notas p { font-size:10px; color:#555; display:flex; align-items:flex-start; gap:6px; margin-bottom:5px; }
+.totales { min-width:220px; }
+.total-row { display:flex; justify-content:space-between; padding:5px 0; font-size:12px; border-bottom:1px solid #f0f0f0; }
+.total-row.main { background:#1a56db; color:#fff; padding:10px 12px; border-radius:4px; margin-top:8px; font-size:16px; font-weight:900; }
+.total-row.sub { font-size:11px; color:#555; }
+.bottom { margin-top:30px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; letter-spacing:.5px; }
+@media print { body { padding:15px; } }
+</style></head><body>
+
+<div class="header">
+  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
+  <div class="header-info">
+    <h1>PRESUPUESTO</h1>
+    <p>N° ${presupuesto.numero}</p>
+    <p>Fecha: ${new Date(presupuesto.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</p>
+    <p>Malvinas 2084 — Mar del Plata 7600</p>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<div class="cliente-box">
+  <div>
+    <label>Cliente</label>
+    <span>${presupuesto.cliente || '—'}</span>
+  </div>
+  <div>
+    <label>Vehículo</label>
+    <span>${presupuesto.vehiculo || '—'}</span>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:55%">DESCRIPCIÓN</th>
+      <th style="width:25%;text-align:right">PRECIO UNITARIO</th>
+      <th style="width:20%">TOTAL</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${presupuesto.items.map(item => item.descripcion ? `
+    <tr>
+      <td class="td-desc">${item.descripcion}</td>
+      <td style="text-align:right">${item.precio_unitario ? (item.es_mano_obra ? `${presupuesto.moneda_mano_obra === 'USD' ? 'USS' : '$'} ${item.precio_unitario}` : '') : ''}</td>
+      <td>${item.total ? (item.es_mano_obra ? `${presupuesto.moneda_mano_obra === 'USD' ? 'USS' : '$'} ${item.total}` : `$${item.total}`) : ''}</td>
+    </tr>` : '').join('')}
+  </tbody>
+</table>
+
+<div class="footer-box">
+  <div class="notas">
+    ${presupuesto.notas ? presupuesto.notas.split('\n').map(n => n.trim() ? `<p>✅ ${n}</p>` : '').join('') : ''}
+  </div>
+  <div class="totales">
+    ${manoObra ? `<div class="total-row sub"><span>MANO DE OBRA + REPUESTOS</span></div>
+    <div class="total-row main"><span>${presupuesto.moneda_mano_obra === 'USD' ? 'USS' : '$'} ${manoObra.total}</span></div>
+    <div class="total-row sub" style="margin-top:8px"><span>DÓLAR BILLETE</span></div>` : ''}
+    <div class="total-row main"><span>$${formatPeso(totalPesos)}</span><span style="font-size:11px;font-weight:400;margin-left:6px">REPUESTOS</span></div>
+  </div>
+</div>
+
+<div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600 — ¡Gracias por confiar en nosotros!</div>
+
+<script>window.onload=()=>{window.print()}<\/script>
+</body></html>`
+
+    const w = window.open('','_blank','width=820,height=1000')
+    w.document.write(html)
+    w.document.close()
+  }
 
   function imprimirOrden(trabajo) {
     const c = trabajo.vehiculos?.clientes
@@ -349,7 +463,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
     setModalReingreso(null)
     setFormReingreso({ motivo: '', mecanico: '', taller: 'Malvinas 2084', estado: 'Diagnóstico', llego_en_grua: false, fecha_ingreso_manual: '' })
     cargarDatos()
-    setVerSalidos(false)
+    setVerEntregados(false)
   }
 
   async function guardarCliente(e) {
@@ -516,7 +630,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   }
 
   const trabajosActivos = trabajos.filter(t => t.estado !== 'Salio')
-  const trabajosSalidos = trabajos.filter(t => t.estado === 'Salio').sort((a,b) => new Date(b.fecha_salida||b.fecha_ingreso) - new Date(a.fecha_salida||a.fecha_ingreso))
+  const trabajosEntregados = trabajos.filter(t => t.estado === 'Salio').sort((a,b) => new Date(b.fecha_salida||b.fecha_ingreso) - new Date(a.fecha_salida||a.fecha_ingreso))
   const conteoMarcas = trabajosActivos.reduce((acc, t) => {
     const marca = getMarca(t.vehiculos?.marca_modelo)
     acc[marca] = (acc[marca] || 0) + 1
@@ -527,13 +641,13 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
     return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q) || t.vehiculos?.patente?.toLowerCase().includes(q) || t.vehiculos?.marca_modelo?.toLowerCase().includes(q)
   }).sort((a, b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso))
   const totalFiltrados = trabajosFiltrados.length
-  const stats = { total: clientes.length, enTaller: trabajosActivos.length, listos: trabajos.filter(t => t.estado === 'Listo').length, salidos: trabajosSalidos.length }
+  const stats = { total: clientes.length, enTaller: trabajosActivos.length, listos: trabajos.filter(t => t.estado === 'Listo').length, salidos: trabajosEntregados.length }
   const listaVistaStats = {
     enTaller: trabajos.filter(t => t.estado !== 'Salio').sort((a,b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)),
     listos: trabajos.filter(t => t.estado === 'Listo').sort((a,b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)),
-    salidos: trabajosSalidos,
+    salidos: trabajosEntregados,
   }
-  const titulosVistaStats = { enTaller: 'Autos en taller', listos: 'Listos para entregar', salidos: 'Salidos' }
+  const titulosVistaStats = { enTaller: 'Autos en taller', listos: 'Listos para entregar', salidos: 'Vehículos entregados' }
   const tipoHistorial = { ingreso: '🟢', salida: '🔴', movimiento: '🔵', reingreso: '🟡', estado: '⚪', prueba: '🟠' }
   const trabajosTaller = tallerVista ? trabajos.filter(t => t.taller === tallerVista && t.estado !== 'Salio').sort((a,b) => new Date(a.fecha_ingreso) - new Date(b.fecha_ingreso)) : []
   const trabajosDeMarca = vistaMarca ? trabajosActivos.filter(t => getMarca(t.vehiculos?.marca_modelo) === vistaMarca) : []
@@ -687,8 +801,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
             <div className={styles.modalTitle}>Registrar actualización</div>
             <div className={styles.modalSub}><b>{modalActualizar.vehiculos?.marca_modelo}</b> — {modalActualizar.vehiculos?.clientes?.nombre}</div>
             <div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}>
-              <div className={styles.formGroup}>
-                <label>Tipo</label>
+              <div className={styles.formGroup}><label>Tipo</label>
                 <select value={formActualizar.tipo} onChange={e => setFormActualizar({...formActualizar, tipo: e.target.value})}>
                   <option value="estado">Actualización de estado</option>
                   <option value="prueba">En prueba</option>
@@ -696,15 +809,13 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                 </select>
               </div>
               {formActualizar.tipo === 'taller' && (
-                <div className={styles.formGroup}>
-                  <label>Mover a</label>
+                <div className={styles.formGroup}><label>Mover a</label>
                   <select value={formActualizar.taller_nuevo} onChange={e => setFormActualizar({...formActualizar, taller_nuevo: e.target.value})}>
                     <option>Malvinas 2084</option><option>Malvinas 3906</option>
                   </select>
                 </div>
               )}
-              <div className={styles.formGroup}>
-                <label>Descripción</label>
+              <div className={styles.formGroup}><label>Descripción</label>
                 <textarea value={formActualizar.descripcion} onChange={e => setFormActualizar({...formActualizar, descripcion: e.target.value})} placeholder="Detallá la actualización..."/>
               </div>
             </div>
@@ -791,14 +902,20 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
         {[
           { id: 'dashboard', label: 'Dashboard' },
           { id: 'clientes', label: 'Clientes' },
-          ...(admin ? [{ id: 'nuevo', label: 'Nuevo cliente' }] : []),
+          ...(admin ? [
+            { id: 'nuevo', label: 'Nuevo cliente' },
+            { id: 'presupuesto', label: 'Presupuesto' },
+          ] : []),
         ].map(item => (
-          <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => { setSeccion(item.id); setTallerVista(null); setVistaStats(null); setVistaMarca(null); setVerSalidos(false); setSidebarOpen(false) }}>
+          <button key={item.id} className={`${styles.navItem} ${seccion === item.id ? styles.navActive : ''}`} onClick={() => { setSeccion(item.id); setTallerVista(null); setVistaStats(null); setVistaMarca(null); setVerEntregados(false); setSidebarOpen(false) }}>
             {item.label}
           </button>
         ))}
         <div style={{marginTop:'8px',padding:'6px 8px',fontSize:'11px',color:'#64748B',borderTop:'1px solid #2D3748',paddingTop:'10px'}}>
-          {admin ? '👑 Admin' : '👷 Empleado'}
+          <div style={{marginBottom:'8px'}}>{admin ? '👑 Admin' : '👷 Empleado'}</div>
+          <button onClick={cerrarSesion} style={{width:'100%',padding:'8px',borderRadius:'6px',background:'#DC2626',color:'#fff',border:'none',fontSize:'12px',fontWeight:'600',cursor:'pointer',fontFamily:'inherit'}}>
+            Cerrar sesión
+          </button>
         </div>
         <div className={styles.navBottom}>
           <div style={{display:'flex',flexDirection:'column',gap:'4px',padding:'4px 0'}}>
@@ -825,7 +942,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{stats.total}</div><div className={styles.statL}>Clientes totales</div></div>
               <div className={styles.stat} style={{cursor:'pointer'}} onClick={() => setVistaStats('enTaller')}><div className={styles.statN}>{stats.enTaller}</div><div className={styles.statL}>En taller →</div></div>
               <div className={styles.stat} style={{cursor:'pointer'}} onClick={() => setVistaStats('listos')}><div className={styles.statN}>{stats.listos}</div><div className={styles.statL}>Listos →</div></div>
-              <div className={styles.stat} style={{cursor:'pointer'}} onClick={() => setVistaStats('salidos')}><div className={styles.statN}>{stats.salidos}</div><div className={styles.statL}>Salidos →</div></div>
+              <div className={styles.stat} style={{cursor:'pointer'}} onClick={() => setVistaStats('salidos')}><div className={styles.statN}>{stats.salidos}</div><div className={styles.statL}>Entregados →</div></div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1rem'}}>
               {['Malvinas 2084','Malvinas 3906'].map(taller => {
@@ -962,12 +1079,12 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
         )}
 
         {/* CLIENTES */}
-        {seccion === 'clientes' && !verSalidos && (
+        {seccion === 'clientes' && !verEntregados && (
           <div>
             <div className={styles.topBar}>
               <h1 className={styles.pageTitle}>Clientes</h1>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                <button className={styles.btn} onClick={() => setVerSalidos(true)}>Clientes salidos ({trabajosSalidos.length})</button>
+                {admin && <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#EA580C',color:'#fff',border:'none',fontFamily:'inherit',fontWeight:'600'}} onClick={() => setVerEntregados(true)}>Vehículos entregados ({trabajosEntregados.length})</button>}
                 {admin && <button className={styles.btnPrimary} onClick={() => setSeccion('nuevo')}>+ Nuevo cliente</button>}
               </div>
             </div>
@@ -1007,19 +1124,19 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
           </div>
         )}
 
-        {/* CLIENTES SALIDOS */}
-        {seccion === 'clientes' && verSalidos && (
+        {/* VEHÍCULOS ENTREGADOS - solo admin */}
+        {seccion === 'clientes' && verEntregados && admin && (
           <div>
             <div className={styles.topBar}>
-              <button className={styles.btn} onClick={() => setVerSalidos(false)}>← Volver</button>
-              <h1 className={styles.pageTitle}>Clientes salidos ({trabajosSalidos.length})</h1>
+              <button className={styles.btn} onClick={() => setVerEntregados(false)}>← Volver</button>
+              <h1 className={styles.pageTitle}>Vehículos entregados ({trabajosEntregados.length})</h1>
             </div>
             <div className={styles.divider}></div>
             <div className={styles.tblWrap}>
               <table className={styles.table}>
-                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Salida</th>{admin && <th>Acciones</th>}</tr></thead>
+                <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entregado</th><th>Acciones</th></tr></thead>
                 <tbody>
-                  {trabajosSalidos.map((t,i) => (
+                  {trabajosEntregados.map((t,i) => (
                     <tr key={t.id}>
                       <td style={{color:'#A0AEC0'}}>{i+1}</td>
                       <td onClick={() => verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
@@ -1027,15 +1144,15 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                       <td onClick={() => verDetalle(t)}>{t.vehiculos?.patente}</td>
                       <td onClick={() => verDetalle(t)}>{t.taller}</td>
                       <td onClick={() => verDetalle(t)} style={{fontSize:'12px',color:'#718096'}}>{t.fecha_salida ? new Date(t.fecha_salida).toLocaleDateString('es-AR') : '—'}</td>
-                      {admin && <td style={{display:'flex',gap:'5px',cursor:'default'}}>
+                      <td style={{display:'flex',gap:'5px',cursor:'default'}}>
                         <button className={styles.btnPrimary} style={{fontSize:'11px',padding:'4px 8px'}} onClick={() => { setModalReingreso(t); setFormReingreso({ motivo: '', mecanico: t.mecanico||'', taller: t.taller||'Malvinas 2084', estado: 'Diagnóstico', llego_en_grua: false, fecha_ingreso_manual: '' }) }}>🔄 Reingreso</button>
                         <button style={{fontSize:'11px',padding:'4px 8px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={() => abrirWsp(t)}>💬</button>
                         <button className={styles.btnEdit} onClick={() => abrirEditar(t)}>✏️</button>
                         <button className={styles.btnDelete} onClick={() => borrarCliente(t)}>🗑️</button>
-                      </td>}
+                      </td>
                     </tr>
                   ))}
-                  {trabajosSalidos.length === 0 && <tr><td colSpan="7" style={{textAlign:'center',color:'#A0AEC0',padding:'2rem'}}>Sin clientes salidos todavía</td></tr>}
+                  {trabajosEntregados.length === 0 && <tr><td colSpan="7" style={{textAlign:'center',color:'#A0AEC0',padding:'2rem'}}>Sin vehículos entregados todavía</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -1115,6 +1232,97 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
                 <button type="submit" className={styles.btnPrimary}>Registrar cliente</button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* PRESUPUESTO - solo admin */}
+        {seccion === 'presupuesto' && admin && (
+          <div>
+            <div className={styles.topBar}>
+              <h1 className={styles.pageTitle}>Nuevo presupuesto</h1>
+              <button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir presupuesto</button>
+            </div>
+            <div className={styles.divider}></div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Datos generales</div>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}><label>N° de presupuesto</label><input value={presupuesto.numero} onChange={e => setPresupuesto({...presupuesto, numero: e.target.value})} placeholder="001-00001"/></div>
+                <div className={styles.formGroup}><label>Fecha</label><input type="date" value={presupuesto.fecha} onChange={e => setPresupuesto({...presupuesto, fecha: e.target.value})}/></div>
+                <div className={styles.formGroup}><label>Cliente</label><input value={presupuesto.cliente} onChange={e => setPresupuesto({...presupuesto, cliente: e.target.value})} placeholder="Nombre del cliente"/></div>
+                <div className={styles.formGroup}><label>Vehículo</label><input value={presupuesto.vehiculo} onChange={e => setPresupuesto({...presupuesto, vehiculo: e.target.value})} placeholder="Ej: Volkswagen Amarok V6"/></div>
+              </div>
+            </div>
+            <div className={styles.card}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
+                <div className={styles.cardTitle} style={{margin:0}}>Ítems del presupuesto</div>
+                <button className={styles.btnPrimary} style={{fontSize:'12px',padding:'6px 12px'}} onClick={() => setPresupuesto({...presupuesto, items: [...presupuesto.items, { descripcion: '', precio_unitario: '', total: '', es_mano_obra: false }]})}>+ Agregar ítem</button>
+              </div>
+              <div style={{marginBottom:'12px',padding:'10px',background:'#F7FAFC',borderRadius:'8px',border:'1px solid #E2E8F0'}}>
+                <div style={{fontSize:'11px',color:'#718096',marginBottom:'8px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'.5px'}}>Moneda para mano de obra</div>
+                <div style={{display:'flex',gap:'12px'}}>
+                  <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}>
+                    <input type="radio" value="USD" checked={presupuesto.moneda_mano_obra === 'USD'} onChange={e => setPresupuesto({...presupuesto, moneda_mano_obra: e.target.value})}/> USS (Dólar)
+                  </label>
+                  <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}>
+                    <input type="radio" value="ARS" checked={presupuesto.moneda_mano_obra === 'ARS'} onChange={e => setPresupuesto({...presupuesto, moneda_mano_obra: e.target.value})}/> $ (Pesos)
+                  </label>
+                </div>
+              </div>
+              {presupuesto.items.map((item, idx) => (
+                <div key={idx} style={{background:'#F7FAFC',border:'1px solid #E2E8F0',borderRadius:'8px',padding:'12px',marginBottom:'10px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                      <span style={{fontSize:'12px',fontWeight:'600',color:'#718096'}}>Ítem {idx + 1}</span>
+                      <label style={{display:'flex',alignItems:'center',gap:'5px',fontSize:'12px',cursor:'pointer',color:'#2563EB'}}>
+                        <input type="checkbox" checked={item.es_mano_obra} onChange={e => {
+                          const items = [...presupuesto.items]
+                          items[idx] = {...items[idx], es_mano_obra: e.target.checked}
+                          setPresupuesto({...presupuesto, items})
+                        }}/> Es mano de obra
+                      </label>
+                    </div>
+                    {presupuesto.items.length > 1 && <button style={{background:'none',border:'none',color:'#DC2626',cursor:'pointer',fontSize:'16px'}} onClick={() => setPresupuesto({...presupuesto, items: presupuesto.items.filter((_,i) => i !== idx)})}>✕</button>}
+                  </div>
+                  <div className={styles.formGrid}>
+                    <div className={styles.formGroup} style={{gridColumn:'1/-1'}}>
+                      <label>Descripción</label>
+                      <input value={item.descripcion} onChange={e => {
+                        const items = [...presupuesto.items]
+                        items[idx] = {...items[idx], descripcion: e.target.value}
+                        setPresupuesto({...presupuesto, items})
+                      }} placeholder={item.es_mano_obra ? 'Ej: Reparación de motor | Cambio de distribución...' : 'Ej: Kit de distribución Alemán'}/>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Precio unitario {item.es_mano_obra ? `(${presupuesto.moneda_mano_obra === 'USD' ? 'USS' : '$'})` : '(opcional)'}</label>
+                      <input value={item.precio_unitario} onChange={e => {
+                        const items = [...presupuesto.items]
+                        items[idx] = {...items[idx], precio_unitario: e.target.value}
+                        setPresupuesto({...presupuesto, items})
+                      }} placeholder="0"/>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Total {item.es_mano_obra ? `(${presupuesto.moneda_mano_obra === 'USD' ? 'USS' : '$'})` : '($)'}</label>
+                      <input value={item.total} onChange={e => {
+                        const items = [...presupuesto.items]
+                        items[idx] = {...items[idx], total: e.target.value}
+                        setPresupuesto({...presupuesto, items})
+                      }} placeholder="0"/>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Notas / Observaciones</div>
+              <div className={styles.formGroup}>
+                <label>Una por línea (aparecerán con ✅)</label>
+                <textarea value={presupuesto.notas} onChange={e => setPresupuesto({...presupuesto, notas: e.target.value})} placeholder={'Kit de distribución de origen Alemán.\nRepuestos originales. Trabajo garantizado.'} style={{minHeight:'80px'}}/>
+              </div>
+            </div>
+            <div className={styles.formActions}>
+              <button className={styles.btn} onClick={() => setPresupuesto({ numero: '001-00001', fecha: new Date().toISOString().split('T')[0], cliente: '', vehiculo: '', items: [{ descripcion: '', precio_unitario: '', total: '', es_mano_obra: false }], notas: '', moneda_mano_obra: 'USD' })}>Limpiar</button>
+              <button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir presupuesto</button>
+            </div>
           </div>
         )}
 
