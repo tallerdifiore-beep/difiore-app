@@ -27,6 +27,13 @@ export default function App({ Component, pageProps }) {
     }
   }
 
+  function cerrarSesion() {
+    sessionStorage.removeItem('rol')
+    setRol(null)
+    setAutenticado(false)
+    setPass('')
+  }
+
   if (!autenticado) return (
     <div style={{minHeight:'100vh',background:'#0F1117',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
       <div style={{background:'#1A1A2E',borderRadius:'16px',padding:'2.5rem',width:'100%',maxWidth:'380px',border:'1px solid #2D3748',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
@@ -55,5 +62,5 @@ export default function App({ Component, pageProps }) {
     </div>
   )
 
-  return <Component {...pageProps} rol={rol} />
+  return <Component {...pageProps} rol={rol} cerrarSesion={cerrarSesion} />
 }
