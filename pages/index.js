@@ -17,6 +17,20 @@ function formatNum(val) {
 }
 function parseNum(val) { return val.toString().replace(/\./g,'') }
 
+const CHECKLIST_ITEMS = [
+  'BATERIA DE VEHICULO',
+  'LÍQUIDOS/FLUIDOS',
+  'RUEDAS AJUSTADAS',
+  'ENTREGA COMO FOTOS',
+  'MOTOR LAVADO',
+  'LAVADO DE VEHICULO',
+  'CHEQUEADA EN CALLE',
+  'TAPA CUBRE MOTOR',
+  'ELECTRO 2 VECES PROBADO',
+  'CHECK/TESTIGOS APAGADOS',
+  'INTERIOR LIMPIO'
+]
+
 const footerIconsHTML = `
   <a class="footer-icon" href="https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1"><svg width="12" height="12" viewBox="0 0 24 24" fill="#EA4335"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.402 16.199 0 12 0zm0 11c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/></svg>Malvinas Argentinas 2084, MdP</a>
   <a class="footer-icon" href="tel:+542235299700"><svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>223 529-9700</a>
@@ -89,6 +103,19 @@ export default function Home({ rol, cerrarSesion }) {
   const [busqueda, setBusqueda] = useState('')
   const [dolarBlue, setDolarBlue] = useState(null)
   const [mesInforme, setMesInforme] = useState(new Date().toISOString().slice(0,7))
+  const [empleados, setEmpleados] = useState([])
+  const [checklists, setChecklists] = useState([])
+  const [checklistActivo, setChecklistActivo] = useState(null)
+  const [vistaChecklist, setVistaChecklist] = useState('lista')
+  const [busqChecklist, setBusqChecklist] = useState('')
+  const [sugsChecklist, setSugsChecklist] = useState([])
+  const [formChecklist, setFormChecklist] = useState({
+    trabajo_id: '', vehiculo: '', patente: '', color: '',
+    fecha_entrega: new Date().toISOString().split('T')[0],
+    mecanico: '', encargado: '', observacion_general: '',
+    items: CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})
+  })
+  const [nuevoEmpleado, setNuevoEmpleado] = useState({nombre:'',rol:'mecanico'})
   const [form, setForm] = useState({
     nombre:'',telefono:'',email:'',marca_modelo:'',patente:'',anio:'',kilometraje:'',color:'',
     motivo:'',estado:'Diagnóstico',mecanico:'',taller:'Malvinas 2084',llego_en_grua:false,tiene_seguro:false,fecha_ingreso_manual:''
@@ -117,7 +144,6 @@ export default function Home({ rol, cerrarSesion }) {
   const [formRepuesto, setFormRepuesto] = useState({nombre:'',valor:'',lugar:'',fecha:new Date().toISOString().split('T')[0]})
   const [formActualizar, setFormActualizar] = useState({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'})
   const [subiendo, setSubiendo] = useState(false)
-
   const [presupuesto, setPresupuesto] = useState({
     numero:'001-00001', fecha:new Date().toISOString().split('T')[0],
     cliente:'', vehiculo:'',
@@ -126,13 +152,11 @@ export default function Home({ rol, cerrarSesion }) {
     descuento_concepto:'Descuento por diagnóstico', descuento_monto:'', aplicar_descuento:false,
     mostrar_transferencia:false, transferencia_repuestos:true, transferencia_mano_obra:false
   })
-
   const [recibo, setRecibo] = useState({
     numero:'001-00001', fecha:new Date().toISOString().split('T')[0],
     cliente:'', vehiculo:'', patente:'',
     concepto:'', monto:'', moneda:'ARS', forma_pago:'Efectivo', observaciones:''
   })
-
   const [busqPresupuesto, setBusqPresupuesto] = useState('')
   const [busqRecibo, setBusqRecibo] = useState('')
   const [sugsPresupuesto, setSugsPresupuesto] = useState([])
@@ -164,12 +188,10 @@ export default function Home({ rol, cerrarSesion }) {
       t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)
     ).slice(0,6))
   }
-
   function seleccionarClientePresupuesto(t) {
     setPresupuesto({...presupuesto, cliente:t.vehiculos?.clientes?.nombre||'', vehiculo:t.vehiculos?.marca_modelo||''})
     setBusqPresupuesto(''); setSugsPresupuesto([])
   }
-
   function buscarClientesRecibo(q) {
     setBusqRecibo(q)
     if (!q || q.length < 2) { setSugsRecibo([]); return }
@@ -180,18 +202,41 @@ export default function Home({ rol, cerrarSesion }) {
       t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)
     ).slice(0,6))
   }
-
   function seleccionarClienteRecibo(t) {
     setRecibo({...recibo, cliente:t.vehiculos?.clientes?.nombre||'', vehiculo:t.vehiculos?.marca_modelo||'', patente:t.vehiculos?.patente||''})
     setBusqRecibo(''); setSugsRecibo([])
+  }
+  function buscarClientesChecklist(q) {
+    setBusqChecklist(q)
+    if (!q || q.length < 2) { setSugsChecklist([]); return }
+    const ql = q.toLowerCase()
+    setSugsChecklist(trabajos.filter(t =>
+      t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql) ||
+      t.vehiculos?.patente?.toLowerCase().includes(ql) ||
+      t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)
+    ).slice(0,6))
+  }
+  function seleccionarClienteChecklist(t) {
+    setFormChecklist({
+      ...formChecklist,
+      trabajo_id: t.id,
+      vehiculo: t.vehiculos?.marca_modelo||'',
+      patente: t.vehiculos?.patente||'',
+      color: t.vehiculos?.color||''
+    })
+    setBusqChecklist(''); setSugsChecklist([])
   }
 
   async function cargarDatos() {
     setLoading(true)
     const { data: clientesData } = await supabase.from('clientes').select('*').order('created_at',{ascending:false})
     const { data: trabajosData } = await supabase.from('trabajos').select('*, vehiculos(*, clientes(*))').order('fecha_ingreso',{ascending:true})
+    const { data: empleadosData } = await supabase.from('empleados').select('*').order('rol').order('nombre')
+    const { data: checklistsData } = await supabase.from('checklists').select('*').order('created_at',{ascending:false})
     setClientes(clientesData||[])
     setTrabajos(trabajosData||[])
+    setEmpleados(empleadosData||[])
+    setChecklists(checklistsData||[])
     setLoading(false)
   }
 
@@ -225,6 +270,127 @@ export default function Home({ rol, cerrarSesion }) {
   }
   function formatPeso(v) { return Number(v).toLocaleString('es-AR') }
 
+  async function guardarChecklist() {
+    const { error } = await supabase.from('checklists').insert({
+      trabajo_id: formChecklist.trabajo_id || null,
+      fecha_entrega: formChecklist.fecha_entrega,
+      vehiculo: formChecklist.vehiculo,
+      patente: formChecklist.patente,
+      color: formChecklist.color,
+      mecanico: formChecklist.mecanico,
+      encargado: formChecklist.encargado,
+      items: formChecklist.items,
+      observacion_general: formChecklist.observacion_general
+    })
+    if (!error) {
+      alert('Checklist guardado correctamente')
+      setFormChecklist({
+        trabajo_id:'', vehiculo:'', patente:'', color:'',
+        fecha_entrega: new Date().toISOString().split('T')[0],
+        mecanico:'', encargado:'', observacion_general:'',
+        items: CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})
+      })
+      setBusqChecklist('')
+      setVistaChecklist('lista')
+      const { data } = await supabase.from('checklists').select('*').order('created_at',{ascending:false})
+      setChecklists(data||[])
+    }
+  }
+
+  async function borrarChecklist(id) {
+    if (!confirm('¿Borrar este checklist?')) return
+    await supabase.from('checklists').delete().eq('id',id)
+    const { data } = await supabase.from('checklists').select('*').order('created_at',{ascending:false})
+    setChecklists(data||[])
+    setChecklistActivo(null)
+  }
+
+  async function agregarEmpleado() {
+    if (!nuevoEmpleado.nombre.trim()) return
+    await supabase.from('empleados').insert({nombre: nuevoEmpleado.nombre.toUpperCase(), rol: nuevoEmpleado.rol})
+    setNuevoEmpleado({nombre:'',rol:'mecanico'})
+    const { data } = await supabase.from('empleados').select('*').order('rol').order('nombre')
+    setEmpleados(data||[])
+  }
+
+  async function borrarEmpleado(id) {
+    if (!confirm('¿Borrar empleado?')) return
+    await supabase.from('empleados').delete().eq('id',id)
+    const { data } = await supabase.from('empleados').select('*').order('rol').order('nombre')
+    setEmpleados(data||[])
+  }
+
+  function imprimirChecklist(ch) {
+    const items = ch.items || {}
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Checklist de Entrega</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:20px; max-width:720px; margin:0 auto; }
+.header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:2px solid #000; padding-bottom:10px; }
+.header-logo img { width:140px; }
+.header-title { text-align:right; }
+.header-title h1 { font-size:18px; font-weight:900; letter-spacing:1px; }
+.datos { display:grid; grid-template-columns:repeat(4,1fr); gap:0; border:1px solid #000; margin-bottom:12px; }
+.dato { padding:6px 8px; border-right:1px solid #000; }
+.dato:last-child { border-right:none; }
+.dato label { font-size:8px; font-weight:700; text-transform:uppercase; display:block; margin-bottom:3px; }
+.dato span { font-size:12px; font-weight:600; }
+table { width:100%; border-collapse:collapse; margin-bottom:16px; }
+thead th { background:#222; color:#fff; padding:6px 8px; text-align:left; font-size:10px; font-weight:700; letter-spacing:.5px; }
+tbody td { padding:8px; border:1px solid #ccc; font-size:11px; vertical-align:middle; }
+tbody tr:nth-child(even) { background:#f9f9f9; }
+.check-cell { text-align:center; font-size:16px; }
+.firmas { margin-top:16px; }
+.firmas-title { font-size:11px; font-weight:900; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
+.firmas-grid { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid #000; }
+.firma-item { padding:8px; border-right:1px solid #000; }
+.firma-item:last-child { border-right:none; }
+.firma-item label { font-size:9px; font-weight:700; text-transform:uppercase; display:block; margin-bottom:20px; }
+.firma-item .linea { border-bottom:1px solid #000; height:20px; }
+@media print { body { padding:10px; } @page { margin:0.5cm; } }
+</style></head><body>
+<div class="header">
+  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
+  <div class="header-title">
+    <h1>CHECKLIST DE ENTREGA</h1>
+    <div style="font-size:11px;color:#555;margin-top:4px">Fecha: ${ch.fecha_entrega ? new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR') : '—'}</div>
+  </div>
+</div>
+<div class="datos">
+  <div class="dato"><label>Vehículo</label><span>${ch.vehiculo||'—'}</span></div>
+  <div class="dato"><label>Patente</label><span>${ch.patente||'—'}</span></div>
+  <div class="dato"><label>Color</label><span>${ch.color||'—'}</span></div>
+  <div class="dato"><label>Fecha entrega</label><span>${ch.fecha_entrega ? new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR') : '—'}</span></div>
+</div>
+<table>
+  <thead><tr><th style="width:40%">ÍTEM</th><th style="width:15%;text-align:center">SÍ</th><th style="width:15%;text-align:center">NO</th><th>OBSERVACIONES</th></tr></thead>
+  <tbody>
+    ${CHECKLIST_ITEMS.map(item => {
+      const v = items[item] || {}
+      return `<tr>
+        <td style="font-weight:500">${item}</td>
+        <td class="check-cell">${v.valor==='si'?'✓':''}</td>
+        <td class="check-cell">${v.valor==='no'?'✓':''}</td>
+        <td>${v.obs||''}</td>
+      </tr>`
+    }).join('')}
+  </tbody>
+</table>
+${ch.observacion_general?`<div style="border:1px solid #ccc;padding:8px;margin-bottom:16px;"><b style="font-size:10px;text-transform:uppercase;">Observaciones generales:</b><p style="margin-top:4px;font-size:11px">${ch.observacion_general}</p></div>`:''}
+<div class="firmas">
+  <div class="firmas-title">Firmas</div>
+  <div class="firmas-grid">
+    <div class="firma-item"><label>Mecánico: ${ch.mecanico||'___________'}</label><div class="linea"></div></div>
+    <div class="firma-item"><label>Encargado: ${ch.encargado||'___________'}</label><div class="linea"></div></div>
+    <div class="firma-item"><label>Cliente</label><div class="linea"></div></div>
+  </div>
+</div>
+<script>window.onload=()=>{window.print()}<\/script>
+</body></html>`
+    const w = window.open('','_blank','width=820,height=1000')
+    w.document.write(html); w.document.close()
+  }
+
   function calcularTotalesPresupuesto() {
     let totalRepuestosPesos = 0, totalManoObraPesos = 0, totalUSD = 0
     try {
@@ -234,14 +400,11 @@ export default function Home({ rol, cerrarSesion }) {
         if (item.es_mano_obra) {
           if (presupuesto.moneda_mano_obra === 'USD') { totalUSD += val; if(dolarBlue) totalManoObraPesos += val * dolarBlue.venta }
           else totalManoObraPesos += val
-        } else {
-          totalRepuestosPesos += val
-        }
+        } else { totalRepuestosPesos += val }
       })
     } catch(e) {}
     const descMonto = presupuesto.aplicar_descuento && presupuesto.descuento_monto ? parseFloat(parseNum(presupuesto.descuento_monto.toString()))||0 : 0
     const totalEfectivo = totalRepuestosPesos + totalManoObraPesos - descMonto
-
     let totalTransferencia = totalEfectivo
     if (presupuesto.mostrar_transferencia) {
       let baseRecargo = 0
@@ -249,7 +412,6 @@ export default function Home({ rol, cerrarSesion }) {
       if (presupuesto.transferencia_mano_obra && presupuesto.moneda_mano_obra === 'ARS') baseRecargo += totalManoObraPesos
       totalTransferencia = totalEfectivo + (baseRecargo * 0.20)
     }
-
     return { totalRepuestosPesos, totalManoObraPesos, totalUSD, totalEfectivo: Math.max(0,totalEfectivo), totalTransferencia: Math.max(0,totalTransferencia), descMonto }
   }
 
@@ -404,7 +566,6 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
     const usandoUSD = presupuesto.moneda_mano_obra === 'USD'
     const manoObra = presupuesto.items.find(i=>i.es_mano_obra)
     const mostrarTransferencia = presupuesto.mostrar_transferencia
-
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -430,10 +591,9 @@ tbody tr:nth-child(even) { background:#f8faff; }
 .notas p { font-size:11px; color:#444; display:flex; gap:6px; margin-bottom:6px; }
 .totales { min-width:260px; }
 .total-transferencia { display:flex; justify-content:space-between; align-items:center; background:#1a56db; color:#fff; border-radius:8px 8px 0 0; padding:12px 16px; font-size:16px; font-weight:900; }
-.total-efectivo { display:flex; justify-content:space-between; align-items:center; background:#15803D; color:#fff; border-radius:0 0 8px 8px; padding:12px 16px; font-size:16px; font-weight:900; margin-bottom:0; }
+.total-efectivo { display:flex; justify-content:space-between; align-items:center; background:#15803D; color:#fff; border-radius:0 0 8px 8px; padding:12px 16px; font-size:16px; font-weight:900; }
 .total-unico { display:flex; justify-content:space-between; align-items:center; background:#1a56db; color:#fff; border-radius:8px; padding:12px 16px; font-size:16px; font-weight:900; }
 .total-sub { display:flex; justify-content:space-between; padding:6px 14px; font-size:11px; color:#555; background:#f8faff; border:1px solid #e0e0e0; border-top:none; }
-.total-sub:last-of-type { border-radius:0 0 6px 6px; margin-bottom:8px; }
 .bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
 @media print { body { padding:15px; } @page { margin:0.5cm; } }
 </style></head><body>
@@ -467,19 +627,10 @@ tbody tr:nth-child(even) { background:#f8faff; }
     ${usandoUSD&&manoObra?`<div class="total-sub" style="border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div>`:''}
     ${totalRepuestosPesos>0?`<div class="total-sub" style="${!usandoUSD||!manoObra?'border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0':''}"><span>Repuestos</span><span>$${formatPeso(totalRepuestosPesos)}</span></div>`:''}
     ${descMonto>0?`<div class="total-sub"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span style="color:#16A34A">-$${formatPeso(descMonto)}</span></div>`:''}
-    ${mostrarTransferencia ? `
-    <div class="total-transferencia" style="margin-top:8px">
-      <span>🏦 Transferencia</span>
-      <span>$${formatPeso(Math.round(totalTransferencia))}</span>
-    </div>
-    <div class="total-efectivo">
-      <span>💵 Efectivo (descuento)</span>
-      <span>$${formatPeso(Math.round(totalEfectivo))}</span>
-    </div>` : `
-    <div class="total-unico" style="margin-top:8px">
-      <span>TOTAL</span>
-      <span>$${formatPeso(Math.round(totalEfectivo))}</span>
-    </div>`}
+    ${mostrarTransferencia?`
+    <div class="total-transferencia" style="margin-top:8px"><span>🏦 Transferencia</span><span>$${formatPeso(Math.round(totalTransferencia))}</span></div>
+    <div class="total-efectivo"><span>💵 Efectivo (descuento)</span><span>$${formatPeso(Math.round(totalEfectivo))}</span></div>`:`
+    <div class="total-unico" style="margin-top:8px"><span>TOTAL</span><span>$${formatPeso(Math.round(totalEfectivo))}</span></div>`}
     ${usandoUSD&&dolarBlue?`<div style="font-size:9px;color:#888;text-align:right;margin-top:4px">Dólar blue venta: $${formatPeso(dolarBlue.venta)}</div>`:''}
   </div>
 </div>
@@ -736,7 +887,6 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
     <h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">INFORME MENSUAL</h1>
     <p style="font-size:14px;font-weight:700;color:#333;margin-bottom:4px">${nombreMes.toUpperCase()}</p>
     <p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p>
-    <p style="font-size:11px;color:#555">Malvinas 2084 — Mar del Plata</p>
   </div>
 </div>
 <div class="stats">
@@ -757,7 +907,6 @@ ${salidos.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;pa
 <div class="section"><div class="section-title">MARCAS ATENDIDAS</div>
 <div class="marcas">
 ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="marca-item"><span style="font-size:13px;color:#555">${m}</span><b style="font-size:18px;color:#1a56db">${n}</b></div>`).join('')}
-${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;padding:8px">Sin datos este mes</p>':''}
 </div></div>
 <div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div>
 <script>window.onload=()=>{window.print()}<\/script>
@@ -781,6 +930,8 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
   const trabajosTaller=tallerVista?trabajos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(a.fecha_ingreso)-new Date(b.fecha_ingreso)):[]
   const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca):[]
   const {totalEfectivo,totalTransferencia,totalUSD,descMonto}=calcularTotalesPresupuesto()
+  const mecanicos=empleados.filter(e=>e.rol==='mecanico')
+  const encargados=empleados.filter(e=>e.rol==='encargado')
   const navLinks=[
     {color:'#E1306C',icon:<IgIcon/>,href:'https://www.instagram.com/di_fiore_mecanica/',label:'@di_fiore_mecanica'},
     {color:'#1877F2',icon:<FbIcon/>,href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr',label:'di_fiore_mecanica'},
@@ -916,13 +1067,53 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
         <div className={styles.modalActions}><button className={styles.btn} onClick={()=>{setModalFotos(null);setModalFotosData([])}}>Cerrar</button></div>
       </div></div>}
 
+      {/* MODAL VER CHECKLIST */}
+      {checklistActivo&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'600px',maxHeight:'85vh',overflowY:'auto'}}>
+        <div className={styles.modalTitle}>Checklist de entrega</div>
+        <div className={styles.modalSub}>{checklistActivo.vehiculo} · {checklistActivo.patente} · {checklistActivo.fecha_entrega?new Date(checklistActivo.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):''}</div>
+        <div style={{marginTop:'1rem'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px',fontSize:'13px'}}>
+            <div><span style={{color:'#718096'}}>Mecánico:</span> <b>{checklistActivo.mecanico||'—'}</b></div>
+            <div><span style={{color:'#718096'}}>Encargado:</span> <b>{checklistActivo.encargado||'—'}</b></div>
+            <div><span style={{color:'#718096'}}>Color:</span> <b>{checklistActivo.color||'—'}</b></div>
+          </div>
+          <table className={styles.table}>
+            <thead><tr><th>Ítem</th><th style={{textAlign:'center'}}>Sí</th><th style={{textAlign:'center'}}>No</th><th>Observaciones</th></tr></thead>
+            <tbody>
+              {CHECKLIST_ITEMS.map(item=>{
+                const v = (checklistActivo.items||{})[item]||{}
+                return <tr key={item}>
+                  <td style={{fontSize:'12px',fontWeight:'500'}}>{item}</td>
+                  <td style={{textAlign:'center',fontSize:'16px',color:'#16A34A'}}>{v.valor==='si'?'✓':''}</td>
+                  <td style={{textAlign:'center',fontSize:'16px',color:'#DC2626'}}>{v.valor==='no'?'✓':''}</td>
+                  <td style={{fontSize:'12px',color:'#718096'}}>{v.obs||'—'}</td>
+                </tr>
+              })}
+            </tbody>
+          </table>
+          {checklistActivo.observacion_general&&<div style={{marginTop:'8px',padding:'10px',background:'#F7FAFC',borderRadius:'6px',fontSize:'13px'}}><b>Obs. general:</b> {checklistActivo.observacion_general}</div>}
+        </div>
+        <div className={styles.modalActions}>
+          {admin&&<button className={styles.btnDanger} onClick={()=>borrarChecklist(checklistActivo.id)}>🗑️ Borrar</button>}
+          <button className={styles.btn} onClick={()=>imprimirChecklist(checklistActivo)}>🖨️ Imprimir</button>
+          <button className={styles.btn} onClick={()=>setChecklistActivo(null)}>Cerrar</button>
+        </div>
+      </div></div>}
+
       {/* SIDEBAR */}
       <div className={`${styles.sidebar} ${sidebarOpen?styles.sidebarOpen:''}`}>
         <div className={styles.logoArea}><img src={LOGO_URL} alt="DiFiore Performance" style={{width:'100%',maxWidth:'180px',marginBottom:'8px'}}/></div>
         {[
           {id:'dashboard',label:'Dashboard'},
           {id:'clientes',label:'Clientes'},
-          ...(admin?[{id:'nuevo',label:'Nuevo cliente'},{id:'presupuesto',label:'Presupuesto'},{id:'recibo',label:'Recibo'},{id:'informe',label:'Informe mensual'}]:[])
+          {id:'checklist',label:'Checklist entrega'},
+          ...(admin?[
+            {id:'nuevo',label:'Nuevo cliente'},
+            {id:'presupuesto',label:'Presupuesto'},
+            {id:'recibo',label:'Recibo'},
+            {id:'informe',label:'Informe mensual'},
+            {id:'empleados',label:'⚙️ Empleados'},
+          ]:[])
         ].map(item=>(
           <button key={item.id} className={`${styles.navItem} ${seccion===item.id?styles.navActive:''}`} onClick={()=>{setSeccion(item.id);setTallerVista(null);setVistaStats(null);setVistaMarca(null);setVerEntregados(false);setSidebarOpen(false)}}>
             {item.label}
@@ -1126,6 +1317,170 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
           </div>
         )}
 
+        {/* CHECKLIST DE ENTREGA */}
+        {seccion==='checklist'&&(
+          <div>
+            <div className={styles.topBar}>
+              <h1 className={styles.pageTitle}>Checklist de entrega</h1>
+              <div style={{display:'flex',gap:'8px'}}>
+                <button className={`${styles.btn} ${vistaChecklist==='lista'?styles.navActive:''}`} onClick={()=>setVistaChecklist('lista')}>Ver registros</button>
+                <button className={styles.btnPrimary} onClick={()=>setVistaChecklist('nuevo')}>+ Nuevo checklist</button>
+              </div>
+            </div>
+            <div className={styles.divider}></div>
+
+            {vistaChecklist==='nuevo'&&(
+              <div>
+                <div className={styles.card}>
+                  <div className={styles.cardTitle}>Datos del vehículo</div>
+                  <div className={styles.formGrid}>
+                    <div className={styles.formGroup} style={{gridColumn:'1/-1',position:'relative'}}>
+                      <label>Buscar cliente</label>
+                      <input value={busqChecklist} onChange={e=>buscarClientesChecklist(e.target.value)} placeholder="Escribí nombre, patente o vehículo..."/>
+                      {sugsChecklist.length>0&&<div style={autocompleteSyle}>
+                        {sugsChecklist.map(t=>(
+                          <div key={t.id} style={autocompleteItemStyle}
+                            onMouseOver={e=>e.currentTarget.style.background='#F7FAFC'}
+                            onMouseOut={e=>e.currentTarget.style.background='white'}
+                            onClick={()=>seleccionarClienteChecklist(t)}>
+                            <b>{t.vehiculos?.clientes?.nombre}</b> — {t.vehiculos?.marca_modelo} · {t.vehiculos?.patente}
+                          </div>
+                        ))}
+                      </div>}
+                    </div>
+                    <div className={styles.formGroup}><label>Vehículo</label><input value={formChecklist.vehiculo} onChange={e=>setFormChecklist({...formChecklist,vehiculo:e.target.value})} placeholder="VW Amarok V6"/></div>
+                    <div className={styles.formGroup}><label>Patente</label><input value={formChecklist.patente} onChange={e=>setFormChecklist({...formChecklist,patente:e.target.value})} placeholder="AB 123 CD"/></div>
+                    <div className={styles.formGroup}><label>Color</label><input value={formChecklist.color} onChange={e=>setFormChecklist({...formChecklist,color:e.target.value})} placeholder="Blanco"/></div>
+                    <div className={styles.formGroup}><label>Fecha de entrega</label><input type="date" value={formChecklist.fecha_entrega} onChange={e=>setFormChecklist({...formChecklist,fecha_entrega:e.target.value})}/></div>
+                  </div>
+                </div>
+
+                <div className={styles.card}>
+                  <div className={styles.cardTitle}>Personal</div>
+                  <div className={styles.formGrid}>
+                    <div className={styles.formGroup}>
+                      <label>Mecánico</label>
+                      <select value={formChecklist.mecanico} onChange={e=>setFormChecklist({...formChecklist,mecanico:e.target.value})}>
+                        <option value="">— Seleccioná —</option>
+                        {mecanicos.map(m=><option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Encargado</label>
+                      <select value={formChecklist.encargado} onChange={e=>setFormChecklist({...formChecklist,encargado:e.target.value})}>
+                        <option value="">— Seleccioná —</option>
+                        {encargados.map(m=><option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.card}>
+                  <div className={styles.cardTitle}>Checklist</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
+                    {CHECKLIST_ITEMS.map((item,idx)=>(
+                      <div key={item} style={{display:'grid',gridTemplateColumns:'1fr auto auto 1fr',gap:'8px',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #EDF2F7'}}>
+                        <span style={{fontSize:'13px',fontWeight:'500',color:'#2D3748'}}>{item}</span>
+                        <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer',padding:'6px 12px',borderRadius:'6px',background:formChecklist.items[item]?.valor==='si'?'#DCFCE7':'#F7FAFC',border:'1px solid',borderColor:formChecklist.items[item]?.valor==='si'?'#86EFAC':'#E2E8F0',whiteSpace:'nowrap'}}>
+                          <input type="radio" name={`item-${idx}`} value="si" checked={formChecklist.items[item]?.valor==='si'} onChange={()=>setFormChecklist({...formChecklist,items:{...formChecklist.items,[item]:{...formChecklist.items[item],valor:'si'}}})}/>
+                          <span style={{color:formChecklist.items[item]?.valor==='si'?'#16A34A':'#718096'}}>✓ Sí</span>
+                        </label>
+                        <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer',padding:'6px 12px',borderRadius:'6px',background:formChecklist.items[item]?.valor==='no'?'#FEE2E2':'#F7FAFC',border:'1px solid',borderColor:formChecklist.items[item]?.valor==='no'?'#FECACA':'#E2E8F0',whiteSpace:'nowrap'}}>
+                          <input type="radio" name={`item-${idx}`} value="no" checked={formChecklist.items[item]?.valor==='no'} onChange={()=>setFormChecklist({...formChecklist,items:{...formChecklist.items,[item]:{...formChecklist.items[item],valor:'no'}}})}/>
+                          <span style={{color:formChecklist.items[item]?.valor==='no'?'#DC2626':'#718096'}}>✗ No</span>
+                        </label>
+                        <input value={formChecklist.items[item]?.obs||''} onChange={e=>setFormChecklist({...formChecklist,items:{...formChecklist.items,[item]:{...formChecklist.items[item],obs:e.target.value}}})} placeholder="Observación..." style={{fontSize:'12px'}}/>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.formGroup} style={{marginTop:'16px'}}>
+                    <label>Observaciones generales</label>
+                    <textarea value={formChecklist.observacion_general} onChange={e=>setFormChecklist({...formChecklist,observacion_general:e.target.value})} placeholder="Notas adicionales..." style={{minHeight:'60px'}}/>
+                  </div>
+                </div>
+
+                <div className={styles.formActions}>
+                  <button className={styles.btn} onClick={()=>setVistaChecklist('lista')}>Cancelar</button>
+                  <button className={styles.btnPrimary} onClick={guardarChecklist}>Guardar checklist</button>
+                </div>
+              </div>
+            )}
+
+            {vistaChecklist==='lista'&&(
+              <div>
+                {checklists.length===0?<div style={{color:'#A0AEC0',fontSize:'14px',textAlign:'center',padding:'3rem'}}>No hay checklists registrados todavía</div>:(
+                  <div className={styles.tblWrap}><table className={styles.table}>
+                    <thead><tr><th>Fecha</th><th>Vehículo</th><th>Patente</th><th>Mecánico</th><th>Encargado</th><th>Acciones</th></tr></thead>
+                    <tbody>
+                      {checklists.map(ch=>(
+                        <tr key={ch.id}>
+                          <td style={{fontSize:'12px',color:'#718096'}}>{ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td>
+                          <td onClick={()=>setChecklistActivo(ch)} style={{cursor:'pointer'}}><b>{ch.vehiculo||'—'}</b></td>
+                          <td onClick={()=>setChecklistActivo(ch)} style={{cursor:'pointer'}}>{ch.patente||'—'}</td>
+                          <td>{ch.mecanico||'—'}</td>
+                          <td>{ch.encargado||'—'}</td>
+                          <td style={{display:'flex',gap:'5px'}}>
+                            <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setChecklistActivo(ch)}>Ver</button>
+                            <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>imprimirChecklist(ch)}>🖨️</button>
+                            {admin&&<button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarChecklist(ch.id)}>🗑️</button>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table></div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* EMPLEADOS - solo admin */}
+        {seccion==='empleados'&&admin&&(
+          <div>
+            <div className={styles.topBar}><h1 className={styles.pageTitle}>⚙️ Empleados</h1></div>
+            <div className={styles.divider}></div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Agregar empleado</div>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}><label>Nombre</label><input value={nuevoEmpleado.nombre} onChange={e=>setNuevoEmpleado({...nuevoEmpleado,nombre:e.target.value})} placeholder="NOMBRE APELLIDO"/></div>
+                <div className={styles.formGroup}><label>Rol</label>
+                  <select value={nuevoEmpleado.rol} onChange={e=>setNuevoEmpleado({...nuevoEmpleado,rol:e.target.value})}>
+                    <option value="mecanico">Mecánico</option>
+                    <option value="encargado">Encargado</option>
+                  </select>
+                </div>
+              </div>
+              <button className={styles.btnPrimary} style={{marginTop:'8px'}} onClick={agregarEmpleado}>+ Agregar</button>
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Mecánicos</div>
+              {mecanicos.length===0?<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin mecánicos</div>:(
+                <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                  {mecanicos.map(e=>(
+                    <div key={e.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'#F7FAFC',borderRadius:'6px',border:'1px solid #E2E8F0'}}>
+                      <span style={{fontSize:'13px',fontWeight:'500'}}>{e.nombre}</span>
+                      <button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarEmpleado(e.id)}>🗑️</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Encargados</div>
+              {encargados.length===0?<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin encargados</div>:(
+                <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                  {encargados.map(e=>(
+                    <div key={e.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'#F7FAFC',borderRadius:'6px',border:'1px solid #E2E8F0'}}>
+                      <span style={{fontSize:'13px',fontWeight:'500'}}>{e.nombre}</span>
+                      <button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarEmpleado(e.id)}>🗑️</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* NUEVO CLIENTE */}
         {seccion==='nuevo'&&admin&&(
           <div>
@@ -1208,7 +1563,6 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                 <div className={styles.formGroup}><label>Vehículo</label><input value={presupuesto.vehiculo} onChange={e=>setPresupuesto({...presupuesto,vehiculo:e.target.value})} placeholder="Ej: Volkswagen Amarok V6"/></div>
               </div>
             </div>
-
             <div className={styles.card}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
                 <div className={styles.cardTitle} style={{margin:0}}>Ítems del presupuesto</div>
@@ -1247,8 +1601,6 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                   </div>
                 </div>
               ))}
-
-              {/* DESCUENTO */}
               <div style={{background:'#F0FDF4',border:'1px solid #86EFAC',borderRadius:'8px',padding:'12px 16px',marginTop:'4px',marginBottom:'8px'}}>
                 <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px',cursor:'pointer',fontWeight:'600',color:'#16A34A',marginBottom:'10px'}}>
                   <input type="checkbox" checked={presupuesto.aplicar_descuento} onChange={e=>setPresupuesto({...presupuesto,aplicar_descuento:e.target.checked})}/>
@@ -1261,8 +1613,6 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                   </div>
                 )}
               </div>
-
-              {/* TRANSFERENCIA */}
               <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'12px 16px',marginBottom:'8px'}}>
                 <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px',cursor:'pointer',fontWeight:'600',color:'#2563EB',marginBottom:'10px'}}>
                   <input type="checkbox" checked={presupuesto.mostrar_transferencia} onChange={e=>setPresupuesto({...presupuesto,mostrar_transferencia:e.target.checked})}/>
@@ -1280,18 +1630,16 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                         {presupuesto.moneda_mano_obra==='USD'&&<span style={{fontSize:'11px',color:'#A0AEC0'}}>(solo aplica en ARS)</span>}
                       </label>
                     </div>
-                    {presupuesto.mostrar_transferencia&&(
-                      <div style={{marginTop:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
-                        <div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                          <span style={{fontSize:'12px',fontWeight:'600'}}>🏦 Transferencia</span>
-                          <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalTransferencia))}</span>
-                        </div>
-                        <div style={{background:'#15803D',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                          <span style={{fontSize:'12px',fontWeight:'600'}}>💵 Efectivo (descuento)</span>
-                          <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalEfectivo))}</span>
-                        </div>
+                    <div style={{marginTop:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+                      <div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{fontSize:'12px',fontWeight:'600'}}>🏦 Transferencia</span>
+                        <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalTransferencia))}</span>
                       </div>
-                    )}
+                      <div style={{background:'#15803D',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{fontSize:'12px',fontWeight:'600'}}>💵 Efectivo (descuento)</span>
+                        <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalEfectivo))}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
                 {!presupuesto.mostrar_transferencia&&(
@@ -1302,7 +1650,6 @@ ${Object.keys(marcasCount).length===0?'<p style="color:#999;font-size:12px;paddi
                 )}
               </div>
             </div>
-
             <div className={styles.card}>
               <div className={styles.cardTitle}>Notas / Observaciones</div>
               <div className={styles.formGroup}><label>Una por línea (aparecerán con ✅)</label><textarea value={presupuesto.notas} onChange={e=>setPresupuesto({...presupuesto,notas:e.target.value})} placeholder={'Kit de distribución de origen Alemán.\nRepuestos originales. Trabajo garantizado.'} style={{minHeight:'80px'}}/></div>
