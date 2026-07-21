@@ -18,18 +18,12 @@ function formatNum(val) {
 function parseNum(val) { return val.toString().replace(/\./g,'') }
 
 const CHECKLIST_ITEMS = [
-  'BATERIA DE VEHICULO',
-  'LÍQUIDOS/FLUIDOS',
-  'RUEDAS AJUSTADAS',
-  'ENTREGA COMO FOTOS',
-  'MOTOR LAVADO',
-  'LAVADO DE VEHICULO',
-  'CHEQUEADA EN CALLE',
-  'TAPA CUBRE MOTOR',
-  'ELECTRO 2 VECES PROBADO',
-  'CHECK/TESTIGOS APAGADOS',
-  'INTERIOR LIMPIO'
+  'BATERIA DE VEHICULO','LÍQUIDOS/FLUIDOS','RUEDAS AJUSTADAS','ENTREGA COMO FOTOS',
+  'MOTOR LAVADO','LAVADO DE VEHICULO','CHEQUEADA EN CALLE','TAPA CUBRE MOTOR',
+  'ELECTRO 2 VECES PROBADO','CHECK/TESTIGOS APAGADOS','INTERIOR LIMPIO'
 ]
+
+const MAX_TURNOS_POR_DIA = 4
 
 const footerIconsHTML = `
   <a class="footer-icon" href="https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1"><svg width="12" height="12" viewBox="0 0 24 24" fill="#EA4335"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.402 16.199 0 12 0zm0 11c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/></svg>Malvinas Argentinas 2084, MdP</a>
@@ -106,16 +100,25 @@ export default function Home({ rol, cerrarSesion }) {
   const [empleados, setEmpleados] = useState([])
   const [checklists, setChecklists] = useState([])
   const [checklistActivo, setChecklistActivo] = useState(null)
+  const [editandoChecklist, setEditandoChecklist] = useState(false)
   const [vistaChecklist, setVistaChecklist] = useState('lista')
   const [busqChecklist, setBusqChecklist] = useState('')
   const [sugsChecklist, setSugsChecklist] = useState([])
+  const [empleadoActual, setEmpleadoActual] = useState('')
   const [formChecklist, setFormChecklist] = useState({
-    trabajo_id: '', vehiculo: '', patente: '', color: '',
+    trabajo_id:'', vehiculo:'', patente:'', color:'',
     fecha_entrega: new Date().toISOString().split('T')[0],
-    mecanico: '', encargado: '', observacion_general: '',
+    mecanico:'', encargado:'', observacion_general:'',
     items: CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})
   })
   const [nuevoEmpleado, setNuevoEmpleado] = useState({nombre:'',rol:'mecanico'})
+
+  // Turnos
+  const [turnos, setTurnos] = useState([])
+  const [vistaTurnos, setVistaTurnos] = useState('lista')
+  const [formTurno, setFormTurno] = useState({nombre:'',telefono:'',vehiculo:'',fecha:'',motivo:''})
+  const [editandoTurno, setEditandoTurno] = useState(null)
+
   const [form, setForm] = useState({
     nombre:'',telefono:'',email:'',marca_modelo:'',patente:'',anio:'',kilometraje:'',color:'',
     motivo:'',estado:'Diagnóstico',mecanico:'',taller:'Malvinas 2084',llego_en_grua:false,tiene_seguro:false,fecha_ingreso_manual:''
@@ -178,6 +181,13 @@ export default function Home({ rol, cerrarSesion }) {
     fetchDolar()
   }, [])
 
+  // Si es empleado, pedimos que seleccione su nombre al abrir checklist
+  function abrirChecklist() {
+    setSeccion('checklist')
+    setVistaChecklist('lista')
+    setSidebarOpen(false)
+  }
+
   function buscarClientesPresupuesto(q) {
     setBusqPresupuesto(q)
     if (!q || q.length < 2) { setSugsPresupuesto([]); return }
@@ -217,13 +227,7 @@ export default function Home({ rol, cerrarSesion }) {
     ).slice(0,6))
   }
   function seleccionarClienteChecklist(t) {
-    setFormChecklist({
-      ...formChecklist,
-      trabajo_id: t.id,
-      vehiculo: t.vehiculos?.marca_modelo||'',
-      patente: t.vehiculos?.patente||'',
-      color: t.vehiculos?.color||''
-    })
+    setFormChecklist({...formChecklist, trabajo_id:t.id, vehiculo:t.vehiculos?.marca_modelo||'', patente:t.vehiculos?.patente||'', color:t.vehiculos?.color||''})
     setBusqChecklist(''); setSugsChecklist([])
   }
 
@@ -233,10 +237,12 @@ export default function Home({ rol, cerrarSesion }) {
     const { data: trabajosData } = await supabase.from('trabajos').select('*, vehiculos(*, clientes(*))').order('fecha_ingreso',{ascending:true})
     const { data: empleadosData } = await supabase.from('empleados').select('*').order('rol').order('nombre')
     const { data: checklistsData } = await supabase.from('checklists').select('*').order('created_at',{ascending:false})
+    const { data: turnosData } = await supabase.from('turnos').select('*').order('fecha',{ascending:true})
     setClientes(clientesData||[])
     setTrabajos(trabajosData||[])
     setEmpleados(empleadosData||[])
     setChecklists(checklistsData||[])
+    setTurnos(turnosData||[])
     setLoading(false)
   }
 
@@ -270,31 +276,65 @@ export default function Home({ rol, cerrarSesion }) {
   }
   function formatPeso(v) { return Number(v).toLocaleString('es-AR') }
 
+  // CHECKLIST
+  const checklistsFiltrados = admin
+    ? checklists
+    : checklists.filter(ch => ch.mecanico === empleadoActual || ch.encargado === empleadoActual)
+
   async function guardarChecklist() {
-    const { error } = await supabase.from('checklists').insert({
-      trabajo_id: formChecklist.trabajo_id || null,
-      fecha_entrega: formChecklist.fecha_entrega,
-      vehiculo: formChecklist.vehiculo,
-      patente: formChecklist.patente,
-      color: formChecklist.color,
-      mecanico: formChecklist.mecanico,
-      encargado: formChecklist.encargado,
-      items: formChecklist.items,
-      observacion_general: formChecklist.observacion_general
-    })
-    if (!error) {
-      alert('Checklist guardado correctamente')
-      setFormChecklist({
-        trabajo_id:'', vehiculo:'', patente:'', color:'',
-        fecha_entrega: new Date().toISOString().split('T')[0],
-        mecanico:'', encargado:'', observacion_general:'',
-        items: CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})
+    if (!formChecklist.mecanico && !formChecklist.encargado) { alert('Seleccioná tu nombre antes de guardar'); return }
+    if (editandoChecklist && checklistActivo) {
+      await supabase.from('checklists').update({
+        trabajo_id: formChecklist.trabajo_id||null,
+        fecha_entrega: formChecklist.fecha_entrega,
+        vehiculo: formChecklist.vehiculo,
+        patente: formChecklist.patente,
+        color: formChecklist.color,
+        mecanico: formChecklist.mecanico,
+        encargado: formChecklist.encargado,
+        items: formChecklist.items,
+        observacion_general: formChecklist.observacion_general
+      }).eq('id', checklistActivo.id)
+    } else {
+      await supabase.from('checklists').insert({
+        trabajo_id: formChecklist.trabajo_id||null,
+        fecha_entrega: formChecklist.fecha_entrega,
+        vehiculo: formChecklist.vehiculo,
+        patente: formChecklist.patente,
+        color: formChecklist.color,
+        mecanico: formChecklist.mecanico,
+        encargado: formChecklist.encargado,
+        items: formChecklist.items,
+        observacion_general: formChecklist.observacion_general
       })
-      setBusqChecklist('')
-      setVistaChecklist('lista')
-      const { data } = await supabase.from('checklists').select('*').order('created_at',{ascending:false})
-      setChecklists(data||[])
     }
+    setFormChecklist({
+      trabajo_id:'', vehiculo:'', patente:'', color:'',
+      fecha_entrega: new Date().toISOString().split('T')[0],
+      mecanico:'', encargado:'', observacion_general:'',
+      items: CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})
+    })
+    setBusqChecklist(''); setVistaChecklist('lista')
+    setChecklistActivo(null); setEditandoChecklist(false)
+    const { data } = await supabase.from('checklists').select('*').order('created_at',{ascending:false})
+    setChecklists(data||[])
+  }
+
+  function abrirEditarChecklist(ch) {
+    setFormChecklist({
+      trabajo_id: ch.trabajo_id||'',
+      vehiculo: ch.vehiculo||'',
+      patente: ch.patente||'',
+      color: ch.color||'',
+      fecha_entrega: ch.fecha_entrega||new Date().toISOString().split('T')[0],
+      mecanico: ch.mecanico||'',
+      encargado: ch.encargado||'',
+      observacion_general: ch.observacion_general||'',
+      items: ch.items || CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})
+    })
+    setChecklistActivo(ch)
+    setEditandoChecklist(true)
+    setVistaChecklist('nuevo')
   }
 
   async function borrarChecklist(id) {
@@ -305,9 +345,47 @@ export default function Home({ rol, cerrarSesion }) {
     setChecklistActivo(null)
   }
 
+  // TURNOS
+  function turnosPorDia(fecha) { return turnos.filter(t=>t.fecha===fecha) }
+  function diaCompleto(fecha) { return turnosPorDia(fecha).length >= MAX_TURNOS_POR_DIA }
+
+  async function guardarTurno() {
+    if (!formTurno.nombre || !formTurno.fecha) { alert('Completá nombre y fecha'); return }
+    if (!editandoTurno && diaCompleto(formTurno.fecha)) { alert(`El día ${new Date(formTurno.fecha+'T12:00:00').toLocaleDateString('es-AR')} ya tiene ${MAX_TURNOS_POR_DIA} turnos. Elegí otro día.`); return }
+    if (editandoTurno) {
+      await supabase.from('turnos').update({nombre:formTurno.nombre,telefono:formTurno.telefono,vehiculo:formTurno.vehiculo,fecha:formTurno.fecha,motivo:formTurno.motivo}).eq('id',editandoTurno.id)
+    } else {
+      await supabase.from('turnos').insert({nombre:formTurno.nombre,telefono:formTurno.telefono,vehiculo:formTurno.vehiculo,fecha:formTurno.fecha,motivo:formTurno.motivo})
+    }
+    // Mandar WhatsApp
+    if (formTurno.telefono && !editandoTurno) {
+      let tel = formTurno.telefono.replace(/\D/g,'')
+      if (!tel.startsWith('54')) tel = '54'+tel
+      const fechaFormateada = new Date(formTurno.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
+      const msg = `Hola ${formTurno.nombre}! Te confirmamos tu turno en DiFiore Performance.\n\n📅 Fecha: ${fechaFormateada}\n🕘 Horario: 8:30 hs\n🚗 Vehículo: ${formTurno.vehiculo||'—'}\n📝 Motivo: ${formTurno.motivo||'—'}\n\nTe esperamos en Malvinas 2084, Mar del Plata.`
+      window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank')
+    }
+    setFormTurno({nombre:'',telefono:'',vehiculo:'',fecha:'',motivo:''})
+    setEditandoTurno(null); setVistaTurnos('lista')
+    const { data } = await supabase.from('turnos').select('*').order('fecha',{ascending:true})
+    setTurnos(data||[])
+  }
+
+  async function borrarTurno(id) {
+    if (!confirm('¿Cancelar este turno?')) return
+    await supabase.from('turnos').delete().eq('id',id)
+    const { data } = await supabase.from('turnos').select('*').order('fecha',{ascending:true})
+    setTurnos(data||[])
+  }
+
+  function abrirEditarTurno(t) {
+    setFormTurno({nombre:t.nombre,telefono:t.telefono||'',vehiculo:t.vehiculo||'',fecha:t.fecha,motivo:t.motivo||''})
+    setEditandoTurno(t); setVistaTurnos('nuevo')
+  }
+
   async function agregarEmpleado() {
     if (!nuevoEmpleado.nombre.trim()) return
-    await supabase.from('empleados').insert({nombre: nuevoEmpleado.nombre.toUpperCase(), rol: nuevoEmpleado.rol})
+    await supabase.from('empleados').insert({nombre:nuevoEmpleado.nombre.toUpperCase(),rol:nuevoEmpleado.rol})
     setNuevoEmpleado({nombre:'',rol:'mecanico'})
     const { data } = await supabase.from('empleados').select('*').order('rol').order('nombre')
     setEmpleados(data||[])
@@ -328,7 +406,6 @@ export default function Home({ rol, cerrarSesion }) {
 body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:20px; max-width:720px; margin:0 auto; }
 .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:2px solid #000; padding-bottom:10px; }
 .header-logo img { width:140px; }
-.header-title { text-align:right; }
 .header-title h1 { font-size:18px; font-weight:900; letter-spacing:1px; }
 .datos { display:grid; grid-template-columns:repeat(4,1fr); gap:0; border:1px solid #000; margin-bottom:12px; }
 .dato { padding:6px 8px; border-right:1px solid #000; }
@@ -342,7 +419,7 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
 .check-cell { text-align:center; font-size:16px; }
 .firmas { margin-top:16px; }
 .firmas-title { font-size:11px; font-weight:900; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
-.firmas-grid { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid #000; }
+.firmas-grid { display:grid; grid-template-columns:1fr 1fr; border:1px solid #000; }
 .firma-item { padding:8px; border-right:1px solid #000; }
 .firma-item:last-child { border-right:none; }
 .firma-item label { font-size:9px; font-weight:700; text-transform:uppercase; display:block; margin-bottom:20px; }
@@ -353,26 +430,21 @@ tbody tr:nth-child(even) { background:#f9f9f9; }
   <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
   <div class="header-title">
     <h1>CHECKLIST DE ENTREGA</h1>
-    <div style="font-size:11px;color:#555;margin-top:4px">Fecha: ${ch.fecha_entrega ? new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR') : '—'}</div>
+    <div style="font-size:11px;color:#555;margin-top:4px">Fecha: ${ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</div>
   </div>
 </div>
 <div class="datos">
   <div class="dato"><label>Vehículo</label><span>${ch.vehiculo||'—'}</span></div>
   <div class="dato"><label>Patente</label><span>${ch.patente||'—'}</span></div>
   <div class="dato"><label>Color</label><span>${ch.color||'—'}</span></div>
-  <div class="dato"><label>Fecha entrega</label><span>${ch.fecha_entrega ? new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR') : '—'}</span></div>
+  <div class="dato"><label>Fecha entrega</label><span>${ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</span></div>
 </div>
 <table>
   <thead><tr><th style="width:40%">ÍTEM</th><th style="width:15%;text-align:center">SÍ</th><th style="width:15%;text-align:center">NO</th><th>OBSERVACIONES</th></tr></thead>
   <tbody>
-    ${CHECKLIST_ITEMS.map(item => {
-      const v = items[item] || {}
-      return `<tr>
-        <td style="font-weight:500">${item}</td>
-        <td class="check-cell">${v.valor==='si'?'✓':''}</td>
-        <td class="check-cell">${v.valor==='no'?'✓':''}</td>
-        <td>${v.obs||''}</td>
-      </tr>`
+    ${CHECKLIST_ITEMS.map(item=>{
+      const v = items[item]||{}
+      return `<tr><td style="font-weight:500">${item}</td><td class="check-cell">${v.valor==='si'?'✓':''}</td><td class="check-cell">${v.valor==='no'?'✓':''}</td><td>${v.obs||''}</td></tr>`
     }).join('')}
   </tbody>
 </table>
@@ -380,8 +452,7 @@ ${ch.observacion_general?`<div style="border:1px solid #ccc;padding:8px;margin-b
 <div class="firmas">
   <div class="firmas-title">Firmas</div>
   <div class="firmas-grid">
-    <div class="firma-item"><label>Mecánico: ${ch.mecanico||'___________'}</label><div class="linea"></div></div>
-    <div class="firma-item"><label>Encargado: ${ch.encargado||'___________'}</label><div class="linea"></div></div>
+    <div class="firma-item"><label>Empleado: ${ch.mecanico||ch.encargado||'___________'}</label><div class="linea"></div></div>
     <div class="firma-item"><label>Cliente</label><div class="linea"></div></div>
   </div>
 </div>
@@ -392,377 +463,98 @@ ${ch.observacion_general?`<div style="border:1px solid #ccc;padding:8px;margin-b
   }
 
   function calcularTotalesPresupuesto() {
-    let totalRepuestosPesos = 0, totalManoObraPesos = 0, totalUSD = 0
+    let totalRepuestosPesos=0, totalManoObraPesos=0, totalUSD=0
     try {
-      presupuesto.items.forEach(item => {
-        if (!item.total) return
-        const val = parseFloat(parseNum(item.total.toString())) || 0
-        if (item.es_mano_obra) {
-          if (presupuesto.moneda_mano_obra === 'USD') { totalUSD += val; if(dolarBlue) totalManoObraPesos += val * dolarBlue.venta }
-          else totalManoObraPesos += val
-        } else { totalRepuestosPesos += val }
+      presupuesto.items.forEach(item=>{
+        if(!item.total) return
+        const val=parseFloat(parseNum(item.total.toString()))||0
+        if(item.es_mano_obra){
+          if(presupuesto.moneda_mano_obra==='USD'){totalUSD+=val;if(dolarBlue)totalManoObraPesos+=val*dolarBlue.venta}
+          else totalManoObraPesos+=val
+        } else totalRepuestosPesos+=val
       })
-    } catch(e) {}
-    const descMonto = presupuesto.aplicar_descuento && presupuesto.descuento_monto ? parseFloat(parseNum(presupuesto.descuento_monto.toString()))||0 : 0
-    const totalEfectivo = totalRepuestosPesos + totalManoObraPesos - descMonto
-    let totalTransferencia = totalEfectivo
-    if (presupuesto.mostrar_transferencia) {
-      let baseRecargo = 0
-      if (presupuesto.transferencia_repuestos) baseRecargo += totalRepuestosPesos
-      if (presupuesto.transferencia_mano_obra && presupuesto.moneda_mano_obra === 'ARS') baseRecargo += totalManoObraPesos
-      totalTransferencia = totalEfectivo + (baseRecargo * 0.20)
-    }
-    return { totalRepuestosPesos, totalManoObraPesos, totalUSD, totalEfectivo: Math.max(0,totalEfectivo), totalTransferencia: Math.max(0,totalTransferencia), descMonto }
-  }
+    } catch(e){}
+    const descMonto=presupuesto.aplicar_descuento&&presupuesto.descuento_monto?parseFloat(parseNum(presupu
+                                                                                                   ="color:#333">Performance</span></div></div><div class="folio">N° CLIENTE<br><span class="folio-num">${nroCliente}</span></div></div>`}
 
-  function buildHeader(nroCliente) {
-    return `<div class="header">
-  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
-  <div class="header-center"><h1>ORDEN DE SERVICIO</h1><div class="brand">DiFiore<span style="color:#333">Performance</span></div></div>
-  <div class="folio">N° CLIENTE<br><span class="folio-num">${nroCliente}</span></div>
-</div>`
-  }
+  function buildDatosVehiculo(trabajo){const v=trabajo.vehiculos;return`<div class="body"><div><div class="field"><label>Marca / Modelo:</label><div class="val">${v?.marca_modelo||''}</div></div><div class="field"><label>Color:</label><div class="val">${v?.color||''}</div></div><div class="field"><label>Kilometraje:</label><div class="val">${v?.kilometraje||''}</div></div><div class="field"><label>Patente:</label><div class="val">${v?.patente||''}</div></div><div class="grua-seg"><div class="grua-item"><span>Grúa:</span><span class="checkbox"><span class="box">${trabajo.llego_en_grua?'✓':''}</span> Sí</span><span class="checkbox"><span class="box">${!trabajo.llego_en_grua?'✓':''}</span> No</span></div><div class="grua-item"><span>Seguro:</span><span class="checkbox"><span class="box">${trabajo.tiene_seguro?'✓':''}</span> Sí</span><span class="checkbox"><span class="box">${!trabajo.tiene_seguro?'✓':''}</span> No</span></div></div></div><div><div style="font-weight:900;margin-bottom:5px;font-size:10px;">DATOS DEL CLIENTE</div><div class="field"><label>Ingreso:</label><div class="val">${trabajo.fecha_ingreso?new Date(trabajo.fecha_ingreso).toLocaleDateString('es-AR'):'___/___/______'}</div></div><div class="field"><label>Salida estimada:</label><div class="val">${trabajo.fecha_salida?new Date(trabajo.fecha_salida).toLocaleDateString('es-AR'):'___/___/______'}</div></div><div class="field"><label>Nombre:</label><div class="val">${v?.clientes?.nombre||''}</div></div><div class="field"><label>Teléfono:</label><div class="val">${v?.clientes?.telefono||''}</div></div><div class="field"><label>Email:</label><div class="val">${v?.clientes?.email||''}</div></div></div></div>`}
 
-  function buildDatosVehiculo(trabajo) {
-    const v = trabajo.vehiculos
-    return `<div class="body">
-  <div>
-    <div class="field"><label>Marca / Modelo:</label><div class="val">${v?.marca_modelo||''}</div></div>
-    <div class="field"><label>Color:</label><div class="val">${v?.color||''}</div></div>
-    <div class="field"><label>Kilometraje:</label><div class="val">${v?.kilometraje||''}</div></div>
-    <div class="field"><label>Patente:</label><div class="val">${v?.patente||''}</div></div>
-    <div class="grua-seg">
-      <div class="grua-item"><span>Grúa:</span>
-        <span class="checkbox"><span class="box">${trabajo.llego_en_grua?'✓':''}</span> Sí</span>
-        <span class="checkbox"><span class="box">${!trabajo.llego_en_grua?'✓':''}</span> No</span>
-      </div>
-      <div class="grua-item"><span>Seguro:</span>
-        <span class="checkbox"><span class="box">${trabajo.tiene_seguro?'✓':''}</span> Sí</span>
-        <span class="checkbox"><span class="box">${!trabajo.tiene_seguro?'✓':''}</span> No</span>
-      </div>
-    </div>
-  </div>
-  <div>
-    <div style="font-weight:900;margin-bottom:5px;font-size:10px;">DATOS DEL CLIENTE</div>
-    <div class="field"><label>Ingreso:</label><div class="val">${trabajo.fecha_ingreso?new Date(trabajo.fecha_ingreso).toLocaleDateString('es-AR'):'___/___/______'}</div></div>
-    <div class="field"><label>Salida estimada:</label><div class="val">${trabajo.fecha_salida?new Date(trabajo.fecha_salida).toLocaleDateString('es-AR'):'___/___/______'}</div></div>
-    <div class="field"><label>Nombre:</label><div class="val">${v?.clientes?.nombre||''}</div></div>
-    <div class="field"><label>Teléfono:</label><div class="val">${v?.clientes?.telefono||''}</div></div>
-    <div class="field"><label>Email:</label><div class="val">${v?.clientes?.email||''}</div></div>
-  </div>
-</div>`
-  }
+  function buildTrabajoBox(motivo){const lineas=(motivo||'').split('.').map(l=>l.trim()).filter(l=>l.length>0);return`<div class="section-title">TRABAJO A REALIZAR / DESCRIPCIÓN DEL PROBLEMA</div><div class="trabajo-box"><div class="trabajo-lineas">${Array(7).fill('<div></div>').join('')}</div><div class="trabajo-texto">${lineas.map(l=>`<div>${l}.</div>`).join('')}</div></div>`}
 
-  function buildTrabajoBox(motivo) {
-    const lineas = (motivo||'').split('.').map(l=>l.trim()).filter(l=>l.length>0)
-    return `<div class="section-title">TRABAJO A REALIZAR / DESCRIPCIÓN DEL PROBLEMA</div>
-<div class="trabajo-box">
-  <div class="trabajo-lineas">${Array(7).fill('<div></div>').join('')}</div>
-  <div class="trabajo-texto">${lineas.map(l=>`<div>${l}.</div>`).join('')}</div>
-</div>`
-  }
+  function abrirVentana(html){const w=window.open('','_blank','width=820,height=1000');w.document.write(html);w.document.close()}
 
-  function abrirVentana(html) {
-    const w = window.open('','_blank','width=820,height=1000')
-    w.document.write(html); w.document.close()
-  }
+  function imprimirOrden(trabajo){const nroCliente=trabajo.numero_cliente||'—';const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title><style>${baseCSS}.tc{margin-top:8px;border-top:2px solid #000;padding-top:6px;}.tc-title{font-size:11px;font-weight:900;letter-spacing:1px;margin-bottom:6px;text-align:center;background:#222;color:#fff;padding:4px;}.tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 16px;}.tc-item{font-size:9.5px;line-height:1.5;margin-bottom:5px;}.tc-item b{display:block;font-size:9.5px;text-transform:uppercase;margin-bottom:1px;}</style></head><body>${buildHeader(nroCliente)}${buildDatosVehiculo(trabajo)}${buildTrabajoBox(trabajo.motivo)}<div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">A C E P T O</span><div class="firma"></div></div></div>${tcHTML}<div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
 
-  function imprimirOrden(trabajo) {
-    const nroCliente = trabajo.numero_cliente||'—'
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title>
-<style>${baseCSS}
-.tc { margin-top:8px; border-top:2px solid #000; padding-top:6px; }
-.tc-title { font-size:11px; font-weight:900; letter-spacing:1px; margin-bottom:6px; text-align:center; background:#222; color:#fff; padding:4px; }
-.tc-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px 16px; }
-.tc-item { font-size:9.5px; line-height:1.5; margin-bottom:5px; }
-.tc-item b { display:block; font-size:9.5px; text-transform:uppercase; margin-bottom:1px; }
-</style></head><body>
-${buildHeader(nroCliente)}
-${buildDatosVehiculo(trabajo)}
-${buildTrabajoBox(trabajo.motivo)}
-<div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">A C E P T O</span><div class="firma"></div></div></div>
-${tcHTML}
-<div class="footer">${footerIconsHTML}</div>
-<script>window.onload=()=>{window.print()}<\/script>
-</body></html>`
+  function imprimirOrdenConObservaciones(trabajo,obs){const nroCliente=trabajo.numero_cliente||'—';const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title><style>${baseCSS}.obs-box{margin-top:10px;border-top:2px solid #000;padding-top:8px;}.obs-title{font-size:11px;font-weight:900;letter-spacing:1px;margin-bottom:8px;text-align:center;background:#222;color:#fff;padding:4px;}.obs-text{font-size:12px;line-height:1.7;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;min-height:60px;}</style></head><body>${buildHeader(nroCliente)}${buildDatosVehiculo(trabajo)}${buildTrabajoBox(trabajo.motivo)}<div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">RECIBÍ CONFORME</span><div class="firma"></div></div></div><div class="obs-box"><div class="obs-title">OBSERVACIONES FINALES</div><div class="obs-text">${obs||'—'}</div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
+
+  function imprimirRepuestos(trabajo,lista){const c=trabajo.vehiculos?.clientes;const v=trabajo.vehiculos;const total=lista.reduce((a,r)=>a+Number(r.valor),0);const nroCliente=trabajo.numero_cliente||'—';const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Historial de Repuestos</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:15px;max-width:720px;margin:0 auto;}.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border-bottom:2px solid #000;padding-bottom:8px;}.header-logo{width:140px;}.header-logo img{width:100%;}.header-center{text-align:center;flex:1;}.header-center h1{font-size:16px;font-weight:900;letter-spacing:1px;margin-bottom:2px;}.header-center .brand{font-size:13px;font-weight:900;color:#1a56db;letter-spacing:2px;}.folio{text-align:right;font-size:9px;font-weight:bold;}.folio-num{font-size:22px;font-weight:900;border-bottom:2px solid #000;display:inline-block;min-width:60px;text-align:center;}.info{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;}.info-item label{font-size:9px;color:#555;display:block;font-weight:bold;text-transform:uppercase;}.info-item span{font-size:12px;font-weight:700;}table{width:100%;border-collapse:collapse;margin-bottom:12px;}thead th{background:#222;color:#fff;padding:7px 10px;text-align:left;font-size:10px;font-weight:bold;}tbody td{padding:7px 10px;border-bottom:1px solid #ddd;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.total-row td{font-weight:900;background:#e8f4e8;font-size:13px;border-top:2px solid #000;}.footer{margin-top:10px;border-top:1px solid #ccc;padding-top:6px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:9px;color:#444;}.footer-icon{display:flex;align-items:center;gap:4px;text-decoration:none;color:#444;}@media print{body{padding:8px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div class="header-center"><h1>HISTORIAL DE REPUESTOS</h1><div class="brand">DiFiore<span style="color:#333">Performance</span></div></div><div class="folio">N° CLIENTE<br><span class="folio-num">${nroCliente}</span></div></div><div class="info"><div class="info-item"><label>Cliente</label><span>${c?.nombre||'—'}</span></div><div class="info-item"><label>Teléfono</label><span>${c?.telefono||'—'}</span></div><div class="info-item"><label>Email</label><span>${c?.email||'—'}</span></div><div class="info-item"><label>Vehículo</label><span>${v?.marca_modelo||'—'}</span></div><div class="info-item"><label>Patente</label><span>${v?.patente||'—'}</span></div><div class="info-item"><label>Color</label><span>${v?.color||'—'}</span></div></div><table><thead><tr><th>#</th><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th></tr></thead><tbody>${lista.map((r,i)=>`<tr><td>${i+1}</td><td>${r.nombre}</td><td>$${Number(r.valor).toLocaleString('es-AR')}</td><td>${r.lugar||'—'}</td><td>${new Date(r.fecha).toLocaleDateString('es-AR')}</td></tr>`).join('')}<tr class="total-row"><td colspan="2">TOTAL</td><td>$${total.toLocaleString('es-AR')}</td><td colspan="2"></td></tr></tbody></table><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
+
+  function imprimirPresupuesto(){
+    const{totalRepuestosPesos,totalManoObraPesos,totalUSD,totalEfectivo,totalTransferencia,descMonto}=calcularTotalesPresupuesto()
+    const usandoUSD=presupuesto.moneda_mano_obra==='USD'
+    const manoObra=presupuesto.items.find(i=>i.es_mano_obra)
+    const mostrarTransferencia=presupuesto.mostrar_transferencia
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;}.header-logo img{width:160px;}.header-info{text-align:right;}.header-info h1{font-size:28px;font-weight:900;color:#1a56db;letter-spacing:2px;margin-bottom:4px;}.header-info p{font-size:11px;color:#555;margin-bottom:2px;}.divider{height:3px;background:linear-gradient(to right,#1a56db,#93c5fd);margin-bottom:20px;border-radius:2px;}.cliente-box{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;padding:12px;border:1px solid #e0e0e0;border-radius:6px;}.cliente-box label{font-size:9px;font-weight:700;color:#1a56db;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px;}.cliente-box span{font-size:14px;font-weight:700;color:#1a1a1a;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}thead th{background:#1a56db;color:#fff;padding:10px 12px;text-align:left;font-size:11px;font-weight:700;}thead th:nth-child(2),thead th:nth-child(3){text-align:right;}tbody td{padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:12px;vertical-align:top;}tbody td:nth-child(2),tbody td:nth-child(3){text-align:right;font-weight:600;}tbody tr:nth-child(even){background:#f8faff;}.descuento-row td{color:#16A34A;font-weight:600;}.footer-box{display:flex;justify-content:space-between;align-items:flex-start;margin-top:16px;}.notas{flex:1;padding-right:30px;}.notas p{font-size:11px;color:#444;display:flex;gap:6px;margin-bottom:6px;}.totales{min-width:260px;}.total-transferencia{display:flex;justify-content:space-between;align-items:center;background:#1a56db;color:#fff;border-radius:8px 8px 0 0;padding:12px 16px;font-size:16px;font-weight:900;}.total-efectivo{display:flex;justify-content:space-between;align-items:center;background:#15803D;color:#fff;border-radius:0 0 8px 8px;padding:12px 16px;font-size:16px;font-weight:900;}.total-unico{display:flex;justify-content:space-between;align-items:center;background:#1a56db;color:#fff;border-radius:8px;padding:12px 16px;font-size:16px;font-weight:900;}.total-sub{display:flex;justify-content:space-between;padding:6px 14px;font-size:11px;color:#555;background:#f8faff;border:1px solid #e0e0e0;border-top:none;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div class="header-info"><h1>PRESUPUESTO</h1><p>N° ${presupuesto.numero}</p><p>Fecha: ${new Date(presupuesto.fecha+'T12:00:00').toLocaleDateString('es-AR')}</p><p>Malvinas 2084 — Mar del Plata 7600</p></div></div><div class="divider"></div><div class="cliente-box"><div><label>Cliente</label><span>${presupuesto.cliente||'—'}</span></div><div><label>Vehículo</label><span>${presupuesto.vehiculo||'—'}</span></div></div><table><thead><tr><th style="width:50%">DESCRIPCIÓN</th><th style="width:25%">PRECIO UNITARIO</th><th style="width:25%">TOTAL</th></tr></thead><tbody>${presupuesto.items.filter(i=>i.descripcion).map(item=>{const s=item.es_mano_obra?(usandoUSD?'USS':'$'):'$';return`<tr><td>${item.descripcion}</td><td>${item.precio_unitario?`${s} ${item.precio_unitario}`:''}</td><td>${item.total?`${s} ${item.total}`:''}</td></tr>`}).join('')}${descMonto>0?`<tr class="descuento-row"><td>${presupuesto.descuento_concepto||'Descuento'}</td><td></td><td>-$${formatPeso(descMonto)}</td></tr>`:''}</tbody></table><div class="footer-box"><div class="notas">${presupuesto.notas?presupuesto.notas.split('\n').filter(n=>n.trim()).map(n=>`<p>✅ ${n}</p>`).join(''):''}</div><div class="totales">${usandoUSD&&manoObra?`<div class="total-sub" style="border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div>`:''}${totalRepuestosPesos>0?`<div class="total-sub" style="${!usandoUSD||!manoObra?'border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0':''}"><span>Repuestos</span><span>$${formatPeso(totalRepuestosPesos)}</span></div>`:''}${descMonto>0?`<div class="total-sub"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span style="color:#16A34A">-$${formatPeso(descMonto)}</span></div>`:''}${mostrarTransferencia?`<div class="total-transferencia" style="margin-top:8px"><span>🏦 Transferencia</span><span>$${formatPeso(Math.round(totalTransferencia))}</span></div><div class="total-efectivo"><span>💵 Efectivo (descuento)</span><span>$${formatPeso(Math.round(totalEfectivo))}</span></div>`:`<div class="total-unico" style="margin-top:8px"><span>TOTAL</span><span>$${formatPeso(Math.round(totalEfectivo))}</span></div>`}${usandoUSD&&dolarBlue?`<div style="font-size:9px;color:#888;text-align:right;margin-top:4px">Dólar blue venta: $${formatPeso(dolarBlue.venta)}</div>`:''}</div></div><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600 — ¡Gracias por confiar en nosotros!</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
   }
 
-  function imprimirOrdenConObservaciones(trabajo, obs) {
-    const nroCliente = trabajo.numero_cliente||'—'
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title>
-<style>${baseCSS}
-.obs-box { margin-top:10px; border-top:2px solid #000; padding-top:8px; }
-.obs-title { font-size:11px; font-weight:900; letter-spacing:1px; margin-bottom:8px; text-align:center; background:#222; color:#fff; padding:4px; }
-.obs-text { font-size:12px; line-height:1.7; padding:8px; border:1px solid #ddd; border-radius:4px; background:#f9f9f9; min-height:60px; }
-</style></head><body>
-${buildHeader(nroCliente)}
-${buildDatosVehiculo(trabajo)}
-${buildTrabajoBox(trabajo.motivo)}
-<div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">RECIBÍ CONFORME</span><div class="firma"></div></div></div>
-<div class="obs-box"><div class="obs-title">OBSERVACIONES FINALES</div><div class="obs-text">${obs||'—'}</div></div>
-<div class="footer">${footerIconsHTML}</div>
-<script>window.onload=()=>{window.print()}<\/script>
-</body></html>`
+  function imprimirRecibo(){
+    const esUSD=recibo.moneda==='USD'
+    const montoNum=parseFloat(parseNum(recibo.monto.toString()))||0
+    const montoEnPesos=esUSD&&dolarBlue?montoNum*dolarBlue.venta:null
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibo</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a56db;padding-bottom:16px;}.header-logo img{width:160px;}.header-info{text-align:right;}.header-info h1{font-size:28px;font-weight:900;color:#1a56db;letter-spacing:2px;margin-bottom:4px;}.header-info p{font-size:11px;color:#555;margin-bottom:2px;}.datos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;padding:16px;border:1px solid #e0e0e0;border-radius:8px;background:#f8faff;}.dato label{font-size:9px;font-weight:700;color:#1a56db;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px;}.dato span{font-size:13px;font-weight:600;color:#1a1a1a;}.monto-box{background:#1a56db;color:#fff;border-radius:8px;padding:20px;text-align:center;margin:20px 0;}.monto-box label{font-size:11px;letter-spacing:2px;opacity:.8;display:block;margin-bottom:6px;}.monto-box .monto{font-size:32px;font-weight:900;}.monto-box .monto-sub{font-size:13px;opacity:.8;margin-top:4px;}.concepto-box{border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:20px;}.concepto-box label{font-size:9px;font-weight:700;color:#1a56db;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px;}.concepto-box p{font-size:14px;color:#1a1a1a;line-height:1.6;}.firma-box{display:flex;justify-content:space-between;margin-top:30px;padding-top:16px;border-top:1px solid #e0e0e0;}.firma{text-align:center;}.firma-line{border-bottom:1px solid #000;width:180px;margin:0 auto 8px;}.firma span{font-size:10px;color:#555;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div class="header-info"><h1>RECIBO</h1><p>N° ${recibo.numero}</p><p>Fecha: ${new Date(recibo.fecha+'T12:00:00').toLocaleDateString('es-AR')}</p><p>Malvinas 2084 — Mar del Plata 7600</p></div></div><div class="datos"><div class="dato"><label>Cliente</label><span>${recibo.cliente||'—'}</span></div><div class="dato"><label>Vehículo</label><span>${recibo.vehiculo||'—'}</span></div><div class="dato"><label>Patente</label><span>${recibo.patente||'—'}</span></div><div class="dato"><label>Forma de pago</label><span>${recibo.forma_pago}</span></div></div><div class="monto-box"><label>MONTO RECIBIDO</label><div class="monto">${esUSD?'USS':'$'} ${montoNum?formatPeso(montoNum):'0'}</div>${esUSD&&montoEnPesos?`<div class="monto-sub">≈ $${formatPeso(Math.round(montoEnPesos))} (Dólar blue $${formatPeso(dolarBlue.venta)})</div>`:''}</div><div class="concepto-box"><label>Concepto</label><p>${recibo.concepto||'—'}</p></div>${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p>${recibo.observaciones}</p></div>`:''}<div class="firma-box"><div class="firma"><div class="firma-line"></div><span>Firma del cliente</span></div><div class="firma"><div class="firma-line"></div><span>DiFiore Performance</span></div></div><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600 — ¡Gracias por confiar en nosotros!</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
   }
 
-  function imprimirRepuestos(trabajo, lista) {
-    const c = trabajo.vehiculos?.clientes
-    const v = trabajo.vehiculos
-    const total = lista.reduce((a,r)=>a+Number(r.valor),0)
-    const nroCliente = trabajo.numero_cliente||'—'
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Historial de Repuestos</title>
-<style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:Arial,sans-serif; font-size:11px; color:#000; padding:15px; max-width:720px; margin:0 auto; }
-.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; border-bottom:2px solid #000; padding-bottom:8px; }
-.header-logo { width:140px; } .header-logo img { width:100%; }
-.header-center { text-align:center; flex:1; }
-.header-center h1 { font-size:16px; font-weight:900; letter-spacing:1px; margin-bottom:2px; }
-.header-center .brand { font-size:13px; font-weight:900; color:#1a56db; letter-spacing:2px; }
-.folio { text-align:right; font-size:9px; font-weight:bold; }
-.folio-num { font-size:22px; font-weight:900; border-bottom:2px solid #000; display:inline-block; min-width:60px; text-align:center; }
-.info { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:10px 0; padding:8px; border:1px solid #ddd; border-radius:4px; background:#f9f9f9; }
-.info-item label { font-size:9px; color:#555; display:block; font-weight:bold; text-transform:uppercase; }
-.info-item span { font-size:12px; font-weight:700; }
-table { width:100%; border-collapse:collapse; margin-bottom:12px; }
-thead th { background:#222; color:#fff; padding:7px 10px; text-align:left; font-size:10px; font-weight:bold; }
-tbody td { padding:7px 10px; border-bottom:1px solid #ddd; font-size:11px; }
-tbody tr:nth-child(even) { background:#f9f9f9; }
-.total-row td { font-weight:900; background:#e8f4e8; font-size:13px; border-top:2px solid #000; }
-.footer { margin-top:10px; border-top:1px solid #ccc; padding-top:6px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:9px; color:#444; }
-.footer-icon { display:flex; align-items:center; gap:4px; text-decoration:none; color:#444; }
-@media print { body { padding:8px; } @page { margin:0.5cm; } }
-</style></head><body>
-<div class="header">
-  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
-  <div class="header-center"><h1>HISTORIAL DE REPUESTOS</h1><div class="brand">DiFiore<span style="color:#333">Performance</span></div></div>
-  <div class="folio">N° CLIENTE<br><span class="folio-num">${nroCliente}</span></div>
-</div>
-<div class="info">
-  <div class="info-item"><label>Cliente</label><span>${c?.nombre||'—'}</span></div>
-  <div class="info-item"><label>Teléfono</label><span>${c?.telefono||'—'}</span></div>
-  <div class="info-item"><label>Email</label><span>${c?.email||'—'}</span></div>
-  <div class="info-item"><label>Vehículo</label><span>${v?.marca_modelo||'—'}</span></div>
-  <div class="info-item"><label>Patente</label><span>${v?.patente||'—'}</span></div>
-  <div class="info-item"><label>Color</label><span>${v?.color||'—'}</span></div>
-</div>
-<table>
-  <thead><tr><th>#</th><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th></tr></thead>
-  <tbody>
-    ${lista.map((r,i)=>`<tr><td>${i+1}</td><td>${r.nombre}</td><td>$${Number(r.valor).toLocaleString('es-AR')}</td><td>${r.lugar||'—'}</td><td>${new Date(r.fecha).toLocaleDateString('es-AR')}</td></tr>`).join('')}
-    <tr class="total-row"><td colspan="2">TOTAL</td><td>$${total.toLocaleString('es-AR')}</td><td colspan="2"></td></tr>
-  </tbody>
-</table>
-<div class="footer">${footerIconsHTML}</div>
-<script>window.onload=()=>{window.print()}<\/script>
-</body></html>`
-    abrirVentana(html)
-  }
-
-  function imprimirPresupuesto() {
-    const { totalRepuestosPesos, totalManoObraPesos, totalUSD, totalEfectivo, totalTransferencia, descMonto } = calcularTotalesPresupuesto()
-    const usandoUSD = presupuesto.moneda_mano_obra === 'USD'
-    const manoObra = presupuesto.items.find(i=>i.es_mano_obra)
-    const mostrarTransferencia = presupuesto.mostrar_transferencia
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>
-<style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; max-width:750px; margin:0 auto; }
-.header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; }
-.header-logo img { width:160px; }
-.header-info { text-align:right; }
-.header-info h1 { font-size:28px; font-weight:900; color:#1a56db; letter-spacing:2px; margin-bottom:4px; }
-.header-info p { font-size:11px; color:#555; margin-bottom:2px; }
-.divider { height:3px; background:linear-gradient(to right,#1a56db,#93c5fd); margin-bottom:20px; border-radius:2px; }
-.cliente-box { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; padding:12px; border:1px solid #e0e0e0; border-radius:6px; }
-.cliente-box label { font-size:9px; font-weight:700; color:#1a56db; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:3px; }
-.cliente-box span { font-size:14px; font-weight:700; color:#1a1a1a; }
-table { width:100%; border-collapse:collapse; margin-bottom:20px; }
-thead th { background:#1a56db; color:#fff; padding:10px 12px; text-align:left; font-size:11px; font-weight:700; }
-thead th:nth-child(2),thead th:nth-child(3) { text-align:right; }
-tbody td { padding:10px 12px; border-bottom:1px solid #f0f0f0; font-size:12px; vertical-align:top; }
-tbody td:nth-child(2),tbody td:nth-child(3) { text-align:right; font-weight:600; }
-tbody tr:nth-child(even) { background:#f8faff; }
-.descuento-row td { color:#16A34A; font-weight:600; }
-.footer-box { display:flex; justify-content:space-between; align-items:flex-start; margin-top:16px; }
-.notas { flex:1; padding-right:30px; }
-.notas p { font-size:11px; color:#444; display:flex; gap:6px; margin-bottom:6px; }
-.totales { min-width:260px; }
-.total-transferencia { display:flex; justify-content:space-between; align-items:center; background:#1a56db; color:#fff; border-radius:8px 8px 0 0; padding:12px 16px; font-size:16px; font-weight:900; }
-.total-efectivo { display:flex; justify-content:space-between; align-items:center; background:#15803D; color:#fff; border-radius:0 0 8px 8px; padding:12px 16px; font-size:16px; font-weight:900; }
-.total-unico { display:flex; justify-content:space-between; align-items:center; background:#1a56db; color:#fff; border-radius:8px; padding:12px 16px; font-size:16px; font-weight:900; }
-.total-sub { display:flex; justify-content:space-between; padding:6px 14px; font-size:11px; color:#555; background:#f8faff; border:1px solid #e0e0e0; border-top:none; }
-.bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
-@media print { body { padding:15px; } @page { margin:0.5cm; } }
-</style></head><body>
-<div class="header">
-  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
-  <div class="header-info">
-    <h1>PRESUPUESTO</h1>
-    <p>N° ${presupuesto.numero}</p>
-    <p>Fecha: ${new Date(presupuesto.fecha+'T12:00:00').toLocaleDateString('es-AR')}</p>
-    <p>Malvinas 2084 — Mar del Plata 7600</p>
-  </div>
-</div>
-<div class="divider"></div>
-<div class="cliente-box">
-  <div><label>Cliente</label><span>${presupuesto.cliente||'—'}</span></div>
-  <div><label>Vehículo</label><span>${presupuesto.vehiculo||'—'}</span></div>
-</div>
-<table>
-  <thead><tr><th style="width:50%">DESCRIPCIÓN</th><th style="width:25%">PRECIO UNITARIO</th><th style="width:25%">TOTAL</th></tr></thead>
-  <tbody>
-    ${presupuesto.items.filter(i=>i.descripcion).map(item=>{
-      const s=item.es_mano_obra?(usandoUSD?'USS':'$'):'$'
-      return `<tr><td>${item.descripcion}</td><td>${item.precio_unitario?`${s} ${item.precio_unitario}`:''}</td><td>${item.total?`${s} ${item.total}`:''}</td></tr>`
-    }).join('')}
-    ${descMonto>0?`<tr class="descuento-row"><td>${presupuesto.descuento_concepto||'Descuento'}</td><td></td><td>-$${formatPeso(descMonto)}</td></tr>`:''}
-  </tbody>
-</table>
-<div class="footer-box">
-  <div class="notas">${presupuesto.notas?presupuesto.notas.split('\n').filter(n=>n.trim()).map(n=>`<p>✅ ${n}</p>`).join(''):''}</div>
-  <div class="totales">
-    ${usandoUSD&&manoObra?`<div class="total-sub" style="border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0"><span>Mano de obra</span><span>USS ${manoObra.total}</span></div>`:''}
-    ${totalRepuestosPesos>0?`<div class="total-sub" style="${!usandoUSD||!manoObra?'border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0':''}"><span>Repuestos</span><span>$${formatPeso(totalRepuestosPesos)}</span></div>`:''}
-    ${descMonto>0?`<div class="total-sub"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span style="color:#16A34A">-$${formatPeso(descMonto)}</span></div>`:''}
-    ${mostrarTransferencia?`
-    <div class="total-transferencia" style="margin-top:8px"><span>🏦 Transferencia</span><span>$${formatPeso(Math.round(totalTransferencia))}</span></div>
-    <div class="total-efectivo"><span>💵 Efectivo (descuento)</span><span>$${formatPeso(Math.round(totalEfectivo))}</span></div>`:`
-    <div class="total-unico" style="margin-top:8px"><span>TOTAL</span><span>$${formatPeso(Math.round(totalEfectivo))}</span></div>`}
-    ${usandoUSD&&dolarBlue?`<div style="font-size:9px;color:#888;text-align:right;margin-top:4px">Dólar blue venta: $${formatPeso(dolarBlue.venta)}</div>`:''}
-  </div>
-</div>
-<div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600 — ¡Gracias por confiar en nosotros!</div>
-<script>window.onload=()=>{window.print()}<\/script>
-</body></html>`
-    abrirVentana(html)
-  }
-
-  function imprimirRecibo() {
-    const esUSD = recibo.moneda==='USD'
-    const montoNum = parseFloat(parseNum(recibo.monto.toString()))||0
-    const montoEnPesos = esUSD&&dolarBlue ? montoNum*dolarBlue.venta : null
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibo</title>
-<style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; max-width:750px; margin:0 auto; }
-.header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; border-bottom:3px solid #1a56db; padding-bottom:16px; }
-.header-logo img { width:160px; }
-.header-info { text-align:right; }
-.header-info h1 { font-size:28px; font-weight:900; color:#1a56db; letter-spacing:2px; margin-bottom:4px; }
-.header-info p { font-size:11px; color:#555; margin-bottom:2px; }
-.datos { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; padding:16px; border:1px solid #e0e0e0; border-radius:8px; background:#f8faff; }
-.dato label { font-size:9px; font-weight:700; color:#1a56db; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:3px; }
-.dato span { font-size:13px; font-weight:600; color:#1a1a1a; }
-.monto-box { background:#1a56db; color:#fff; border-radius:8px; padding:20px; text-align:center; margin:20px 0; }
-.monto-box label { font-size:11px; letter-spacing:2px; opacity:.8; display:block; margin-bottom:6px; }
-.monto-box .monto { font-size:32px; font-weight:900; }
-.monto-box .monto-sub { font-size:13px; opacity:.8; margin-top:4px; }
-.concepto-box { border:1px solid #e0e0e0; border-radius:8px; padding:16px; margin-bottom:20px; }
-.concepto-box label { font-size:9px; font-weight:700; color:#1a56db; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:8px; }
-.concepto-box p { font-size:14px; color:#1a1a1a; line-height:1.6; }
-.firma-box { display:flex; justify-content:space-between; margin-top:30px; padding-top:16px; border-top:1px solid #e0e0e0; }
-.firma { text-align:center; }
-.firma-line { border-bottom:1px solid #000; width:180px; margin:0 auto 8px; }
-.firma span { font-size:10px; color:#555; }
-.bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
-@media print { body { padding:15px; } @page { margin:0.5cm; } }
-</style></head><body>
-<div class="header">
-  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
-  <div class="header-info"><h1>RECIBO</h1><p>N° ${recibo.numero}</p><p>Fecha: ${new Date(recibo.fecha+'T12:00:00').toLocaleDateString('es-AR')}</p><p>Malvinas 2084 — Mar del Plata 7600</p></div>
-</div>
-<div class="datos">
-  <div class="dato"><label>Cliente</label><span>${recibo.cliente||'—'}</span></div>
-  <div class="dato"><label>Vehículo</label><span>${recibo.vehiculo||'—'}</span></div>
-  <div class="dato"><label>Patente</label><span>${recibo.patente||'—'}</span></div>
-  <div class="dato"><label>Forma de pago</label><span>${recibo.forma_pago}</span></div>
-</div>
-<div class="monto-box">
-  <label>MONTO RECIBIDO</label>
-  <div class="monto">${esUSD?'USS':'$'} ${montoNum?formatPeso(montoNum):'0'}</div>
-  ${esUSD&&montoEnPesos?`<div class="monto-sub">≈ $${formatPeso(Math.round(montoEnPesos))} (Dólar blue $${formatPeso(dolarBlue.venta)})</div>`:''}
-</div>
-<div class="concepto-box"><label>Concepto</label><p>${recibo.concepto||'—'}</p></div>
-${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p>${recibo.observaciones}</p></div>`:''}
-<div class="firma-box">
-  <div class="firma"><div class="firma-line"></div><span>Firma del cliente</span></div>
-  <div class="firma"><div class="firma-line"></div><span>DiFiore Performance</span></div>
-</div>
-<div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600 — ¡Gracias por confiar en nosotros!</div>
-<script>window.onload=()=>{window.print()}<\/script>
-</body></html>`
-    abrirVentana(html)
-  }
-
-  function abrirWsp(trabajo) {
-    const tel = trabajo.vehiculos?.clientes?.telefono?.replace(/\D/g,'')
+  function abrirWsp(trabajo){
+    const tel=trabajo.vehiculos?.clientes?.telefono?.replace(/\D/g,'')
     setMsgWsp(`Hola ${trabajo.vehiculos?.clientes?.nombre}! Te contactamos desde DiFiore Performance con novedades sobre tu ${trabajo.vehiculos?.marca_modelo} (${trabajo.vehiculos?.patente}).`)
     setModalWsp({trabajo,tel})
   }
-
-  function enviarWsp() {
+  function enviarWsp(){
     if(!modalWsp) return
-    const t = modalWsp.trabajo
-    let tel = modalWsp.tel||''
+    const t=modalWsp.trabajo
+    let tel=modalWsp.tel||''
     if(!tel.startsWith('54')) tel='54'+tel
-    const msg = msgWsp+`\n\n_Datos:_\n• Cliente: ${t.vehiculos?.clientes?.nombre||''}\n• Vehículo: ${t.vehiculos?.marca_modelo||''}\n• Patente: ${t.vehiculos?.patente||''}`
+    const msg=msgWsp+`\n\n_Datos:_\n• Cliente: ${t.vehiculos?.clientes?.nombre||''}\n• Vehículo: ${t.vehiculos?.marca_modelo||''}\n• Patente: ${t.vehiculos?.patente||''}`
     window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank')
     setModalWsp(null)
   }
 
-  async function registrarReingreso() {
-    const trabajo = modalReingreso
-    const fechaIngreso = formReingreso.fecha_ingreso_manual ? new Date(formReingreso.fecha_ingreso_manual).toISOString() : new Date().toISOString()
-    const {data:nt} = await supabase.from('trabajos').insert({
-      vehiculo_id:trabajo.vehiculos?.id, motivo:formReingreso.motivo, estado:formReingreso.estado,
-      mecanico:formReingreso.mecanico, taller:formReingreso.taller, llego_en_grua:formReingreso.llego_en_grua,
-      tiene_seguro:trabajo.tiene_seguro, fecha_ingreso:fechaIngreso
-    }).select('*, vehiculos(*, clientes(*))').single()
-    if(nt) {
-      await agregarHistorial(nt.id,'reingreso',`Reingreso al taller ${formReingreso.taller}. Motivo: ${formReingreso.motivo}`)
-      await agregarHistorial(nt.id,'estado',`Historial anterior conservado (trabajo N° ${trabajo.id.slice(0,8)}).`)
-    }
-    setModalReingreso(null)
-    setFormReingreso({motivo:'',mecanico:'',taller:'Malvinas 2084',estado:'Diagnóstico',llego_en_grua:false,fecha_ingreso_manual:''})
-    cargarDatos(); setVerEntregados(false)
+  async function registrarReingreso(){
+    const trabajo=modalReingreso
+    const fechaIngreso=formReingreso.fecha_ingreso_manual?new Date(formReingreso.fecha_ingreso_manual).toISOString():new Date().toISOString()
+    const{data:nt}=await supabase.from('trabajos').insert({vehiculo_id:trabajo.vehiculos?.id,motivo:formReingreso.motivo,estado:formReingreso.estado,mecanico:formReingreso.mecanico,taller:formReingreso.taller,llego_en_grua:formReingreso.llego_en_grua,tiene_seguro:trabajo.tiene_seguro,fecha_ingreso:fechaIngreso}).select('*, vehiculos(*, clientes(*))').single()
+    if(nt){await agregarHistorial(nt.id,'reingreso',`Reingreso al taller ${formReingreso.taller}. Motivo: ${formReingreso.motivo}`);await agregarHistorial(nt.id,'estado',`Historial anterior conservado (trabajo N° ${trabajo.id.slice(0,8)}).`)}
+    setModalReingreso(null);setFormReingreso({motivo:'',mecanico:'',taller:'Malvinas 2084',estado:'Diagnóstico',llego_en_grua:false,fecha_ingreso_manual:''});cargarDatos();setVerEntregados(false)
   }
 
-  async function guardarCliente(e) {
+  async function guardarCliente(e){
     e.preventDefault()
-    const {data:cliente,error:errC} = await supabase.from('clientes').insert({nombre:form.nombre,telefono:form.telefono,email:form.email}).select().single()
+    const{data:cliente,error:errC}=await supabase.from('clientes').insert({nombre:form.nombre,telefono:form.telefono,email:form.email}).select().single()
     if(errC){setMensaje('Error al guardar cliente');return}
-    const {data:vehiculo,error:errV} = await supabase.from('vehiculos').insert({cliente_id:cliente.id,marca_modelo:form.marca_modelo,patente:form.patente,anio:form.anio,kilometraje:form.kilometraje,color:form.color}).select().single()
+    const{data:vehiculo,error:errV}=await supabase.from('vehiculos').insert({cliente_id:cliente.id,marca_modelo:form.marca_modelo,patente:form.patente,anio:form.anio,kilometraje:form.kilometraje,color:form.color}).select().single()
     if(errV){setMensaje('Error al guardar vehículo');return}
-    const fechaIngreso = form.fecha_ingreso_manual ? new Date(form.fecha_ingreso_manual).toISOString() : new Date().toISOString()
-    const {data:trabajo} = await supabase.from('trabajos').insert({
-      vehiculo_id:vehiculo.id,motivo:form.motivo,estado:form.estado,mecanico:form.mecanico,
-      taller:form.taller,llego_en_grua:form.llego_en_grua,tiene_seguro:form.tiene_seguro,fecha_ingreso:fechaIngreso
-    }).select('*, vehiculos(*, clientes(*))').single()
+    const fechaIngreso=form.fecha_ingreso_manual?new Date(form.fecha_ingreso_manual).toISOString():new Date().toISOString()
+    const{data:trabajo}=await supabase.from('trabajos').insert({vehiculo_id:vehiculo.id,motivo:form.motivo,estado:form.estado,mecanico:form.mecanico,taller:form.taller,llego_en_grua:form.llego_en_grua,tiene_seguro:form.tiene_seguro,fecha_ingreso:fechaIngreso}).select('*, vehiculos(*, clientes(*))').single()
     if(fotoNuevo.length>0&&trabajo) for(const f of fotoNuevo){const url=await subirFotoStorage(f,trabajo.id);if(url)await supabase.from('fotos').insert({trabajo_id:trabajo.id,url})}
     await agregarHistorial(trabajo.id,'ingreso',`Ingresó al taller ${form.taller} ${form.llego_en_grua?'(en grúa)':'(andando)'}. Seguro: ${form.tiene_seguro?'Sí':'No'}. Motivo: ${form.motivo}`)
-    setForm({nombre:'',telefono:'',email:'',marca_modelo:'',patente:'',anio:'',kilometraje:'',color:'',motivo:'',estado:'Diagnóstico',mecanico:'',taller:'Malvinas 2084',llego_en_grua:false,tiene_seguro:false,fecha_ingreso_manual:''})
-    setFotoNuevo([]); cargarDatos()
-    if(trabajo?.vehiculos?.clientes?.telefono){
-      const tel=trabajo.vehiculos.clientes.telefono.replace(/\D/g,'')
-      setModalWsp({trabajo,tel})
-      setMsgWsp(`Hola ${trabajo.vehiculos.clientes.nombre}! Te contactamos desde DiFiore Performance. Tu ${trabajo.vehiculos.marca_modelo} (${trabajo.vehiculos.patente}) ingresó al taller.`)
-    } else setSeccion('clientes')
+    setForm({nombre:'',telefono:'',email:'',marca_modelo:'',patente:'',anio:'',kilometraje:'',color:'',motivo:'',estado:'Diagnóstico',mecanico:'',taller:'Malvinas 2084',llego_en_grua:false,tiene_seguro:false,fecha_ingreso_manual:''});setFotoNuevo([]);cargarDatos()
+    if(trabajo?.vehiculos?.clientes?.telefono){const tel=trabajo.vehiculos.clientes.telefono.replace(/\D/g,'');setModalWsp({trabajo,tel});setMsgWsp(`Hola ${trabajo.vehiculos.clientes.nombre}! Te contactamos desde DiFiore Performance. Tu ${trabajo.vehiculos.marca_modelo} (${trabajo.vehiculos.patente}) ingresó al taller.`)}
+    else setSeccion('clientes')
   }
 
-  async function registrarSalida() {
+  async function registrarSalida(){
     await supabase.from('trabajos').update({estado:'Salio',fecha_salida:new Date().toISOString(),observacion_final:observacionFinal}).eq('id',modalSalida.id)
     await agregarHistorial(modalSalida.id,'salida',`Vehículo retirado. ${observacionFinal?'Obs: '+observacionFinal:''}`)
     const tActualizado={...modalSalida,estado:'Salio',fecha_salida:new Date().toISOString(),observacion_final:observacionFinal}
-    setModalSalida(null); setObservacionFinal('')
+    setModalSalida(null);setObservacionFinal('')
     if(clienteDetalle?.id===tActualizado.id){setSeccion('clientes');setClienteDetalle(null)}
     cargarDatos()
     if(observacionFinal&&window.confirm('¿Querés imprimir la orden con las observaciones finales?')) imprimirOrdenConObservaciones(tActualizado,observacionFinal)
   }
 
-  async function borrarCliente(trabajo) {
+  async function borrarCliente(trabajo){
     if(!confirm(`¿Borrar a ${trabajo.vehiculos?.clientes?.nombre}?`)) return
     await supabase.from('historial').delete().eq('trabajo_id',trabajo.id)
     await supabase.from('actualizaciones').delete().eq('trabajo_id',trabajo.id)
@@ -771,71 +563,58 @@ ${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p
     await supabase.from('trabajos').delete().eq('id',trabajo.id)
     await supabase.from('vehiculos').delete().eq('id',trabajo.vehiculos?.id)
     await supabase.from('clientes').delete().eq('id',trabajo.vehiculos?.clientes?.id)
-    setSeccion('clientes'); setClienteDetalle(null); cargarDatos()
+    setSeccion('clientes');setClienteDetalle(null);cargarDatos()
   }
 
-  async function guardarEdicion() {
-    const ant=formEditar.taller_anterior, nvo=formEditar.taller
+  async function guardarEdicion(){
+    const ant=formEditar.taller_anterior,nvo=formEditar.taller
     await supabase.from('clientes').update({nombre:formEditar.nombre,telefono:formEditar.telefono,email:formEditar.email}).eq('id',formEditar.cliente_id)
     await supabase.from('vehiculos').update({marca_modelo:formEditar.marca_modelo,patente:formEditar.patente,anio:formEditar.anio,kilometraje:formEditar.kilometraje,color:formEditar.color}).eq('id',formEditar.vehiculo_id)
     await supabase.from('trabajos').update({motivo:formEditar.motivo,estado:formEditar.estado,mecanico:formEditar.mecanico,taller:formEditar.taller,llego_en_grua:formEditar.llego_en_grua,tiene_seguro:formEditar.tiene_seguro}).eq('id',formEditar.trabajo_id)
     if(ant!==nvo) await agregarHistorial(formEditar.trabajo_id,'movimiento',`Movido de ${ant} a ${nvo}`)
-    setModalEditar(null); cargarDatos()
-    if(clienteDetalle) cargarHistorial(formEditar.trabajo_id)
+    setModalEditar(null);cargarDatos();if(clienteDetalle) cargarHistorial(formEditar.trabajo_id)
   }
 
-  async function guardarActualizacion() {
-    const t=modalActualizar
-    let desc=formActualizar.descripcion, tipo=formActualizar.tipo
+  async function guardarActualizacion(){
+    const t=modalActualizar;let desc=formActualizar.descripcion,tipo=formActualizar.tipo
     if(tipo==='taller'){await supabase.from('trabajos').update({taller:formActualizar.taller_nuevo}).eq('id',t.id);desc=`Movido a ${formActualizar.taller_nuevo}. ${desc}`;tipo='movimiento'}
     else if(tipo==='prueba') desc=`En prueba. ${desc}`
     await supabase.from('actualizaciones').insert({trabajo_id:t.id,tipo,descripcion:desc})
-    setModalActualizar(null); setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'})
-    cargarDatos()
+    setModalActualizar(null);setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'});cargarDatos()
     if(clienteDetalle?.id===t.id){await cargarHistorial(t.id);await cargarRepuestos(t.id)}
   }
 
-  async function guardarRepuesto() {
+  async function guardarRepuesto(){
     const id=modalRepuesto.id
     await supabase.from('repuestos').insert({trabajo_id:id,nombre:formRepuesto.nombre,valor:parseFloat(parseNum(formRepuesto.valor.toString()))||0,lugar:formRepuesto.lugar,fecha:formRepuesto.fecha})
-    setModalRepuesto(null); setFormRepuesto({nombre:'',valor:'',lugar:'',fecha:new Date().toISOString().split('T')[0]})
-    await cargarRepuestos(id)
+    setModalRepuesto(null);setFormRepuesto({nombre:'',valor:'',lugar:'',fecha:new Date().toISOString().split('T')[0]});await cargarRepuestos(id)
   }
 
-  async function guardarEdicionRepuesto() {
+  async function guardarEdicionRepuesto(){
     await supabase.from('repuestos').update({nombre:formEditarRepuesto.nombre,valor:parseFloat(parseNum(formEditarRepuesto.valor.toString()))||0,lugar:formEditarRepuesto.lugar,fecha:formEditarRepuesto.fecha}).eq('id',formEditarRepuesto.id)
-    setModalEditarRepuesto(null); await cargarRepuestos(clienteDetalle.id)
+    setModalEditarRepuesto(null);await cargarRepuestos(clienteDetalle.id)
   }
 
-  async function borrarRepuesto(r) {
+  async function borrarRepuesto(r){
     if(!confirm(`¿Borrar repuesto "${r.nombre}"?`)) return
-    await supabase.from('repuestos').delete().eq('id',r.id)
-    await cargarRepuestos(clienteDetalle.id)
+    await supabase.from('repuestos').delete().eq('id',r.id);await cargarRepuestos(clienteDetalle.id)
   }
 
-  async function subirFotosModal(e) {
-    const files=Array.from(e.target.files); if(!files.length||!modalFotos) return
-    setSubiendo(true)
+  async function subirFotosModal(e){
+    const files=Array.from(e.target.files);if(!files.length||!modalFotos) return;setSubiendo(true)
     for(const f of files){const url=await subirFotoStorage(f,modalFotos.id);if(url)await supabase.from('fotos').insert({trabajo_id:modalFotos.id,url})}
-    await cargarFotosModal(modalFotos.id); setSubiendo(false); e.target.value=''
+    await cargarFotosModal(modalFotos.id);setSubiendo(false);e.target.value=''
   }
   async function borrarFotoModal(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotosModal(modalFotos.id)}
-  async function subirFoto(e) {
-    const files=Array.from(e.target.files); if(!files.length||!clienteDetalle) return
-    setSubiendo(true)
+  async function subirFoto(e){
+    const files=Array.from(e.target.files);if(!files.length||!clienteDetalle) return;setSubiendo(true)
     for(const f of files){const url=await subirFotoStorage(f,clienteDetalle.id);if(url)await supabase.from('fotos').insert({trabajo_id:clienteDetalle.id,url})}
-    await cargarFotos(clienteDetalle.id); setSubiendo(false); e.target.value=''
+    await cargarFotos(clienteDetalle.id);setSubiendo(false);e.target.value=''
   }
   async function borrarFoto(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotos(clienteDetalle.id)}
   function verDetalle(t){setClienteDetalle(t);setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarHistorial(t.id);cargarRepuestos(t.id)}
-  function abrirEditar(t) {
-    setFormEditar({
-      trabajo_id:t.id,cliente_id:t.vehiculos?.clientes?.id,vehiculo_id:t.vehiculos?.id,
-      nombre:t.vehiculos?.clientes?.nombre,telefono:t.vehiculos?.clientes?.telefono,email:t.vehiculos?.clientes?.email,
-      marca_modelo:t.vehiculos?.marca_modelo,patente:t.vehiculos?.patente,anio:t.vehiculos?.anio,kilometraje:t.vehiculos?.kilometraje,color:t.vehiculos?.color,
-      motivo:t.motivo,estado:t.estado,mecanico:t.mecanico,taller:t.taller,taller_anterior:t.taller,
-      llego_en_grua:t.llego_en_grua||false,tiene_seguro:t.tiene_seguro||false
-    })
+  function abrirEditar(t){
+    setFormEditar({trabajo_id:t.id,cliente_id:t.vehiculos?.clientes?.id,vehiculo_id:t.vehiculos?.id,nombre:t.vehiculos?.clientes?.nombre,telefono:t.vehiculos?.clientes?.telefono,email:t.vehiculos?.clientes?.email,marca_modelo:t.vehiculos?.marca_modelo,patente:t.vehiculos?.patente,anio:t.vehiculos?.anio,kilometraje:t.vehiculos?.kilometraje,color:t.vehiculos?.color,motivo:t.motivo,estado:t.estado,mecanico:t.mecanico,taller:t.taller,taller_anterior:t.taller,llego_en_grua:t.llego_en_grua||false,tiene_seguro:t.tiene_seguro||false})
     setModalEditar(true)
   }
   function badgeClass(e){
@@ -846,71 +625,20 @@ ${recibo.observaciones?`<div class="concepto-box"><label>Observaciones</label><p
     if(e==='Salio') return styles.badgeGray
     return styles.badgeGray
   }
-
-  function generarInforme() {
-    const [anio,mes]=mesInforme.split('-').map(Number)
-    const inicio=new Date(anio,mes-1,1), fin=new Date(anio,mes,0,23,59,59)
+  function generarInforme(){
+    const[anio,mes]=mesInforme.split('-').map(Number)
+    const inicio=new Date(anio,mes-1,1),fin=new Date(anio,mes,0,23,59,59)
     const ingresados=trabajos.filter(t=>{const d=new Date(t.fecha_ingreso);return d>=inicio&&d<=fin})
     const salidos=trabajos.filter(t=>{if(!t.fecha_salida)return false;const d=new Date(t.fecha_salida);return d>=inicio&&d<=fin})
-    const mc={}; ingresados.forEach(t=>{const m=getMarca(t.vehiculos?.marca_modelo);mc[m]=(mc[m]||0)+1})
+    const mc={};ingresados.forEach(t=>{const m=getMarca(t.vehiculos?.marca_modelo);mc[m]=(mc[m]||0)+1})
     const marcaTop=Object.entries(mc).sort((a,b)=>b[1]-a[1])[0]
     const nombreMes=new Date(anio,mes-1,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'})
-    return {ingresados,salidos,marcaTop,marcasCount:mc,nombreMes}
+    return{ingresados,salidos,marcaTop,marcasCount:mc,nombreMes}
   }
 
-  function imprimirInforme() {
-    const {ingresados,salidos,marcaTop,marcasCount,nombreMes}=generarInforme()
-    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Mensual</title>
-<style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:Arial,sans-serif; font-size:12px; color:#000; padding:30px; max-width:750px; margin:0 auto; }
-.header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; border-bottom:3px solid #1a56db; padding-bottom:16px; }
-.header-logo img { width:160px; }
-.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
-.stat-box { border:2px solid #1a56db; border-radius:10px; padding:16px; text-align:center; }
-.stat-box .num { font-size:36px; font-weight:900; color:#1a56db; }
-.stat-box .lbl { font-size:10px; color:#555; text-transform:uppercase; letter-spacing:.5px; margin-top:4px; }
-.section { margin-bottom:20px; }
-.section-title { background:#222; color:#fff; font-weight:bold; font-size:11px; padding:6px 12px; margin-bottom:8px; letter-spacing:1px; }
-table { width:100%; border-collapse:collapse; }
-thead th { background:#f0f0f0; padding:8px 10px; text-align:left; font-size:10px; font-weight:700; border-bottom:2px solid #ccc; }
-tbody td { padding:8px 10px; border-bottom:1px solid #eee; font-size:11px; }
-tbody tr:nth-child(even) { background:#f9f9f9; }
-.marcas { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-.marca-item { border:1px solid #e0e0e0; border-radius:6px; padding:10px; display:flex; justify-content:space-between; align-items:center; }
-.bottom { margin-top:24px; border-top:2px solid #1a56db; padding-top:10px; text-align:center; font-size:10px; color:#1a56db; font-weight:600; }
-@media print { body { padding:15px; } @page { margin:0.5cm; } }
-</style></head><body>
-<div class="header">
-  <div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div>
-  <div style="text-align:right">
-    <h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">INFORME MENSUAL</h1>
-    <p style="font-size:14px;font-weight:700;color:#333;margin-bottom:4px">${nombreMes.toUpperCase()}</p>
-    <p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p>
-  </div>
-</div>
-<div class="stats">
-  <div class="stat-box"><div class="num">${ingresados.length}</div><div class="lbl">Vehículos ingresados</div></div>
-  <div class="stat-box"><div class="num">${salidos.length}</div><div class="lbl">Vehículos entregados</div></div>
-  <div class="stat-box" style="border-color:#16A34A"><div class="num" style="color:#16A34A;font-size:24px">${marcaTop?marcaTop[0]:'—'}</div><div class="lbl">Marca más frecuente${marcaTop?` (${marcaTop[1]})`:''}</div></div>
-</div>
-<div class="section"><div class="section-title">VEHÍCULOS INGRESADOS (${ingresados.length})</div>
-<table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>
-${ingresados.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>`).join('')}
-${ingresados.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin ingresos este mes</td></tr>':''}
-</tbody></table></div>
-<div class="section"><div class="section-title">VEHÍCULOS ENTREGADOS (${salidos.length})</div>
-<table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead><tbody>
-${salidos.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>`).join('')}
-${salidos.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin entregas este mes</td></tr>':''}
-</tbody></table></div>
-<div class="section"><div class="section-title">MARCAS ATENDIDAS</div>
-<div class="marcas">
-${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="marca-item"><span style="font-size:13px;color:#555">${m}</span><b style="font-size:18px;color:#1a56db">${n}</b></div>`).join('')}
-</div></div>
-<div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div>
-<script>window.onload=()=>{window.print()}<\/script>
-</body></html>`
+  function imprimirInforme(){
+    const{ingresados,salidos,marcaTop,marcasCount,nombreMes}=generarInforme()
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Mensual</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a56db;padding-bottom:16px;}.header-logo img{width:160px;}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}.stat-box{border:2px solid #1a56db;border-radius:10px;padding:16px;text-align:center;}.stat-box .num{font-size:36px;font-weight:900;color:#1a56db;}.stat-box .lbl{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;}.section{margin-bottom:20px;}.section-title{background:#222;color:#fff;font-weight:bold;font-size:11px;padding:6px 12px;margin-bottom:8px;letter-spacing:1px;}table{width:100%;border-collapse:collapse;}thead th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;border-bottom:2px solid #ccc;}tbody td{padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.marcas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}.marca-item{border:1px solid #e0e0e0;border-radius:6px;padding:10px;display:flex;justify-content:space-between;align-items:center;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div style="text-align:right"><h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">INFORME MENSUAL</h1><p style="font-size:14px;font-weight:700;color:#333;margin-bottom:4px">${nombreMes.toUpperCase()}</p><p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p></div></div><div class="stats"><div class="stat-box"><div class="num">${ingresados.length}</div><div class="lbl">Vehículos ingresados</div></div><div class="stat-box"><div class="num">${salidos.length}</div><div class="lbl">Vehículos entregados</div></div><div class="stat-box" style="border-color:#16A34A"><div class="num" style="color:#16A34A;font-size:24px">${marcaTop?marcaTop[0]:'—'}</div><div class="lbl">Marca más frecuente${marcaTop?` (${marcaTop[1]})`:''}</div></div></div><div class="section"><div class="section-title">VEHÍCULOS INGRESADOS (${ingresados.length})</div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>${ingresados.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>`).join('')}${ingresados.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin ingresos este mes</td></tr>':''}</tbody></table></div><div class="section"><div class="section-title">VEHÍCULOS ENTREGADOS (${salidos.length})</div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead><tbody>${salidos.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>`).join('')}${salidos.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin entregas este mes</td></tr>':''}</tbody></table></div><div class="section"><div class="section-title">MARCAS ATENDIDAS</div><div class="marcas">${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="marca-item"><span style="font-size:13px;color:#555">${m}</span><b style="font-size:18px;color:#1a56db">${n}</b></div>`).join('')}</div></div><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
   }
 
@@ -920,18 +648,21 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
   const trabajosFiltrados=trabajos.filter(t=>t.estado!=='Salio').filter(t=>{const q=busqueda.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso))
   const totalFiltrados=trabajosFiltrados.length
   const stats={total:clientes.length,enTaller:trabajosActivos.length,listos:trabajos.filter(t=>t.estado==='Listo').length,salidos:trabajosEntregados.length}
-  const listaVistaStats={
-    enTaller:trabajos.filter(t=>t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),
-    listos:trabajos.filter(t=>t.estado==='Listo').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),
-    salidos:trabajosEntregados
-  }
+  const listaVistaStats={enTaller:trabajos.filter(t=>t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),listos:trabajos.filter(t=>t.estado==='Listo').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),salidos:trabajosEntregados}
   const titulosVistaStats={enTaller:'Autos en taller',listos:'Listos para entregar',salidos:'Vehículos entregados'}
   const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠'}
   const trabajosTaller=tallerVista?trabajos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(a.fecha_ingreso)-new Date(b.fecha_ingreso)):[]
   const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca):[]
-  const {totalEfectivo,totalTransferencia,totalUSD,descMonto}=calcularTotalesPresupuesto()
+  const{totalEfectivo,totalTransferencia}=calcularTotalesPresupuesto()
   const mecanicos=empleados.filter(e=>e.rol==='mecanico')
   const encargados=empleados.filter(e=>e.rol==='encargado')
+  const todosEmpleados=[...mecanicos,...encargados]
+
+  // Turnos agrupados por fecha
+  const hoy=new Date().toISOString().split('T')[0]
+  const turnosFuturos=turnos.filter(t=>t.fecha>=hoy).sort((a,b)=>a.fecha.localeCompare(b.fecha))
+  const turnosPasados=turnos.filter(t=>t.fecha<hoy).sort((a,b)=>b.fecha.localeCompare(a.fecha))
+
   const navLinks=[
     {color:'#E1306C',icon:<IgIcon/>,href:'https://www.instagram.com/di_fiore_mecanica/',label:'@di_fiore_mecanica'},
     {color:'#1877F2',icon:<FbIcon/>,href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr',label:'di_fiore_mecanica'},
@@ -940,6 +671,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
   ]
   const autocompleteSyle={position:'absolute',top:'100%',left:0,right:0,background:'white',border:'1px solid #CBD5E0',borderRadius:'6px',zIndex:100,boxShadow:'0 4px 12px rgba(0,0,0,.1)',maxHeight:'200px',overflowY:'auto'}
   const autocompleteItemStyle={padding:'8px 12px',cursor:'pointer',fontSize:'13px',borderBottom:'1px solid #F7FAFC'}
+
   return (
     <div className={styles.app}>
       <button className={styles.menuBtn} onClick={()=>setSidebarOpen(!sidebarOpen)}>☰</button>
@@ -966,7 +698,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
         <div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}>
           <div className={styles.formGroup}><label>Motivo</label><textarea value={formReingreso.motivo} onChange={e=>setFormReingreso({...formReingreso,motivo:e.target.value})} placeholder="Describí el problema..."/></div>
           <div className={styles.formGrid}>
-            <div className={styles.formGroup}><label>Mecánico</label><input value={formReingreso.mecanico} onChange={e=>setFormReingreso({...formReingreso,mecanico:e.target.value})} placeholder="Agus D."/></div>
+            <div className={styles.formGroup}><label>Mecánico</label><input value={formReingreso.mecanico} onChange={e=>setFormReingreso({...formReingreso,mecanico:e.target.value})}/></div>
             <div className={styles.formGroup}><label>Estado</label><select value={formReingreso.estado} onChange={e=>setFormReingreso({...formReingreso,estado:e.target.value})}><option>Diagnóstico</option><option>En proceso</option><option>En espera</option><option>Desarmando</option><option>Listo</option></select></div>
             <div className={styles.formGroup}><label>Taller</label><select value={formReingreso.taller} onChange={e=>setFormReingreso({...formReingreso,taller:e.target.value})}><option>Malvinas 2084</option><option>Malvinas 3906</option></select></div>
             <div className={styles.formGroup}><label>Llegó en</label><select value={formReingreso.llego_en_grua?'grua':'andando'} onChange={e=>setFormReingreso({...formReingreso,llego_en_grua:e.target.value==='grua'})}><option value="andando">Andando</option><option value="grua">En grúa</option></select></div>
@@ -1068,20 +800,19 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
       </div></div>}
 
       {/* MODAL VER CHECKLIST */}
-      {checklistActivo&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'600px',maxHeight:'85vh',overflowY:'auto'}}>
+      {checklistActivo&&!editandoChecklist&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'600px',maxHeight:'85vh',overflowY:'auto'}}>
         <div className={styles.modalTitle}>Checklist de entrega</div>
         <div className={styles.modalSub}>{checklistActivo.vehiculo} · {checklistActivo.patente} · {checklistActivo.fecha_entrega?new Date(checklistActivo.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):''}</div>
         <div style={{marginTop:'1rem'}}>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px',fontSize:'13px'}}>
             <div><span style={{color:'#718096'}}>Mecánico:</span> <b>{checklistActivo.mecanico||'—'}</b></div>
-            <div><span style={{color:'#718096'}}>Encargado:</span> <b>{checklistActivo.encargado||'—'}</b></div>
             <div><span style={{color:'#718096'}}>Color:</span> <b>{checklistActivo.color||'—'}</b></div>
           </div>
           <table className={styles.table}>
             <thead><tr><th>Ítem</th><th style={{textAlign:'center'}}>Sí</th><th style={{textAlign:'center'}}>No</th><th>Observaciones</th></tr></thead>
             <tbody>
               {CHECKLIST_ITEMS.map(item=>{
-                const v = (checklistActivo.items||{})[item]||{}
+                const v=(checklistActivo.items||{})[item]||{}
                 return <tr key={item}>
                   <td style={{fontSize:'12px',fontWeight:'500'}}>{item}</td>
                   <td style={{textAlign:'center',fontSize:'16px',color:'#16A34A'}}>{v.valor==='si'?'✓':''}</td>
@@ -1095,6 +826,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
         </div>
         <div className={styles.modalActions}>
           {admin&&<button className={styles.btnDanger} onClick={()=>borrarChecklist(checklistActivo.id)}>🗑️ Borrar</button>}
+          <button className={styles.btnPrimary} onClick={()=>abrirEditarChecklist(checklistActivo)}>✏️ Editar</button>
           <button className={styles.btn} onClick={()=>imprimirChecklist(checklistActivo)}>🖨️ Imprimir</button>
           <button className={styles.btn} onClick={()=>setChecklistActivo(null)}>Cerrar</button>
         </div>
@@ -1106,15 +838,16 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
         {[
           {id:'dashboard',label:'Dashboard'},
           {id:'clientes',label:'Clientes'},
+          {id:'turnos',label:'📅 Turnos'},
+          {id:'recibo',label:'Recibo',adminOnly:true},
           {id:'checklist',label:'Checklist entrega'},
           ...(admin?[
             {id:'nuevo',label:'Nuevo cliente'},
             {id:'presupuesto',label:'Presupuesto'},
-            {id:'recibo',label:'Recibo'},
             {id:'informe',label:'Informe mensual'},
             {id:'empleados',label:'⚙️ Empleados'},
           ]:[])
-        ].map(item=>(
+        ].filter(item=>!item.adminOnly||admin).map(item=>(
           <button key={item.id} className={`${styles.navItem} ${seccion===item.id?styles.navActive:''}`} onClick={()=>{setSeccion(item.id);setTallerVista(null);setVistaStats(null);setVistaMarca(null);setVerEntregados(false);setSidebarOpen(false)}}>
             {item.label}
           </button>
@@ -1317,22 +1050,152 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
           </div>
         )}
 
+        {/* TURNOS */}
+        {seccion==='turnos'&&(
+          <div>
+            <div className={styles.topBar}>
+              <h1 className={styles.pageTitle}>📅 Turnos</h1>
+              <div style={{display:'flex',gap:'8px'}}>
+                {vistaTurnos==='nuevo'?<button className={styles.btn} onClick={()=>{setVistaTurnos('lista');setEditandoTurno(null);setFormTurno({nombre:'',telefono:'',vehiculo:'',fecha:'',motivo:''})}}>← Volver</button>
+                :<button className={styles.btnPrimary} onClick={()=>setVistaTurnos('nuevo')}>+ Nuevo turno</button>}
+              </div>
+            </div>
+            <div className={styles.divider}></div>
+
+            {vistaTurnos==='nuevo'&&(
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>{editandoTurno?'Editar turno':'Agendar turno'}</div>
+                <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'10px 14px',marginBottom:'16px',fontSize:'13px',color:'#2563EB',fontWeight:'500'}}>
+                  🕘 Horario fijo: 8:30 hs · Máximo {MAX_TURNOS_POR_DIA} turnos por día
+                </div>
+                <div className={styles.formGrid}>
+                  <div className={styles.formGroup}><label>Nombre del cliente *</label><input value={formTurno.nombre} onChange={e=>setFormTurno({...formTurno,nombre:e.target.value})} placeholder="Juan García"/></div>
+                  <div className={styles.formGroup}><label>Teléfono</label><input value={formTurno.telefono} onChange={e=>setFormTurno({...formTurno,telefono:e.target.value})} placeholder="223 000-0000"/></div>
+                  <div className={styles.formGroup}><label>Vehículo</label><input value={formTurno.vehiculo} onChange={e=>setFormTurno({...formTurno,vehiculo:e.target.value})} placeholder="VW Amarok V6"/></div>
+                  <div className={styles.formGroup}>
+                    <label>Fecha *</label>
+                    <input type="date" value={formTurno.fecha} onChange={e=>setFormTurno({...formTurno,fecha:e.target.value})} min={new Date().toISOString().split('T')[0]}/>
+                    {formTurno.fecha&&!editandoTurno&&(
+                      <div style={{marginTop:'6px',fontSize:'12px',color:diaCompleto(formTurno.fecha)?'#DC2626':'#16A34A',fontWeight:'500'}}>
+                        {diaCompleto(formTurno.fecha)?`⚠️ Día completo (${MAX_TURNOS_POR_DIA}/${MAX_TURNOS_POR_DIA} turnos)`:`✓ ${turnosPorDia(formTurno.fecha).length}/${MAX_TURNOS_POR_DIA} turnos`}
+                      </div>
+                    )}
+                  </div>
+                  <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Motivo</label><textarea value={formTurno.motivo} onChange={e=>setFormTurno({...formTurno,motivo:e.target.value})} placeholder="Service de aceite, revisión frenos, etc..." style={{minHeight:'60px'}}/></div>
+                </div>
+                <div className={styles.formActions}>
+                  <button className={styles.btn} onClick={()=>{setVistaTurnos('lista');setEditandoTurno(null);setFormTurno({nombre:'',telefono:'',vehiculo:'',fecha:'',motivo:''})}}>Cancelar</button>
+                  <button className={styles.btnPrimary} onClick={guardarTurno}>
+                    {editandoTurno?'Guardar cambios':'✓ Agendar y avisar por WhatsApp'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {vistaTurnos==='lista'&&(
+              <div>
+                {turnosFuturos.length===0&&turnosPasados.length===0&&(
+                  <div style={{color:'#A0AEC0',fontSize:'14px',textAlign:'center',padding:'3rem'}}>No hay turnos agendados todavía</div>
+                )}
+
+                {turnosFuturos.length>0&&(
+                  <div className={styles.card}>
+                    <div className={styles.cardTitle}>Próximos turnos</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                      {(() => {
+                        const porFecha = {}
+                        turnosFuturos.forEach(t => { if(!porFecha[t.fecha]) porFecha[t.fecha]=[]; porFecha[t.fecha].push(t) })
+                        return Object.entries(porFecha).map(([fecha, turnos]) => (
+                          <div key={fecha}>
+                            <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px',marginTop:'8px'}}>
+                              <div style={{fontSize:'13px',fontWeight:'600',color:'#2D3748'}}>
+                                📅 {new Date(fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}
+                              </div>
+                              <div style={{fontSize:'11px',color:turnos.length>=MAX_TURNOS_POR_DIA?'#DC2626':'#16A34A',fontWeight:'600',background:turnos.length>=MAX_TURNOS_POR_DIA?'#FEE2E2':'#DCFCE7',padding:'2px 8px',borderRadius:'20px'}}>
+                                {turnos.length}/{MAX_TURNOS_POR_DIA} turnos {turnos.length>=MAX_TURNOS_POR_DIA?'— COMPLETO':''}
+                              </div>
+                            </div>
+                            {turnos.map(t=>(
+                              <div key={t.id} style={{display:'grid',gridTemplateColumns:'auto 1fr auto',gap:'12px',alignItems:'center',padding:'10px 12px',background:fecha===hoy?'#F0FDF4':'#F7FAFC',borderRadius:'8px',border:`1px solid ${fecha===hoy?'#86EFAC':'#E2E8F0'}`,marginBottom:'6px'}}>
+                                <div style={{textAlign:'center',minWidth:'50px'}}>
+                                  <div style={{fontSize:'12px',fontWeight:'700',color:fecha===hoy?'#16A34A':'#2563EB'}}>8:30</div>
+                                  <div style={{fontSize:'10px',color:'#718096'}}>hs</div>
+                                </div>
+                                <div>
+                                  <div style={{fontSize:'13px',fontWeight:'600',color:'#2D3748'}}>{t.nombre}</div>
+                                  <div style={{fontSize:'12px',color:'#718096'}}>{t.vehiculo||'Sin vehículo'} {t.telefono?`· ${t.telefono}`:''}</div>
+                                  {t.motivo&&<div style={{fontSize:'11px',color:'#A0AEC0',marginTop:'2px'}}>{t.motivo}</div>}
+                                </div>
+                                <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                                  {t.telefono&&<button style={{fontSize:'11px',padding:'4px 8px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>{let tel=t.telefono.replace(/\D/g,'');if(!tel.startsWith('54'))tel='54'+tel;const fechaF=new Date(t.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});const msg=`Hola ${t.nombre}! Te recordamos tu turno en DiFiore Performance.\n\n📅 Fecha: ${fechaF}\n🕘 Horario: 8:30 hs\n🚗 Vehículo: ${t.vehiculo||'—'}\n\nTe esperamos en Malvinas 2084, Mar del Plata.`;window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank')}}>💬 Recordar</button>}
+                                  <button className={styles.btnEdit} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>abrirEditarTurno(t)}>✏️</button>
+                                  <button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarTurno(t.id)}>🗑️</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {turnosPasados.length>0&&admin&&(
+                  <div className={styles.card}>
+                    <div className={styles.cardTitle} style={{color:'#A0AEC0'}}>Turnos pasados</div>
+                    <div className={styles.tblWrap}><table className={styles.table}>
+                      <thead><tr><th>Fecha</th><th>Cliente</th><th>Vehículo</th><th>Motivo</th>{admin&&<th></th>}</tr></thead>
+                      <tbody>
+                        {turnosPasados.map(t=>(
+                          <tr key={t.id} style={{opacity:.6}}>
+                            <td style={{fontSize:'12px'}}>{new Date(t.fecha+'T12:00:00').toLocaleDateString('es-AR')}</td>
+                            <td>{t.nombre}</td>
+                            <td>{t.vehiculo||'—'}</td>
+                            <td style={{fontSize:'12px',color:'#718096'}}>{t.motivo||'—'}</td>
+                            {admin&&<td><button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>borrarTurno(t.id)}>🗑️</button></td>}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table></div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* CHECKLIST DE ENTREGA */}
         {seccion==='checklist'&&(
           <div>
             <div className={styles.topBar}>
               <h1 className={styles.pageTitle}>Checklist de entrega</h1>
               <div style={{display:'flex',gap:'8px'}}>
-                <button className={`${styles.btn} ${vistaChecklist==='lista'?styles.navActive:''}`} onClick={()=>setVistaChecklist('lista')}>Ver registros</button>
-                <button className={styles.btnPrimary} onClick={()=>setVistaChecklist('nuevo')}>+ Nuevo checklist</button>
+                <button className={`${styles.btn} ${vistaChecklist==='lista'?styles.navActive:''}`} onClick={()=>{setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Ver registros</button>
+                <button className={styles.btnPrimary} onClick={()=>{setVistaChecklist('nuevo');setEditandoChecklist(false);setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',encargado:'',observacion_general:'',items:CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})})}}>+ Nuevo checklist</button>
               </div>
             </div>
             <div className={styles.divider}></div>
 
+            {/* Selector de empleado para no-admin */}
+            {!admin&&!empleadoActual&&vistaChecklist==='lista'&&(
+              <div className={styles.card} style={{marginBottom:'1rem'}}>
+                <div className={styles.cardTitle}>¿Quién sos?</div>
+                <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'8px'}}>
+                  {todosEmpleados.map(e=>(
+                    <button key={e.id} className={styles.btnPrimary} style={{fontSize:'13px',padding:'8px 16px'}} onClick={()=>setEmpleadoActual(e.nombre)}>{e.nombre}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!admin&&empleadoActual&&<div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'8px 14px',marginBottom:'12px',fontSize:'13px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span>👷 Mostrando registros de <b>{empleadoActual}</b></span>
+              <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setEmpleadoActual('')}>Cambiar</button>
+            </div>}
+
             {vistaChecklist==='nuevo'&&(
               <div>
                 <div className={styles.card}>
-                  <div className={styles.cardTitle}>Datos del vehículo</div>
+                  <div className={styles.cardTitle}>{editandoChecklist?'Editar checklist':'Datos del vehículo'}</div>
                   <div className={styles.formGrid}>
                     <div className={styles.formGroup} style={{gridColumn:'1/-1',position:'relative'}}>
                       <label>Buscar cliente</label>
@@ -1354,7 +1217,6 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
                     <div className={styles.formGroup}><label>Fecha de entrega</label><input type="date" value={formChecklist.fecha_entrega} onChange={e=>setFormChecklist({...formChecklist,fecha_entrega:e.target.value})}/></div>
                   </div>
                 </div>
-
                 <div className={styles.card}>
                   <div className={styles.cardTitle}>Personal</div>
                   <div className={styles.formGrid}>
@@ -1374,7 +1236,6 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
                     </div>
                   </div>
                 </div>
-
                 <div className={styles.card}>
                   <div className={styles.cardTitle}>Checklist</div>
                   <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
@@ -1398,29 +1259,28 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
                     <textarea value={formChecklist.observacion_general} onChange={e=>setFormChecklist({...formChecklist,observacion_general:e.target.value})} placeholder="Notas adicionales..." style={{minHeight:'60px'}}/>
                   </div>
                 </div>
-
                 <div className={styles.formActions}>
-                  <button className={styles.btn} onClick={()=>setVistaChecklist('lista')}>Cancelar</button>
-                  <button className={styles.btnPrimary} onClick={guardarChecklist}>Guardar checklist</button>
+                  <button className={styles.btn} onClick={()=>{setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Cancelar</button>
+                  <button className={styles.btnPrimary} onClick={guardarChecklist}>{editandoChecklist?'Guardar cambios':'Guardar checklist'}</button>
                 </div>
               </div>
             )}
 
             {vistaChecklist==='lista'&&(
               <div>
-                {checklists.length===0?<div style={{color:'#A0AEC0',fontSize:'14px',textAlign:'center',padding:'3rem'}}>No hay checklists registrados todavía</div>:(
+                {checklistsFiltrados.length===0?<div style={{color:'#A0AEC0',fontSize:'14px',textAlign:'center',padding:'3rem'}}>{!admin&&!empleadoActual?'Seleccioná tu nombre arriba para ver tus registros':'No hay checklists registrados todavía'}</div>:(
                   <div className={styles.tblWrap}><table className={styles.table}>
-                    <thead><tr><th>Fecha</th><th>Vehículo</th><th>Patente</th><th>Mecánico</th><th>Encargado</th><th>Acciones</th></tr></thead>
+                    <thead><tr><th>Fecha</th><th>Vehículo</th><th>Patente</th><th>Mecánico</th><th>Acciones</th></tr></thead>
                     <tbody>
-                      {checklists.map(ch=>(
+                      {checklistsFiltrados.map(ch=>(
                         <tr key={ch.id}>
                           <td style={{fontSize:'12px',color:'#718096'}}>{ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td>
                           <td onClick={()=>setChecklistActivo(ch)} style={{cursor:'pointer'}}><b>{ch.vehiculo||'—'}</b></td>
                           <td onClick={()=>setChecklistActivo(ch)} style={{cursor:'pointer'}}>{ch.patente||'—'}</td>
                           <td>{ch.mecanico||'—'}</td>
-                          <td>{ch.encargado||'—'}</td>
                           <td style={{display:'flex',gap:'5px'}}>
                             <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setChecklistActivo(ch)}>Ver</button>
+                            <button className={styles.btnEdit} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>abrirEditarChecklist(ch)}>✏️</button>
                             <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>imprimirChecklist(ch)}>🖨️</button>
                             {admin&&<button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarChecklist(ch.id)}>🗑️</button>}
                           </td>
@@ -1434,7 +1294,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
           </div>
         )}
 
-        {/* EMPLEADOS - solo admin */}
+        {/* EMPLEADOS */}
         {seccion==='empleados'&&admin&&(
           <div>
             <div className={styles.topBar}><h1 className={styles.pageTitle}>⚙️ Empleados</h1></div>
@@ -1443,12 +1303,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
               <div className={styles.cardTitle}>Agregar empleado</div>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}><label>Nombre</label><input value={nuevoEmpleado.nombre} onChange={e=>setNuevoEmpleado({...nuevoEmpleado,nombre:e.target.value})} placeholder="NOMBRE APELLIDO"/></div>
-                <div className={styles.formGroup}><label>Rol</label>
-                  <select value={nuevoEmpleado.rol} onChange={e=>setNuevoEmpleado({...nuevoEmpleado,rol:e.target.value})}>
-                    <option value="mecanico">Mecánico</option>
-                    <option value="encargado">Encargado</option>
-                  </select>
-                </div>
+                <div className={styles.formGroup}><label>Rol</label><select value={nuevoEmpleado.rol} onChange={e=>setNuevoEmpleado({...nuevoEmpleado,rol:e.target.value})}><option value="mecanico">Mecánico</option><option value="encargado">Encargado</option></select></div>
               </div>
               <button className={styles.btnPrimary} style={{marginTop:'8px'}} onClick={agregarEmpleado}>+ Agregar</button>
             </div>
@@ -1550,10 +1405,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
                   <input value={busqPresupuesto} onChange={e=>buscarClientesPresupuesto(e.target.value)} placeholder="Escribí nombre, patente o vehículo..."/>
                   {sugsPresupuesto.length>0&&<div style={autocompleteSyle}>
                     {sugsPresupuesto.map(t=>(
-                      <div key={t.id} style={autocompleteItemStyle}
-                        onMouseOver={e=>e.currentTarget.style.background='#F7FAFC'}
-                        onMouseOut={e=>e.currentTarget.style.background='white'}
-                        onClick={()=>seleccionarClientePresupuesto(t)}>
+                      <div key={t.id} style={autocompleteItemStyle} onMouseOver={e=>e.currentTarget.style.background='#F7FAFC'} onMouseOut={e=>e.currentTarget.style.background='white'} onClick={()=>seleccionarClientePresupuesto(t)}>
                         <b>{t.vehiculos?.clientes?.nombre}</b> — {t.vehiculos?.marca_modelo} · {t.vehiculos?.patente}
                       </div>
                     ))}
@@ -1586,68 +1438,38 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
                     {presupuesto.items.length>1&&<button style={{background:'none',border:'none',color:'#DC2626',cursor:'pointer',fontSize:'18px',lineHeight:1}} onClick={()=>setPresupuesto({...presupuesto,items:presupuesto.items.filter((_,i)=>i!==idx)})}>✕</button>}
                   </div>
                   <div className={styles.formGrid}>
-                    <div className={styles.formGroup} style={{gridColumn:'1/-1'}}>
-                      <label>Descripción</label>
-                      <input value={item.descripcion} onChange={e=>{const items=[...presupuesto.items];items[idx]={...items[idx],descripcion:e.target.value};setPresupuesto({...presupuesto,items})}} placeholder={item.es_mano_obra?'Ej: Reparación de motor | Cambio de distribución...':'Ej: Kit de distribución Alemán'}/>
-                    </div>
-                    <div className={styles.formGroup}>
-                      <label>Precio unitario {item.es_mano_obra?`(${presupuesto.moneda_mano_obra==='USD'?'USS':'$'})`:'(opcional)'}</label>
-                      <input value={item.precio_unitario} onChange={e=>{const items=[...presupuesto.items];items[idx]={...items[idx],precio_unitario:formatNum(e.target.value)};setPresupuesto({...presupuesto,items})}} placeholder="0"/>
-                    </div>
-                    <div className={styles.formGroup}>
-                      <label>Total {item.es_mano_obra?`(${presupuesto.moneda_mano_obra==='USD'?'USS':'$'})`:'($)'}</label>
-                      <input value={item.total} onChange={e=>{const items=[...presupuesto.items];items[idx]={...items[idx],total:formatNum(e.target.value)};setPresupuesto({...presupuesto,items})}} placeholder="0"/>
-                    </div>
+                    <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Descripción</label><input value={item.descripcion} onChange={e=>{const items=[...presupuesto.items];items[idx]={...items[idx],descripcion:e.target.value};setPresupuesto({...presupuesto,items})}} placeholder={item.es_mano_obra?'Ej: Reparación de motor | Cambio de distribución...':'Ej: Kit de distribución Alemán'}/></div>
+                    <div className={styles.formGroup}><label>Precio unitario {item.es_mano_obra?`(${presupuesto.moneda_mano_obra==='USD'?'USS':'$'})`:'(opcional)'}</label><input value={item.precio_unitario} onChange={e=>{const items=[...presupuesto.items];items[idx]={...items[idx],precio_unitario:formatNum(e.target.value)};setPresupuesto({...presupuesto,items})}} placeholder="0"/></div>
+                    <div className={styles.formGroup}><label>Total {item.es_mano_obra?`(${presupuesto.moneda_mano_obra==='USD'?'USS':'$'})`:'($)'}</label><input value={item.total} onChange={e=>{const items=[...presupuesto.items];items[idx]={...items[idx],total:formatNum(e.target.value)};setPresupuesto({...presupuesto,items})}} placeholder="0"/></div>
                   </div>
                 </div>
               ))}
               <div style={{background:'#F0FDF4',border:'1px solid #86EFAC',borderRadius:'8px',padding:'12px 16px',marginTop:'4px',marginBottom:'8px'}}>
                 <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px',cursor:'pointer',fontWeight:'600',color:'#16A34A',marginBottom:'10px'}}>
-                  <input type="checkbox" checked={presupuesto.aplicar_descuento} onChange={e=>setPresupuesto({...presupuesto,aplicar_descuento:e.target.checked})}/>
-                  Aplicar descuento
+                  <input type="checkbox" checked={presupuesto.aplicar_descuento} onChange={e=>setPresupuesto({...presupuesto,aplicar_descuento:e.target.checked})}/>Aplicar descuento
                 </label>
-                {presupuesto.aplicar_descuento&&(
-                  <div className={styles.formGrid}>
-                    <div className={styles.formGroup}><label>Concepto del descuento</label><input value={presupuesto.descuento_concepto} onChange={e=>setPresupuesto({...presupuesto,descuento_concepto:e.target.value})} placeholder="Ej: Descuento por diagnóstico"/></div>
-                    <div className={styles.formGroup}><label>Monto a descontar ($)</label><input value={presupuesto.descuento_monto} onChange={e=>setPresupuesto({...presupuesto,descuento_monto:formatNum(e.target.value)})} placeholder="100.000"/></div>
-                  </div>
-                )}
+                {presupuesto.aplicar_descuento&&<div className={styles.formGrid}>
+                  <div className={styles.formGroup}><label>Concepto del descuento</label><input value={presupuesto.descuento_concepto} onChange={e=>setPresupuesto({...presupuesto,descuento_concepto:e.target.value})} placeholder="Ej: Descuento por diagnóstico"/></div>
+                  <div className={styles.formGroup}><label>Monto a descontar ($)</label><input value={presupuesto.descuento_monto} onChange={e=>setPresupuesto({...presupuesto,descuento_monto:formatNum(e.target.value)})} placeholder="100.000"/></div>
+                </div>}
               </div>
               <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'12px 16px',marginBottom:'8px'}}>
                 <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px',cursor:'pointer',fontWeight:'600',color:'#2563EB',marginBottom:'10px'}}>
                   <input type="checkbox" checked={presupuesto.mostrar_transferencia} onChange={e=>setPresupuesto({...presupuesto,mostrar_transferencia:e.target.checked})}/>
                   Mostrar precio transferencia / efectivo (descuento)
                 </label>
-                {presupuesto.mostrar_transferencia&&(
-                  <div>
-                    <div style={{fontSize:'12px',color:'#555',marginBottom:'8px'}}>Aplicar recargo del 20% sobre:</div>
-                    <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
-                      <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}>
-                        <input type="checkbox" checked={presupuesto.transferencia_repuestos} onChange={e=>setPresupuesto({...presupuesto,transferencia_repuestos:e.target.checked})}/> Repuestos
-                      </label>
-                      <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}>
-                        <input type="checkbox" checked={presupuesto.transferencia_mano_obra} disabled={presupuesto.moneda_mano_obra==='USD'} onChange={e=>setPresupuesto({...presupuesto,transferencia_mano_obra:e.target.checked})}/> Mano de obra en pesos
-                        {presupuesto.moneda_mano_obra==='USD'&&<span style={{fontSize:'11px',color:'#A0AEC0'}}>(solo aplica en ARS)</span>}
-                      </label>
-                    </div>
-                    <div style={{marginTop:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
-                      <div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                        <span style={{fontSize:'12px',fontWeight:'600'}}>🏦 Transferencia</span>
-                        <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalTransferencia))}</span>
-                      </div>
-                      <div style={{background:'#15803D',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                        <span style={{fontSize:'12px',fontWeight:'600'}}>💵 Efectivo (descuento)</span>
-                        <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalEfectivo))}</span>
-                      </div>
-                    </div>
+                {presupuesto.mostrar_transferencia&&<div>
+                  <div style={{fontSize:'12px',color:'#555',marginBottom:'8px'}}>Aplicar recargo del 20% sobre:</div>
+                  <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
+                    <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}><input type="checkbox" checked={presupuesto.transferencia_repuestos} onChange={e=>setPresupuesto({...presupuesto,transferencia_repuestos:e.target.checked})}/> Repuestos</label>
+                    <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}><input type="checkbox" checked={presupuesto.transferencia_mano_obra} disabled={presupuesto.moneda_mano_obra==='USD'} onChange={e=>setPresupuesto({...presupuesto,transferencia_mano_obra:e.target.checked})}/> Mano de obra en pesos{presupuesto.moneda_mano_obra==='USD'&&<span style={{fontSize:'11px',color:'#A0AEC0'}}>(solo aplica en ARS)</span>}</label>
                   </div>
-                )}
-                {!presupuesto.mostrar_transferencia&&(
-                  <div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'4px'}}>
-                    <span style={{fontSize:'12px',fontWeight:'600'}}>TOTAL</span>
-                    <span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalEfectivo))}</span>
+                  <div style={{marginTop:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+                    <div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontSize:'12px',fontWeight:'600'}}>🏦 Transferencia</span><span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalTransferencia))}</span></div>
+                    <div style={{background:'#15803D',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontSize:'12px',fontWeight:'600'}}>💵 Efectivo (descuento)</span><span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalEfectivo))}</span></div>
                   </div>
-                )}
+                </div>}
+                {!presupuesto.mostrar_transferencia&&<div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'4px'}}><span style={{fontSize:'12px',fontWeight:'600'}}>TOTAL</span><span style={{fontSize:'16px',fontWeight:'900'}}>${formatPeso(Math.round(totalEfectivo))}</span></div>}
               </div>
             </div>
             <div className={styles.card}>
@@ -1682,10 +1504,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
                   <input value={busqRecibo} onChange={e=>buscarClientesRecibo(e.target.value)} placeholder="Escribí nombre, patente o vehículo..."/>
                   {sugsRecibo.length>0&&<div style={autocompleteSyle}>
                     {sugsRecibo.map(t=>(
-                      <div key={t.id} style={autocompleteItemStyle}
-                        onMouseOver={e=>e.currentTarget.style.background='#F7FAFC'}
-                        onMouseOut={e=>e.currentTarget.style.background='white'}
-                        onClick={()=>seleccionarClienteRecibo(t)}>
+                      <div key={t.id} style={autocompleteItemStyle} onMouseOver={e=>e.currentTarget.style.background='#F7FAFC'} onMouseOut={e=>e.currentTarget.style.background='white'} onClick={()=>seleccionarClienteRecibo(t)}>
                         <b>{t.vehiculos?.clientes?.nombre}</b> — {t.vehiculos?.marca_modelo} · {t.vehiculos?.patente}
                       </div>
                     ))}
@@ -1730,7 +1549,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
             </div>
             <div className={styles.divider}></div>
             {(()=>{
-              const {ingresados,salidos,marcaTop,marcasCount,nombreMes}=generarInforme()
+              const{ingresados,salidos,marcaTop,marcasCount,nombreMes}=generarInforme()
               return <div>
                 <div style={{marginBottom:'12px',fontSize:'14px',fontWeight:'600',color:'#718096',textTransform:'capitalize'}}>{nombreMes}</div>
                 <div className={styles.stats} style={{marginBottom:'1.5rem'}}>
@@ -1741,27 +1560,16 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
                 </div>
                 <div className={styles.card}>
                   <div className={styles.cardTitle}>Vehículos ingresados ({ingresados.length})</div>
-                  {ingresados.length===0?<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin ingresos este mes</div>:<table className={styles.table}>
-                    <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead>
-                    <tbody>{ingresados.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#A0AEC0'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>)}</tbody>
-                  </table>}
+                  {ingresados.length===0?<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin ingresos este mes</div>:<table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>{ingresados.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#A0AEC0'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>)}</tbody></table>}
                 </div>
                 <div className={styles.card}>
                   <div className={styles.cardTitle}>Vehículos entregados ({salidos.length})</div>
-                  {salidos.length===0?<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin entregas este mes</div>:<table className={styles.table}>
-                    <thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead>
-                    <tbody>{salidos.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#A0AEC0'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>)}</tbody>
-                  </table>}
+                  {salidos.length===0?<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin entregas este mes</div>:<table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead><tbody>{salidos.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#A0AEC0'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#718096'}}>{new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>)}</tbody></table>}
                 </div>
                 <div className={styles.card}>
                   <div className={styles.cardTitle}>Marcas atendidas</div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'8px'}}>
-                    {Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([marca,n])=>(
-                      <div key={marca} style={{background:'#F7FAFC',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',border:'1px solid #E2E8F0'}}>
-                        <span style={{fontSize:'13px',color:'#4A5568',fontWeight:'500'}}>{marca}</span>
-                        <span style={{fontSize:'20px',fontWeight:'700',color:'#2563EB'}}>{n}</span>
-                      </div>
-                    ))}
+                    {Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([marca,n])=>(<div key={marca} style={{background:'#F7FAFC',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',border:'1px solid #E2E8F0'}}><span style={{fontSize:'13px',color:'#4A5568',fontWeight:'500'}}>{marca}</span><span style={{fontSize:'20px',fontWeight:'700',color:'#2563EB'}}>{n}</span></div>))}
                     {Object.keys(marcasCount).length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
                   </div>
                 </div>
@@ -1829,11 +1637,7 @@ ${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="m
                       </td>}
                     </tr>
                   ))}
-                  <tr>
-                    <td style={{fontWeight:'700',color:'#2D3748'}}>Total</td>
-                    <td style={{fontWeight:'700',color:'#16A34A'}}>${formatPeso(repuestos.reduce((a,r)=>a+Number(r.valor),0))}</td>
-                    <td colSpan={admin?3:2}></td>
-                  </tr>
+                  <tr><td style={{fontWeight:'700',color:'#2D3748'}}>Total</td><td style={{fontWeight:'700',color:'#16A34A'}}>${formatPeso(repuestos.reduce((a,r)=>a+Number(r.valor),0))}</td><td colSpan={admin?3:2}></td></tr>
                 </tbody>
               </table>}
             </div>
