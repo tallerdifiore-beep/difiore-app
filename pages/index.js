@@ -559,8 +559,7 @@ return (
                   <div className={styles.card}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
                       <div className={styles.cardTitle} style={{margin:0}}>
-{new Date(diaSeleccionado+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}                                                                                  ',{weekday:'long',day:'numeric',month:'long'})}
-                      </div>
+{new Date(diaSeleccionado+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}                      </div>
                       <div style={{fontSize:'11px',color:turnosPorDia(diaSeleccionado).length>=MAX_TURNOS_POR_DIA?'#DC2626':'#16A34A',fontWeight:'600',background:turnosPorDia(diaSeleccionado).length>=MAX_TURNOS_POR_DIA?'#FEE2E2':'#DCFCE7',padding:'2px 8px',borderRadius:'20px'}}>
                         {turnosPorDia(diaSeleccionado).length}/{MAX_TURNOS_POR_DIA}
                       </div>
