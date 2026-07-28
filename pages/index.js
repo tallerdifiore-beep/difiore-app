@@ -20,7 +20,7 @@ function parseNum(val) { return val.toString().replace(/\./g,'') }
 const CHECKLIST_ITEMS = [
   'BATERIA DE VEHICULO','LÍQUIDOS/FLUIDOS','RUEDAS AJUSTADAS','ENTREGA COMO FOTOS',
   'MOTOR LAVADO','LAVADO DE VEHICULO','CHEQUEADA EN CALLE','TAPA CUBRE MOTOR',
-  'ELECTRO 2 VECES PROBADO','CHECK/TESTIGOS APAGADOS','INTERIOR LIMPIO'
+  'ELECTRO 2 VECES PROBADO','CHECK/TESTIGOS APAGADOS','INTERIOR LIMPIO','CHAPÓN'
 ]
 
 const MAX_TURNOS_POR_DIA = 4
@@ -73,10 +73,12 @@ const tcHTML = `
     <div class="tc-item"><b>2. Diagnóstico</b>El diagnóstico es para que los profesionales tengan un panorama del problema. El taller no está obligado a enviar reportes periódicos; al final se entregará un informe detallado del trabajo realizado.</div>
     <div class="tc-item"><b>3. Presupuesto y aceptación</b>Una vez realizado el diagnóstico se enviará el detalle de repuestos y mano de obra. Si el cliente acepta, contará con 48hs hábiles para entregar el importe y dar inicio a la reparación.</div>
     <div class="tc-item"><b>4. Vencimiento / Cochera</b>Si pasadas las 48hs hábiles no se realizó el pago, se cobrará cochera a $8.000/día. Las mismas condiciones aplican una vez notificada la finalización del trabajo.</div>
-    <div class="tc-item"><b>5. Pertenencias</b>El cliente deberá retirar todas las pertenencias personales. Di Fiore no se responsabiliza por objetos personales en el interior del vehículo.</div>
-    <div class="tc-item"><b>6. Plazos de pago</b>El plazo máximo para abonar el total del trabajo es el día del retiro del vehículo.</div>
-    <div class="tc-item"><b>7. Garantía (30 días desde la entrega)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. NO TRABAJAMOS DE OTRA MANERA.</div>
-    <div class="tc-item"><b>8. Entrega</b>El cliente podrá retirar su vehículo hasta las 17hs con previa coordinación.</div>
+    <div class="tc-item"><b>5. Prueba de manejo</b>El cliente presta su consentimiento para que el vehículo sea probado en calle entre 10 y 100 km, a fin de realizar las pruebas correspondientes al diagnóstico o reparación.</div>
+    <div class="tc-item"><b>6. Seguro vigente</b>El cliente declara entregar el vehículo con la póliza de seguro al día. Di Fiore no se responsabiliza por siniestros en caso de que el seguro no se encuentre vigente.</div>
+    <div class="tc-item"><b>7. Pertenencias</b>El cliente deberá retirar todas las pertenencias personales. Di Fiore no se responsabiliza por objetos personales en el interior del vehículo.</div>
+    <div class="tc-item"><b>8. Plazos de pago</b>El plazo máximo para abonar el total del trabajo es el día del retiro del vehículo.</div>
+    <div class="tc-item"><b>9. Garantía (30 días desde la entrega)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. NO TRABAJAMOS DE OTRA MANERA.</div>
+    <div class="tc-item"><b>10. Entrega</b>El cliente podrá retirar su vehículo hasta las 17hs con previa coordinación.</div>
   </div>
   <div style="display:flex;gap:30px;margin-top:8px;font-size:9px;">
     <div>Fecha: ___________________</div>
@@ -287,7 +289,7 @@ export default function Home({ rol, cerrarSesion }) {
     if(!formTurno.nombre||!formTurno.fecha){alert('Completá nombre y fecha');return}
     if(!editandoTurno&&diaCompleto(formTurno.fecha)){alert(`El día ya tiene ${MAX_TURNOS_POR_DIA} turnos. Elegí otro día.`);return}
     if(editandoTurno){await supabase.from('turnos').update({nombre:formTurno.nombre,telefono:formTurno.telefono,vehiculo:formTurno.vehiculo,fecha:formTurno.fecha,motivo:formTurno.motivo}).eq('id',editandoTurno.id)}
-    else{await supabase.from('turnos').insert({nombre:formTurno.nombre,telefono:formTurno.telefono,vehiculo:formTurno.vehiculo,fecha:formTurno.fecha,motivo:formTurno.motivo})}
+    else{await supabase.from('turnos').insert({nombre:formTurno.nombre,telefono:formTurno.telefono,vehiculo:formTurno.vehiculo,fecha:formTurno.fecha,motivo:formTurno.motivo,estado:'pendiente'})}
     if(formTurno.telefono&&!editandoTurno){
       let tel=formTurno.telefono.replace(/\D/g,'')
       if(!tel.startsWith('54'))tel='54'+tel
@@ -309,6 +311,23 @@ export default function Home({ rol, cerrarSesion }) {
   }
 
   function abrirEditarTurno(t){setFormTurno({nombre:t.nombre,telefono:t.telefono||'',vehiculo:t.vehiculo||'',fecha:t.fecha,motivo:t.motivo||''});setEditandoTurno(t);setMostrarFormTurno(true)}
+
+  async function marcarEstadoTurno(turno,estado){
+    await supabase.from('turnos').update({estado}).eq('id',turno.id)
+    const{data}=await supabase.from('turnos').select('*').order('fecha',{ascending:true})
+    setTurnos(data||[])
+  }
+
+  function usarTurnoComoNuevoCliente(turno){
+    marcarEstadoTurno(turno,'presento')
+    setForm({
+      nombre:turno.nombre||'',telefono:turno.telefono||'',email:'',
+      marca_modelo:turno.vehiculo||'',patente:'',anio:'',kilometraje:'',color:'',
+      motivo:turno.motivo||'',estado:'Diagnóstico',mecanico:'',taller:'Malvinas 2084',
+      llego_en_grua:false,tiene_seguro:false,fecha_ingreso_manual:''
+    })
+    setSeccion('nuevo')
+  }
 
   async function agregarEmpleado(){
     if(!nuevoEmpleado.nombre.trim())return
@@ -386,6 +405,13 @@ export default function Home({ rol, cerrarSesion }) {
   }
 
   function abrirWsp(trabajo){const tel=trabajo.vehiculos?.clientes?.telefono?.replace(/\D/g,'');setMsgWsp(`Hola ${trabajo.vehiculos?.clientes?.nombre}! Te contactamos desde DiFiore Performance con novedades sobre tu ${trabajo.vehiculos?.marca_modelo} (${trabajo.vehiculos?.patente}).`);setModalWsp({trabajo,tel})}
+  function enviarFotoWsp(trabajo,fotoUrl){
+    let tel=trabajo?.vehiculos?.clientes?.telefono?.replace(/\D/g,'')
+    if(!tel){alert('Este cliente no tiene teléfono cargado.');return}
+    if(!tel.startsWith('54'))tel='54'+tel
+    const msg=`Hola ${trabajo.vehiculos?.clientes?.nombre||''}! Te compartimos una foto de tu ${trabajo.vehiculos?.marca_modelo||'vehículo'}:\n${fotoUrl}`
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank')
+  }
   function enviarWsp(){if(!modalWsp)return;const t=modalWsp.trabajo;let tel=modalWsp.tel||'';if(!tel.startsWith('54'))tel='54'+tel;const msg=msgWsp+`\n\n_Datos:_\n• Cliente: ${t.vehiculos?.clientes?.nombre||''}\n• Vehículo: ${t.vehiculos?.marca_modelo||''}\n• Patente: ${t.vehiculos?.patente||''}`;window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank');setModalWsp(null)}
 
   async function registrarReingreso(){
@@ -497,7 +523,7 @@ return (
 
       {modalEditarRepuesto&&admin&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Editar repuesto</div><div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}><div className={styles.formGroup}><label>Repuesto</label><input value={formEditarRepuesto.nombre} onChange={e=>setFormEditarRepuesto({...formEditarRepuesto,nombre:e.target.value})}/></div><div className={styles.formGrid}><div className={styles.formGroup}><label>Valor ($)</label><input value={formEditarRepuesto.valor} onChange={e=>setFormEditarRepuesto({...formEditarRepuesto,valor:formatNum(e.target.value)})}/></div><div className={styles.formGroup}><label>Fecha</label><input type="date" value={formEditarRepuesto.fecha} onChange={e=>setFormEditarRepuesto({...formEditarRepuesto,fecha:e.target.value})}/></div></div><div className={styles.formGroup}><label>Lugar</label><input value={formEditarRepuesto.lugar||''} onChange={e=>setFormEditarRepuesto({...formEditarRepuesto,lugar:e.target.value})}/></div></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalEditarRepuesto(null)}>Cancelar</button><button className={styles.btnPrimary} onClick={guardarEdicionRepuesto}>Guardar</button></div></div></div>}
 
-      {modalFotos&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'560px',maxHeight:'85vh',overflowY:'auto'}}><div className={styles.modalTitle}>Fotos del vehículo</div><div className={styles.modalSub}><b>{modalFotos.vehiculos?.marca_modelo}</b> — {modalFotos.vehiculos?.clientes?.nombre}</div><input type="file" accept="image/*" multiple ref={fileFotosRef} style={{display:'none'}} onChange={subirFotosModal}/>{admin&&<button className={styles.btnPrimary} style={{marginTop:'1rem',marginBottom:'1rem'}} onClick={()=>fileFotosRef.current.click()}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{modalFotosData.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFotoModal(f)}>✕</button>}</div>)}{modalFotosData.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>{setModalFotos(null);setModalFotosData([])}}>Cerrar</button></div></div></div>}
+      {modalFotos&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'560px',maxHeight:'85vh',overflowY:'auto'}}><div className={styles.modalTitle}>Fotos del vehículo</div><div className={styles.modalSub}><b>{modalFotos.vehiculos?.marca_modelo}</b> — {modalFotos.vehiculos?.clientes?.nombre}</div><input type="file" accept="image/*" multiple ref={fileFotosRef} style={{display:'none'}} onChange={subirFotosModal}/>{admin&&<button className={styles.btnPrimary} style={{marginTop:'1rem',marginBottom:'1rem'}} onClick={()=>fileFotosRef.current.click()}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{modalFotosData.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/><button style={{position:'absolute',bottom:'4px',left:'4px',fontSize:'11px',padding:'3px 7px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>enviarFotoWsp(modalFotos,f.url)}>💬</button>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFotoModal(f)}>✕</button>}</div>)}{modalFotosData.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>{setModalFotos(null);setModalFotosData([])}}>Cerrar</button></div></div></div>}
 
       {checklistActivo&&!editandoChecklist&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'600px',maxHeight:'85vh',overflowY:'auto'}}><div className={styles.modalTitle}>Checklist de entrega</div><div className={styles.modalSub}>{checklistActivo.vehiculo} · {checklistActivo.patente} · {checklistActivo.fecha_entrega?new Date(checklistActivo.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):''}</div><div style={{marginTop:'1rem'}}><div style={{fontSize:'13px',marginBottom:'12px'}}><span style={{color:'#718096'}}>Mecánico:</span> <b>{checklistActivo.mecanico||'—'}</b></div><table className={styles.table}><thead><tr><th>Ítem</th><th style={{textAlign:'center'}}>Sí</th><th style={{textAlign:'center'}}>No</th><th>Observaciones</th></tr></thead><tbody>{CHECKLIST_ITEMS.map(item=>{const v=(checklistActivo.items||{})[item]||{};return<tr key={item}><td style={{fontSize:'12px',fontWeight:'500'}}>{item}</td><td style={{textAlign:'center',fontSize:'16px',color:'#16A34A'}}>{v.valor==='si'?'✓':''}</td><td style={{textAlign:'center',fontSize:'16px',color:'#DC2626'}}>{v.valor==='no'?'✓':''}</td><td style={{fontSize:'12px',color:'#718096'}}>{v.obs||'—'}</td></tr>})}</tbody></table>{checklistActivo.observacion_general&&<div style={{marginTop:'8px',padding:'10px',background:'#F7FAFC',borderRadius:'6px',fontSize:'13px'}}><b>Obs. general:</b> {checklistActivo.observacion_general}</div>}</div><div className={styles.modalActions}>{admin&&<button className={styles.btnDanger} onClick={()=>borrarChecklist(checklistActivo.id)}>🗑️ Borrar</button>}<button className={styles.btnPrimary} onClick={()=>abrirEditarChecklist(checklistActivo)}>✏️ Editar</button><button className={styles.btn} onClick={()=>imprimirChecklist(checklistActivo)}>🖨️ Imprimir</button><button className={styles.btn} onClick={()=>setChecklistActivo(null)}>Cerrar</button></div></div></div>}
 
@@ -563,19 +589,36 @@ return (
                       <div style={{fontSize:'11px',color:turnosPorDia(diaSeleccionado).length>=MAX_TURNOS_POR_DIA?'#DC2626':'#16A34A',fontWeight:'600',background:turnosPorDia(diaSeleccionado).length>=MAX_TURNOS_POR_DIA?'#FEE2E2':'#DCFCE7',padding:'2px 8px',borderRadius:'20px'}}>{turnosPorDia(diaSeleccionado).length}/{MAX_TURNOS_POR_DIA}</div>
                     </div>
                     {turnosPorDia(diaSeleccionado).length===0&&<div style={{color:'#A0AEC0',fontSize:'13px',textAlign:'center',padding:'1rem'}}>Sin turnos este día</div>}
-                    {turnosPorDia(diaSeleccionado).map(t=>(
+                    {turnosPorDia(diaSeleccionado).map(t=>{
+                      const estadoTurno=t.estado||'pendiente'
+                      const estadoInfo={
+                        pendiente:{label:'Pendiente',bg:'#F1F5F9',color:'#64748B'},
+                        presento:{label:'Se presentó',bg:'#DCFCE7',color:'#16A34A'},
+                        no_presento:{label:'No se presentó',bg:'#FEE2E2',color:'#DC2626'},
+                        reprogramado:{label:'Reprogramado',bg:'#FEF3C7',color:'#B45309'}
+                      }[estadoTurno]
+                      return(
                       <div key={t.id} style={{padding:'10px 12px',background:'#F7FAFC',borderRadius:'8px',border:'1px solid #E2E8F0',marginBottom:'8px'}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                           <div><div style={{fontSize:'13px',fontWeight:'600',color:'#2D3748'}}>{t.nombre}</div><div style={{fontSize:'12px',color:'#718096'}}>{t.vehiculo||'Sin vehículo'}</div>{t.motivo&&<div style={{fontSize:'11px',color:'#A0AEC0',marginTop:'2px'}}>{t.motivo}</div>}</div>
-                          <div style={{fontSize:'11px',fontWeight:'700',color:'#2563EB'}}>8:30 hs</div>
+                          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'4px'}}>
+                            <div style={{fontSize:'11px',fontWeight:'700',color:'#2563EB'}}>8:30 hs</div>
+                            <span style={{fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:estadoInfo.bg,color:estadoInfo.color}}>{estadoInfo.label}</span>
+                          </div>
                         </div>
-                        <div style={{display:'flex',gap:'4px',marginTop:'8px'}}>
+                        <div style={{display:'flex',gap:'4px',marginTop:'8px',flexWrap:'wrap'}}>
                           {t.telefono&&<button style={{fontSize:'11px',padding:'3px 8px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>{let tel=t.telefono.replace(/\D/g,'');if(!tel.startsWith('54'))tel='54'+tel;const fechaF=new Date(t.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});const msg=`Hola ${t.nombre}! Te recordamos tu turno en DiFiore Performance.\n\n📅 Fecha: ${fechaF}\n🕘 Horario: 8:30 hs\n🚗 Vehículo: ${t.vehiculo||'—'}\n\nTe esperamos en Malvinas 2084, Mar del Plata.`;window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank')}}>💬</button>}
                           <button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 8px'}} onClick={()=>abrirEditarTurno(t)}>✏️</button>
                           <button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 8px'}} onClick={()=>borrarTurno(t.id)}>🗑️</button>
                         </div>
+                        <div style={{display:'flex',gap:'4px',marginTop:'6px',flexWrap:'wrap',borderTop:'1px solid #E2E8F0',paddingTop:'6px'}}>
+                          <button style={{fontSize:'10px',padding:'3px 7px',background:estadoTurno==='presento'?'#16A34A':'#F1F5F9',color:estadoTurno==='presento'?'#fff':'#4A5568',border:'1px solid #E2E8F0',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>usarTurnoComoNuevoCliente(t)}>✅ Se presentó</button>
+                          <button style={{fontSize:'10px',padding:'3px 7px',background:estadoTurno==='no_presento'?'#DC2626':'#F1F5F9',color:estadoTurno==='no_presento'?'#fff':'#4A5568',border:'1px solid #E2E8F0',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>marcarEstadoTurno(t,'no_presento')}>❌ No se presentó</button>
+                          <button style={{fontSize:'10px',padding:'3px 7px',background:estadoTurno==='reprogramado'?'#B45309':'#F1F5F9',color:estadoTurno==='reprogramado'?'#fff':'#4A5568',border:'1px solid #E2E8F0',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>{marcarEstadoTurno(t,'reprogramado');abrirEditarTurno(t)}}>🔁 Reprogramó</button>
+                        </div>
                       </div>
-                    ))}
+                      )
+                    })}
                     {!mostrarFormTurno&&turnosPorDia(diaSeleccionado).length<MAX_TURNOS_POR_DIA&&<button className={styles.btnPrimary} style={{width:'100%',marginTop:'8px',fontSize:'13px'}} onClick={()=>{setMostrarFormTurno(true);setEditandoTurno(null);setFormTurno({nombre:'',telefono:'',vehiculo:'',fecha:diaSeleccionado,motivo:''})}}>+ Agregar turno</button>}
                   </div>
                   {mostrarFormTurno&&(
@@ -735,7 +778,7 @@ return (
             </div>
             <div className={styles.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}><div className={styles.cardTitle} style={{margin:0}}>Repuestos</div>{admin&&repuestos.length>0&&<button className={styles.btn} style={{fontSize:'12px',padding:'4px 10px'}} onClick={()=>imprimirRepuestos(clienteDetalle,repuestos)}>🖨️ Imprimir</button>}</div>{repuestos.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin repuestos registrados</div>}{repuestos.length>0&&<table className={styles.table}><thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th>{admin&&<th></th>}</tr></thead><tbody>{repuestos.map(r=>(<tr key={r.id}><td>{r.nombre}</td><td>${formatPeso(r.valor)}</td><td>{r.lugar||'—'}</td><td style={{fontSize:'12px',color:'#718096'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>{admin&&<td style={{display:'flex',gap:'4px',cursor:'default'}}><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:formatNum(r.valor.toString()),lugar:r.lugar||'',fecha:r.fecha});setModalEditarRepuesto(true)}}>✏️</button><button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>borrarRepuesto(r)}>🗑️</button></td>}</tr>))}<tr><td style={{fontWeight:'700',color:'#2D3748'}}>Total</td><td style={{fontWeight:'700',color:'#16A34A'}}>${formatPeso(repuestos.reduce((a,r)=>a+Number(r.valor),0))}</td><td colSpan={admin?3:2}></td></tr></tbody></table>}</div>
             <div className={styles.card}><div className={styles.cardTitle}>Historial</div>{historial.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin historial todavía</div>}{historial.map(h=>(<div key={h.id} className={styles.histItem}><span className={styles.histIcon}>{tipoHistorial[h.tipo]||'⚪'}</span><div style={{flex:1}}><div style={{fontSize:'13px',color:'#2D3748'}}>{h.descripcion}</div><div style={{fontSize:'11px',color:'#718096',marginTop:'2px'}}>{new Date(h.fecha).toLocaleString('es-AR')}</div></div></div>))}</div>
-            <div className={styles.card}><div className={styles.cardTitle}>Fotos del vehículo</div><input type="file" accept="image/*" multiple ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>{admin&&<button className={styles.btnPrimary} onClick={()=>fileRef.current.click()} style={{marginBottom:'1rem'}}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{fotos.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFoto(f)}>✕</button>}</div>)}{fotos.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div></div>
+            <div className={styles.card}><div className={styles.cardTitle}>Fotos del vehículo</div><input type="file" accept="image/*" multiple ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>{admin&&<button className={styles.btnPrimary} onClick={()=>fileRef.current.click()} style={{marginBottom:'1rem'}}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{fotos.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/><button style={{position:'absolute',bottom:'4px',left:'4px',fontSize:'11px',padding:'3px 7px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>enviarFotoWsp(clienteDetalle,f.url)}>💬</button>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFoto(f)}>✕</button>}</div>)}{fotos.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div></div>
           </div>
         )}
       </div>
