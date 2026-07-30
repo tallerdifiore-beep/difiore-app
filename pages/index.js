@@ -378,7 +378,7 @@ export default function Home({ rol, cerrarSesion }) {
       let tel=formTurno.telefono.replace(/\D/g,'')
       if(!tel.startsWith('54'))tel='54'+tel
       const fechaF=new Date(formTurno.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
-      const msg=`Hola ${formTurno.nombre}! Te confirmamos tu turno en DiFiore Performance.\n\n📅 Fecha: ${fechaF}\n🕘 Horario: 8:30 hs\n🚗 Vehículo: ${formTurno.vehiculo||'—'}\n📝 Motivo: ${formTurno.motivo||'—'}\n\nTe esperamos en Malvinas 2084, Mar del Plata.`
+      const msg=`Hola ${formTurno.nombre}! Te confirmamos tu turno en DiFiore Performance.\n\n📅 Fecha: ${fechaF}\n🕘 Horario: 8:30 hs\n🚗 Vehículo: ${formTurno.vehiculo||'—'}\n📝 Motivo: ${formTurno.motivo||'—'}\n\nTe esperamos en Malvinas 2084, Mar del Plata.\n\nNo te olvides de traer el auto LAVADO, con COMBUSTIBLE, tarjeta VERDE y SEGURO.`
       window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank')
     }
     setFormTurno({nombre:'',telefono:'',vehiculo:'',fecha:diaSeleccionado||'',motivo:''})
