@@ -305,12 +305,7 @@ export default function Home({ rol, cerrarSesion }) {
   }
   function seleccionarClienteChecklist(t) {
     setFormChecklist({...formChecklist,trabajo_id:t.id,vehiculo:t.vehiculos?.marca_modelo||'',patente:t.vehiculos?.patente||'',color:t.vehiculos?.color||''})
-    cargarFotosChecklist(t.id)
-  }
-
-  async function cargarFotosChecklist(trabajoId){
-    const{data}=await supabase.from('fotos').select('*').eq('trabajo_id',trabajoId).order('created_at',{ascending:false})
-    setFotosChecklistSubidas(data||[])
+    setFotosChecklistSubidas([])
   }
 
   async function subirFotosChecklist(e){
@@ -318,11 +313,15 @@ export default function Home({ rol, cerrarSesion }) {
     if(!files.length)return
     if(!formChecklist.trabajo_id){avisar('Elegí primero el cliente/vehículo para poder subir fotos','error');e.target.value='';return}
     setSubiendoFotoChecklist(true)
+    const nuevas=[]
     for(const f of files){
       const url=await subirFotoStorage(f,formChecklist.trabajo_id)
-      if(url)await supabase.from('fotos').insert({trabajo_id:formChecklist.trabajo_id,url})
+      if(url){
+        const{data}=await supabase.from('fotos').insert({trabajo_id:formChecklist.trabajo_id,url}).select().single()
+        if(data)nuevas.push(data)
+      }
     }
-    await cargarFotosChecklist(formChecklist.trabajo_id)
+    setFotosChecklistSubidas(prev=>[...prev,...nuevas])
     setSubiendoFotoChecklist(false)
     e.target.value=''
   }
@@ -411,7 +410,7 @@ export default function Home({ rol, cerrarSesion }) {
     const tipo=ch.tipo||'entrega'
     setTipoChecklist(tipo)
     setFormChecklist({trabajo_id:ch.trabajo_id||'',vehiculo:ch.vehiculo||'',patente:ch.patente||'',color:ch.color||'',tipo,fecha_entrega:ch.fecha_entrega||new Date().toISOString().split('T')[0],mecanico:ch.mecanico||'',observacion_general:ch.observacion_general||'',items:ch.items||itemsVacios(tipo)})
-    if(ch.trabajo_id)cargarFotosChecklist(ch.trabajo_id); else setFotosChecklistSubidas([])
+    setFotosChecklistSubidas([])
     setChecklistActivo(ch);setEditandoChecklist(true);setVistaChecklist('nuevo')
   }
 
@@ -731,8 +730,8 @@ export default function Home({ rol, cerrarSesion }) {
   const listaVistaStats={enTaller:trabajosVivos.filter(t=>t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),listos:trabajosVivos.filter(t=>t.estado==='Listo').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),salidos:trabajosEntregados}
   const titulosVistaStats={enTaller:'Autos en taller',listos:'Listos para entregar',salidos:'Vehículos entregados'}
   const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠'}
-  const trabajosTaller=tallerVista?trabajosVivos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(a.fecha_ingreso)-new Date(b.fecha_ingreso)):[]
-  const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca):[]
+  const trabajosTaller=tallerVista?trabajosVivos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)):[]
+  const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)):[]
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
   const mecanicos=empleados.filter(e=>e.rol==='mecanico')
   const hoy=new Date().toISOString().split('T')[0]
