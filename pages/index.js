@@ -76,7 +76,7 @@ function itemsVacios(tipo){
 
 const PROCEDIMIENTO_INYECTORES = [
   {titulo:'Sacar inyectores y diagnosticar', descripcion:'Sacar los inyectores del vehículo y llevarlos a diagnosticar.'},
-  {titulo:'Foto del código de inyectores', descripcion:'Sacar foto del código de inyectores y cargarla en la página.'},
+  {titulo:'Foto del código de inyectores', descripcion:'Una vez reparado los inyectores, sacarle foto al código y cargarlo en la página.'},
   {titulo:'Tanque limpio', descripcion:'Dejar el tanque limpio.'},
   {titulo:'Limpieza de rampa y cañerías', descripcion:'Limpiar la rampa de inyectores, la cañería de gasoil y la de inyectores reparado.'},
   {titulo:'Electroválvulas de la bomba', descripcion:'Sacar las electroválvulas de la bomba y hacer limpieza por ultrasonido.'},
