@@ -84,7 +84,7 @@ const PROCEDIMIENTO_INYECTORES = [
   {titulo:'Arandelas y o-rings nuevos', descripcion:'Colocar siempre arandelas y o-rings nuevos.'},
   {titulo:'Marca del taller', descripcion:'Marcar con la marca del taller los inyectores que se instalaron en el vehículo.'},
   {titulo:'Gasoil nuevo y purgado', descripcion:'Colocar gasoil nuevo y realizar un purgado de la línea de baja, con escáner o manualmente.'},
-  {titulo:'Marcar los tornillos', descripcion:'Marcar los tornillos para que no se pueda aflojar sin que se note.'},
+  {titulo:'Marcar los tornillos', descripcion:'Marcar los tornillos para que no se pueda aflojar.'},
 ]
 
 const MAX_TURNOS_POR_DIA = 4
@@ -316,10 +316,10 @@ export default function Home({ rol, cerrarSesion }) {
     const nuevas=[]
     for(const f of files){
       const url=await subirFotoStorage(f,formChecklist.trabajo_id)
-      if(url){
-        const{data}=await supabase.from('fotos').insert({trabajo_id:formChecklist.trabajo_id,url}).select().single()
-        if(data)nuevas.push(data)
-      }
+      if(!url){avisar('No se pudo subir la imagen al storage','error');continue}
+      const{data,error}=await supabase.from('fotos').insert({trabajo_id:formChecklist.trabajo_id,url}).select().single()
+      if(error){avisar('Error al guardar la foto: '+error.message,'error');continue}
+      if(data)nuevas.push(data)
     }
     setFotosChecklistSubidas(prev=>[...prev,...nuevas])
     setSubiendoFotoChecklist(false)
@@ -392,13 +392,15 @@ export default function Home({ rol, cerrarSesion }) {
     if(!formChecklist.mecanico){avisar('Seleccioná tu nombre antes de guardar','error');return}
     setGuardandoChecklist(true)
     const datos={trabajo_id:formChecklist.trabajo_id||null,fecha_entrega:formChecklist.fecha_entrega,vehiculo:formChecklist.vehiculo,patente:formChecklist.patente,color:formChecklist.color,mecanico:formChecklist.mecanico,items:formChecklist.items,observacion_general:formChecklist.observacion_general,tipo:formChecklist.tipo||tipoChecklist,fotos:fotosChecklistSubidas}
+    let error
     if(editandoChecklist&&checklistActivo){
-      await supabase.from('checklists').update(datos).eq('id',checklistActivo.id)
-      avisar('Checklist actualizado correctamente','exito')
+      ;({error}=await supabase.from('checklists').update(datos).eq('id',checklistActivo.id))
+      if(!error)avisar('Checklist actualizado correctamente','exito')
     } else {
-      await supabase.from('checklists').insert(datos)
-      avisar('Checklist guardado correctamente','exito')
+      ;({error}=await supabase.from('checklists').insert(datos))
+      if(!error)avisar('Checklist guardado correctamente','exito')
     }
+    if(error){avisar('No se pudo guardar: '+error.message,'error');setGuardandoChecklist(false);return}
     setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',tipo:tipoChecklist,fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:itemsVacios(tipoChecklist)})
     setVistaChecklist('lista');setChecklistActivo(null);setEditandoChecklist(false)
     const{data}=await supabase.from('checklists').select('*').order('created_at',{ascending:false})
@@ -970,6 +972,7 @@ return (
             {vistaChecklist==='procedimiento'&&(
               <div className={styles.card}>
                 <div className={styles.cardTitle}>Procedimiento de reparación de inyectores</div>
+                <div style={{background:'#FEF3C7',border:'1px solid #FDE68A',borderRadius:'8px',padding:'12px 14px',marginBottom:'14px',fontSize:'13px',color:'#92400E',fontWeight:'600'}}>⚠️ Cuando hay trabajos de inyectores, los hace una sola persona por completo.</div>
                 <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
                   {PROCEDIMIENTO_INYECTORES.map((paso,idx)=>(
                     <div key={idx} style={{display:'flex',gap:'14px',padding:'14px 0',borderBottom:idx<PROCEDIMIENTO_INYECTORES.length-1?'1px solid #EDF2F7':'none'}}>
