@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
 import { getMarca } from '../lib/marcas'
 import styles from '../styles/App.module.css'
@@ -203,6 +203,8 @@ export default function Home({ rol, cerrarSesion }) {
   const [editandoChecklist, setEditandoChecklist] = useState(false)
   const [vistaChecklist, setVistaChecklist] = useState('lista')
   const [tipoChecklist, setTipoChecklist] = useState('entrega') // 'entrega' | 'inyectores'
+  const [fotosChecklistSubidas, setFotosChecklistSubidas] = useState([])
+  const [subiendoFotoChecklist, setSubiendoFotoChecklist] = useState(false)
   const [empleadoActual, setEmpleadoActual] = useState('')
   const [formChecklist, setFormChecklist] = useState({
     trabajo_id:'', vehiculo:'', patente:'', color:'', tipo:'entrega',
@@ -262,6 +264,7 @@ export default function Home({ rol, cerrarSesion }) {
   const fileRef = useRef()
   const fileNuevoRef = useRef()
   const fileFotosRef = useRef()
+  const fileChecklistFotoRef = useRef()
 
   // sistema propio de confirmación/aviso, reemplaza alert()/confirm() nativos
   const [toast, setToast] = useState(null) // {mensaje, tipo}
@@ -302,6 +305,26 @@ export default function Home({ rol, cerrarSesion }) {
   }
   function seleccionarClienteChecklist(t) {
     setFormChecklist({...formChecklist,trabajo_id:t.id,vehiculo:t.vehiculos?.marca_modelo||'',patente:t.vehiculos?.patente||'',color:t.vehiculos?.color||''})
+    cargarFotosChecklist(t.id)
+  }
+
+  async function cargarFotosChecklist(trabajoId){
+    const{data}=await supabase.from('fotos').select('*').eq('trabajo_id',trabajoId).order('created_at',{ascending:false})
+    setFotosChecklistSubidas(data||[])
+  }
+
+  async function subirFotosChecklist(e){
+    const files=Array.from(e.target.files)
+    if(!files.length)return
+    if(!formChecklist.trabajo_id){avisar('Elegí primero el cliente/vehículo para poder subir fotos','error');e.target.value='';return}
+    setSubiendoFotoChecklist(true)
+    for(const f of files){
+      const url=await subirFotoStorage(f,formChecklist.trabajo_id)
+      if(url)await supabase.from('fotos').insert({trabajo_id:formChecklist.trabajo_id,url})
+    }
+    await cargarFotosChecklist(formChecklist.trabajo_id)
+    setSubiendoFotoChecklist(false)
+    e.target.value=''
   }
 
   async function cargarDatos() {
@@ -388,6 +411,7 @@ export default function Home({ rol, cerrarSesion }) {
     const tipo=ch.tipo||'entrega'
     setTipoChecklist(tipo)
     setFormChecklist({trabajo_id:ch.trabajo_id||'',vehiculo:ch.vehiculo||'',patente:ch.patente||'',color:ch.color||'',tipo,fecha_entrega:ch.fecha_entrega||new Date().toISOString().split('T')[0],mecanico:ch.mecanico||'',observacion_general:ch.observacion_general||'',items:ch.items||itemsVacios(tipo)})
+    if(ch.trabajo_id)cargarFotosChecklist(ch.trabajo_id); else setFotosChecklistSubidas([])
     setChecklistActivo(ch);setEditandoChecklist(true);setVistaChecklist('nuevo')
   }
 
@@ -940,7 +964,7 @@ return (
             <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
               <button className={`${styles.btn} ${vistaChecklist==='lista'?styles.navActive:''}`} onClick={()=>{setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Ver registros</button>
               {tipoChecklist==='inyectores'&&<button className={`${styles.btn} ${vistaChecklist==='procedimiento'?styles.navActive:''}`} onClick={()=>setVistaChecklist('procedimiento')}>📋 Ver procedimiento</button>}
-              <button className={styles.btnPrimary} onClick={()=>{setVistaChecklist('nuevo');setEditandoChecklist(false);setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',tipo:tipoChecklist,fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:itemsVacios(tipoChecklist)})}}>+ Nuevo checklist</button>
+              <button className={styles.btnPrimary} onClick={()=>{setVistaChecklist('nuevo');setEditandoChecklist(false);setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',tipo:tipoChecklist,fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:itemsVacios(tipoChecklist)});setFotosChecklistSubidas([])}}>+ Nuevo checklist</button>
             </div>
             {!admin&&!empleadoActual&&vistaChecklist==='lista'&&<div className={styles.card} style={{marginBottom:'1rem'}}><div className={styles.cardTitle}>¿Quién sos?</div><div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'8px'}}>{mecanicos.map(e=><button key={e.id} className={styles.btnPrimary} style={{fontSize:'13px',padding:'8px 16px'}} onClick={()=>setEmpleadoActual(e.nombre)}>{e.nombre}</button>)}</div></div>}
             {!admin&&empleadoActual&&<div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'8px 14px',marginBottom:'12px',fontSize:'13px',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>👷 Mostrando registros de <b>{empleadoActual}</b></span><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setEmpleadoActual('')}>Cambiar</button></div>}
@@ -980,7 +1004,8 @@ return (
                   <div className={styles.cardTitle}>Checklist</div>
                   <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
                     {CHECKLIST_ITEMS_POR_TIPO[formChecklist.tipo||tipoChecklist].map((item,idx)=>(
-                      <div key={item} style={{display:'grid',gridTemplateColumns:'1fr auto auto 1fr',gap:'8px',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #EDF2F7'}}>
+                      <Fragment key={item}>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr auto auto 1fr',gap:'8px',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #EDF2F7'}}>
                         <span style={{fontSize:'13px',fontWeight:'500',color:'#2D3748'}}>{item}</span>
                         <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer',padding:'6px 12px',borderRadius:'6px',background:formChecklist.items[item]?.valor==='si'?'#DCFCE7':'#F7FAFC',border:'1px solid',borderColor:formChecklist.items[item]?.valor==='si'?'#86EFAC':'#E2E8F0',whiteSpace:'nowrap'}}>
                           <input type="radio" name={`item-${idx}`} value="si" checked={formChecklist.items[item]?.valor==='si'} onChange={()=>setFormChecklist({...formChecklist,items:{...formChecklist.items,[item]:{...formChecklist.items[item],valor:'si'}}})}/>
@@ -992,6 +1017,15 @@ return (
                         </label>
                         <input value={formChecklist.items[item]?.obs||''} onChange={e=>setFormChecklist({...formChecklist,items:{...formChecklist.items,[item]:{...formChecklist.items[item],obs:e.target.value}}})} placeholder="Observación..." style={{fontSize:'12px'}}/>
                       </div>
+                      {tipoChecklist==='inyectores'&&item==='FOTO DE CÓDIGO DE INYECTORES CARGADA EN LA PÁGINA'&&(
+                        <div style={{padding:'8px 0 14px',borderBottom:'1px solid #EDF2F7',display:'flex',flexDirection:'column',gap:'8px'}}>
+                          <input type="file" accept="image/*" multiple ref={fileChecklistFotoRef} style={{display:'none'}} onChange={subirFotosChecklist}/>
+                          <button type="button" className={styles.btnPrimary} style={{width:'fit-content',fontSize:'12.5px',padding:'6px 12px'}} onClick={()=>fileChecklistFotoRef.current.click()}>📷 {subiendoFotoChecklist?'Subiendo...':'Subir foto'}</button>
+                          {!formChecklist.trabajo_id&&<span style={{fontSize:'11.5px',color:'#A0AEC0'}}>Elegí primero el cliente/vehículo arriba para poder subir fotos.</span>}
+                          {fotosChecklistSubidas.length>0&&<div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>{fotosChecklistSubidas.map(f=><img key={f.id} src={f.url} alt="foto" style={{width:'52px',height:'52px',objectFit:'cover',borderRadius:'6px',border:'1px solid #E2E8F0'}}/>)}</div>}
+                        </div>
+                      )}
+                      </Fragment>
                     ))}
                   </div>
                   <div className={styles.formGroup} style={{marginTop:'16px'}}><label>Observaciones generales</label><textarea value={formChecklist.observacion_general} onChange={e=>setFormChecklist({...formChecklist,observacion_general:e.target.value})} placeholder="Notas adicionales..." style={{minHeight:'60px'}}/></div>
