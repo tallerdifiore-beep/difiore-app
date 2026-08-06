@@ -53,6 +53,40 @@ const CHECKLIST_ITEMS = [
   'ELECTRO 2 VECES PROBADO','CHECK/TESTIGOS APAGADOS','INTERIOR LIMPIO','CHAPÓN'
 ]
 
+const CHECKLIST_ITEMS_INYECTORES = [
+  'MARCA DEL TALLER EN LOS INYECTORES INSTALADOS',
+  'ARANDELAS Y O-RINGS NUEVOS',
+  'TANQUE LIMPIO',
+  'FILTRO DE GASOIL NUEVO',
+  'RAMPA DE INYECTORES LIMPIA',
+  'CAÑERÍA DE GASOIL Y DE INYECTORES REPARADO LIMPIA',
+  'ELECTROVÁLVULAS DE BOMBA: LIMPIEZA POR ULTRASONIDO',
+  'GASOIL NUEVO CARGADO',
+  'PURGADO DE LÍNEA DE BAJA (SCANNER O MANUAL)',
+  'FOTO DE CÓDIGO DE INYECTORES CARGADA EN LA PÁGINA',
+  'TORNILLOS MARCADOS (ANTI-AFLOJE)'
+]
+
+const CHECKLIST_ITEMS_POR_TIPO = { entrega: CHECKLIST_ITEMS, inyectores: CHECKLIST_ITEMS_INYECTORES }
+const CHECKLIST_TITULO_POR_TIPO = { entrega: 'Checklist de Entrega', inyectores: 'Checklist de Inyectores' }
+
+function itemsVacios(tipo){
+  return CHECKLIST_ITEMS_POR_TIPO[tipo].reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})
+}
+
+const PROCEDIMIENTO_INYECTORES = [
+  {titulo:'Sacar inyectores y diagnosticar', descripcion:'Sacar los inyectores del vehículo y llevarlos a diagnosticar.'},
+  {titulo:'Foto del código de inyectores', descripcion:'Sacar foto del código de inyectores y cargarla en la página.'},
+  {titulo:'Tanque limpio', descripcion:'Dejar el tanque limpio.'},
+  {titulo:'Limpieza de rampa y cañerías', descripcion:'Limpiar la rampa de inyectores, la cañería de gasoil y la de inyectores reparado.'},
+  {titulo:'Electroválvulas de la bomba', descripcion:'Sacar las electroválvulas de la bomba y hacer limpieza por ultrasonido.'},
+  {titulo:'Filtro de gasoil nuevo', descripcion:'Colocar filtro de gasoil nuevo.'},
+  {titulo:'Arandelas y o-rings nuevos', descripcion:'Colocar siempre arandelas y o-rings nuevos.'},
+  {titulo:'Marca del taller', descripcion:'Marcar con la marca del taller los inyectores que se instalaron en el vehículo.'},
+  {titulo:'Gasoil nuevo y purgado', descripcion:'Colocar gasoil nuevo y realizar un purgado de la línea de baja, con escáner o manualmente.'},
+  {titulo:'Marcar los tornillos', descripcion:'Marcar los tornillos para que no se pueda aflojar sin que se note.'},
+]
+
 const MAX_TURNOS_POR_DIA = 4
 const DIAS_SEMANA = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -168,12 +202,13 @@ export default function Home({ rol, cerrarSesion }) {
   const [checklistActivo, setChecklistActivo] = useState(null)
   const [editandoChecklist, setEditandoChecklist] = useState(false)
   const [vistaChecklist, setVistaChecklist] = useState('lista')
+  const [tipoChecklist, setTipoChecklist] = useState('entrega') // 'entrega' | 'inyectores'
   const [empleadoActual, setEmpleadoActual] = useState('')
   const [formChecklist, setFormChecklist] = useState({
-    trabajo_id:'', vehiculo:'', patente:'', color:'',
+    trabajo_id:'', vehiculo:'', patente:'', color:'', tipo:'entrega',
     fecha_entrega: new Date().toISOString().split('T')[0],
     mecanico:'', observacion_general:'',
-    items: CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})
+    items: itemsVacios('entrega')
   })
   const [nuevoEmpleado, setNuevoEmpleado] = useState({nombre:'',rol:'mecanico'})
   const [turnos, setTurnos] = useState([])
@@ -322,6 +357,7 @@ export default function Home({ rol, cerrarSesion }) {
 
   const checklistsFiltrados = (() => {
     let lista = admin ? checklists : checklists.filter(ch=>ch.mecanico===empleadoActual)
+    lista = lista.filter(ch=>(ch.tipo||'entrega')===tipoChecklist)
     if (busquedaChecklist.trim()) {
       const q = busquedaChecklist.toLowerCase()
       lista = lista.filter(ch=>ch.vehiculo?.toLowerCase().includes(q)||ch.patente?.toLowerCase().includes(q)||ch.mecanico?.toLowerCase().includes(q))
@@ -333,7 +369,7 @@ export default function Home({ rol, cerrarSesion }) {
     if(guardandoChecklist) return
     if(!formChecklist.mecanico){avisar('Seleccioná tu nombre antes de guardar','error');return}
     setGuardandoChecklist(true)
-    const datos={trabajo_id:formChecklist.trabajo_id||null,fecha_entrega:formChecklist.fecha_entrega,vehiculo:formChecklist.vehiculo,patente:formChecklist.patente,color:formChecklist.color,mecanico:formChecklist.mecanico,items:formChecklist.items,observacion_general:formChecklist.observacion_general}
+    const datos={trabajo_id:formChecklist.trabajo_id||null,fecha_entrega:formChecklist.fecha_entrega,vehiculo:formChecklist.vehiculo,patente:formChecklist.patente,color:formChecklist.color,mecanico:formChecklist.mecanico,items:formChecklist.items,observacion_general:formChecklist.observacion_general,tipo:formChecklist.tipo||tipoChecklist}
     if(editandoChecklist&&checklistActivo){
       await supabase.from('checklists').update(datos).eq('id',checklistActivo.id)
       avisar('Checklist actualizado correctamente','exito')
@@ -341,7 +377,7 @@ export default function Home({ rol, cerrarSesion }) {
       await supabase.from('checklists').insert(datos)
       avisar('Checklist guardado correctamente','exito')
     }
-    setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})})
+    setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',tipo:tipoChecklist,fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:itemsVacios(tipoChecklist)})
     setVistaChecklist('lista');setChecklistActivo(null);setEditandoChecklist(false)
     const{data}=await supabase.from('checklists').select('*').order('created_at',{ascending:false})
     setChecklists(data||[])
@@ -349,7 +385,9 @@ export default function Home({ rol, cerrarSesion }) {
   }
 
   function abrirEditarChecklist(ch){
-    setFormChecklist({trabajo_id:ch.trabajo_id||'',vehiculo:ch.vehiculo||'',patente:ch.patente||'',color:ch.color||'',fecha_entrega:ch.fecha_entrega||new Date().toISOString().split('T')[0],mecanico:ch.mecanico||'',observacion_general:ch.observacion_general||'',items:ch.items||CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})})
+    const tipo=ch.tipo||'entrega'
+    setTipoChecklist(tipo)
+    setFormChecklist({trabajo_id:ch.trabajo_id||'',vehiculo:ch.vehiculo||'',patente:ch.patente||'',color:ch.color||'',tipo,fecha_entrega:ch.fecha_entrega||new Date().toISOString().split('T')[0],mecanico:ch.mecanico||'',observacion_general:ch.observacion_general||'',items:ch.items||itemsVacios(tipo)})
     setChecklistActivo(ch);setEditandoChecklist(true);setVistaChecklist('nuevo')
   }
 
@@ -436,7 +474,10 @@ export default function Home({ rol, cerrarSesion }) {
 
   function imprimirChecklist(ch){
     const items=ch.items||{}
-    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Checklist de Entrega</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:20px;max-width:720px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:10px;}.header-logo img{width:180px;}.header-title h1{font-size:18px;font-weight:900;letter-spacing:1px;}.datos{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #000;margin-bottom:12px;}.dato{padding:6px 8px;border-right:1px solid #000;}.dato:last-child{border-right:none;}.dato label{font-size:8px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px;}.dato span{font-size:12px;font-weight:600;}table{width:100%;border-collapse:collapse;margin-bottom:16px;}thead th{background:#222;color:#fff;padding:6px 8px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.5px;}tbody td{padding:8px;border:1px solid #ccc;font-size:11px;vertical-align:middle;}tbody tr:nth-child(even){background:#f9f9f9;}.check-cell{text-align:center;font-size:16px;}.firmas{margin-top:16px;}.firmas-title{font-size:11px;font-weight:900;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;}.firmas-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #000;}.firma-item{padding:8px;border-right:1px solid #000;}.firma-item:last-child{border-right:none;}.firma-item label{font-size:9px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:20px;}.firma-item .linea{border-bottom:1px solid #000;height:20px;}.footer{margin-top:12px;border-top:1px solid #ccc;padding-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:9px;color:#444;}.footer-icon{display:flex;align-items:center;gap:4px;text-decoration:none;color:#444;}@media print{body{padding:10px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div class="header-title"><h1>CHECKLIST DE ENTREGA</h1><div style="font-size:11px;color:#555;margin-top:4px">Fecha: ${ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</div></div></div><div class="datos"><div class="dato"><label>Vehículo</label><span>${ch.vehiculo||'—'}</span></div><div class="dato"><label>Patente</label><span>${ch.patente||'—'}</span></div><div class="dato"><label>Color</label><span>${ch.color||'—'}</span></div><div class="dato"><label>Fecha entrega</label><span>${ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</span></div></div><table><thead><tr><th style="width:40%">ÍTEM</th><th style="width:15%;text-align:center">SÍ</th><th style="width:15%;text-align:center">NO</th><th>OBSERVACIONES</th></tr></thead><tbody>${CHECKLIST_ITEMS.map(item=>{const v=items[item]||{};return`<tr><td style="font-weight:500">${item}</td><td class="check-cell">${v.valor==='si'?'✓':''}</td><td class="check-cell">${v.valor==='no'?'✓':''}</td><td>${v.obs||''}</td></tr>`}).join('')}</tbody></table>${ch.observacion_general?`<div style="border:1px solid #ccc;padding:8px;margin-bottom:16px;"><b style="font-size:10px;text-transform:uppercase;">Observaciones generales:</b><p style="margin-top:4px;font-size:11px">${ch.observacion_general}</p></div>`:''}<div class="firmas"><div class="firmas-title">Firmas</div><div class="firmas-grid"><div class="firma-item"><label>Empleado: ${ch.mecanico||'___________'}</label><div class="linea"></div></div><div class="firma-item"><label>Cliente</label><div class="linea"></div></div></div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
+    const tipo=ch.tipo||'entrega'
+    const itemsLista=CHECKLIST_ITEMS_POR_TIPO[tipo]
+    const titulo=CHECKLIST_TITULO_POR_TIPO[tipo]
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${titulo}</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:20px;max-width:720px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:10px;}.header-logo img{width:180px;}.header-title h1{font-size:18px;font-weight:900;letter-spacing:1px;}.datos{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #000;margin-bottom:12px;}.dato{padding:6px 8px;border-right:1px solid #000;}.dato:last-child{border-right:none;}.dato label{font-size:8px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px;}.dato span{font-size:12px;font-weight:600;}table{width:100%;border-collapse:collapse;margin-bottom:16px;}thead th{background:#222;color:#fff;padding:6px 8px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.5px;}tbody td{padding:8px;border:1px solid #ccc;font-size:11px;vertical-align:middle;}tbody tr:nth-child(even){background:#f9f9f9;}.check-cell{text-align:center;font-size:16px;}.firmas{margin-top:16px;}.firmas-title{font-size:11px;font-weight:900;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;}.firmas-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #000;}.firma-item{padding:8px;border-right:1px solid #000;}.firma-item:last-child{border-right:none;}.firma-item label{font-size:9px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:20px;}.firma-item .linea{border-bottom:1px solid #000;height:20px;}.footer{margin-top:12px;border-top:1px solid #ccc;padding-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:9px;color:#444;}.footer-icon{display:flex;align-items:center;gap:4px;text-decoration:none;color:#444;}@media print{body{padding:10px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div class="header-title"><h1>${titulo.toUpperCase()}</h1><div style="font-size:11px;color:#555;margin-top:4px">Fecha: ${ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</div></div></div><div class="datos"><div class="dato"><label>Vehículo</label><span>${ch.vehiculo||'—'}</span></div><div class="dato"><label>Patente</label><span>${ch.patente||'—'}</span></div><div class="dato"><label>Color</label><span>${ch.color||'—'}</span></div><div class="dato"><label>Fecha</label><span>${ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</span></div></div><table><thead><tr><th style="width:40%">ÍTEM</th><th style="width:15%;text-align:center">SÍ</th><th style="width:15%;text-align:center">NO</th><th>OBSERVACIONES</th></tr></thead><tbody>${itemsLista.map(item=>{const v=items[item]||{};return`<tr><td style="font-weight:500">${item}</td><td class="check-cell">${v.valor==='si'?'✓':''}</td><td class="check-cell">${v.valor==='no'?'✓':''}</td><td>${v.obs||''}</td></tr>`}).join('')}</tbody></table>${ch.observacion_general?`<div style="border:1px solid #ccc;padding:8px;margin-bottom:16px;"><b style="font-size:10px;text-transform:uppercase;">Observaciones generales:</b><p style="margin-top:4px;font-size:11px">${ch.observacion_general}</p></div>`:''}<div class="firmas"><div class="firmas-title">Firmas</div><div class="firmas-grid"><div class="firma-item"><label>Empleado: ${ch.mecanico||'___________'}</label><div class="linea"></div></div><div class="firma-item"><label>Cliente</label><div class="linea"></div></div></div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     const w=window.open('','_blank','width=820,height=1000');w.document.write(html);w.document.close()
   }
 
@@ -738,7 +779,7 @@ return (
 
       {modalFotos&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'560px',maxHeight:'85vh',overflowY:'auto'}}><div className={styles.modalTitle}>Fotos del vehículo</div><div className={styles.modalSub}><b>{modalFotos.vehiculos?.marca_modelo}</b> — {modalFotos.vehiculos?.clientes?.nombre}</div><input type="file" accept="image/*" multiple ref={fileFotosRef} style={{display:'none'}} onChange={subirFotosModal}/>{admin&&<button className={styles.btnPrimary} style={{marginTop:'1rem',marginBottom:'1rem'}} onClick={()=>fileFotosRef.current.click()}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{modalFotosData.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/><button style={{position:'absolute',bottom:'4px',left:'4px',fontSize:'11px',padding:'3px 7px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>enviarFotoWsp(modalFotos,f.url)}>💬</button>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFotoModal(f)}>✕</button>}</div>)}{modalFotosData.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>{setModalFotos(null);setModalFotosData([])}}>Cerrar</button></div></div></div>}
 
-      {checklistActivo&&!editandoChecklist&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'600px',maxHeight:'85vh',overflowY:'auto'}}><div className={styles.modalTitle}>Checklist de entrega</div><div className={styles.modalSub}>{checklistActivo.vehiculo} · {checklistActivo.patente} · {checklistActivo.fecha_entrega?new Date(checklistActivo.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):''}</div><div style={{marginTop:'1rem'}}><div style={{fontSize:'13px',marginBottom:'12px'}}><span style={{color:'#718096'}}>Mecánico:</span> <b>{checklistActivo.mecanico||'—'}</b></div><table className={styles.table}><thead><tr><th>Ítem</th><th style={{textAlign:'center'}}>Sí</th><th style={{textAlign:'center'}}>No</th><th>Observaciones</th></tr></thead><tbody>{CHECKLIST_ITEMS.map(item=>{const v=(checklistActivo.items||{})[item]||{};return<tr key={item}><td style={{fontSize:'12px',fontWeight:'500'}}>{item}</td><td style={{textAlign:'center',fontSize:'16px',color:'#16A34A'}}>{v.valor==='si'?'✓':''}</td><td style={{textAlign:'center',fontSize:'16px',color:'#DC2626'}}>{v.valor==='no'?'✓':''}</td><td style={{fontSize:'12px',color:'#718096'}}>{v.obs||'—'}</td></tr>})}</tbody></table>{checklistActivo.observacion_general&&<div style={{marginTop:'8px',padding:'10px',background:'#F7FAFC',borderRadius:'6px',fontSize:'13px'}}><b>Obs. general:</b> {checklistActivo.observacion_general}</div>}</div><div className={styles.modalActions}>{admin&&<button className={styles.btnDanger} onClick={()=>borrarChecklist(checklistActivo.id)}>🗑️ Borrar</button>}<button className={styles.btnPrimary} onClick={()=>abrirEditarChecklist(checklistActivo)}>✏️ Editar</button><button className={styles.btn} onClick={()=>imprimirChecklist(checklistActivo)}>🖨️ Imprimir</button><button className={styles.btn} onClick={()=>setChecklistActivo(null)}>Cerrar</button></div></div></div>}
+      {checklistActivo&&!editandoChecklist&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'600px',maxHeight:'85vh',overflowY:'auto'}}><div className={styles.modalTitle}>{CHECKLIST_TITULO_POR_TIPO[checklistActivo.tipo||'entrega']}</div><div className={styles.modalSub}>{checklistActivo.vehiculo} · {checklistActivo.patente} · {checklistActivo.fecha_entrega?new Date(checklistActivo.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):''}</div><div style={{marginTop:'1rem'}}><div style={{fontSize:'13px',marginBottom:'12px'}}><span style={{color:'#718096'}}>Mecánico:</span> <b>{checklistActivo.mecanico||'—'}</b></div><table className={styles.table}><thead><tr><th>Ítem</th><th style={{textAlign:'center'}}>Sí</th><th style={{textAlign:'center'}}>No</th><th>Observaciones</th></tr></thead><tbody>{CHECKLIST_ITEMS_POR_TIPO[checklistActivo.tipo||'entrega'].map(item=>{const v=(checklistActivo.items||{})[item]||{};return<tr key={item}><td style={{fontSize:'12px',fontWeight:'500'}}>{item}</td><td style={{textAlign:'center',fontSize:'16px',color:'#16A34A'}}>{v.valor==='si'?'✓':''}</td><td style={{textAlign:'center',fontSize:'16px',color:'#DC2626'}}>{v.valor==='no'?'✓':''}</td><td style={{fontSize:'12px',color:'#718096'}}>{v.obs||'—'}</td></tr>})}</tbody></table>{checklistActivo.observacion_general&&<div style={{marginTop:'8px',padding:'10px',background:'#F7FAFC',borderRadius:'6px',fontSize:'13px'}}><b>Obs. general:</b> {checklistActivo.observacion_general}</div>}</div><div className={styles.modalActions}>{admin&&<button className={styles.btnDanger} onClick={()=>borrarChecklist(checklistActivo.id)}>🗑️ Borrar</button>}<button className={styles.btnPrimary} onClick={()=>abrirEditarChecklist(checklistActivo)}>✏️ Editar</button><button className={styles.btn} onClick={()=>imprimirChecklist(checklistActivo)}>🖨️ Imprimir</button><button className={styles.btn} onClick={()=>setChecklistActivo(null)}>Cerrar</button></div></div></div>}
 
       {/* SIDEBAR */}
       <div className={`${styles.sidebar} ${sidebarOpen?styles.sidebarOpen:''}`}>
@@ -889,15 +930,36 @@ return (
         {seccion==='checklist'&&(
           <div>
             <div className={styles.topBar}>
-              <h1 className={styles.pageTitle}>Checklist de entrega</h1>
-              <div style={{display:'flex',gap:'8px'}}>
-                <button className={`${styles.btn} ${vistaChecklist==='lista'?styles.navActive:''}`} onClick={()=>{setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Ver registros</button>
-                <button className={styles.btnPrimary} onClick={()=>{setVistaChecklist('nuevo');setEditandoChecklist(false);setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:CHECKLIST_ITEMS.reduce((a,k)=>({...a,[k]:{valor:'',obs:''}}),{})})}}>+ Nuevo checklist</button>
+              <h1 className={styles.pageTitle}>{CHECKLIST_TITULO_POR_TIPO[tipoChecklist]}</h1>
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                <button className={`${styles.btn} ${tipoChecklist==='entrega'?styles.navActive:''}`} onClick={()=>{setTipoChecklist('entrega');setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Entrega</button>
+                <button className={`${styles.btn} ${tipoChecklist==='inyectores'?styles.navActive:''}`} onClick={()=>{setTipoChecklist('inyectores');setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Inyectores</button>
               </div>
             </div>
             <div className={styles.divider}></div>
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
+              <button className={`${styles.btn} ${vistaChecklist==='lista'?styles.navActive:''}`} onClick={()=>{setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Ver registros</button>
+              {tipoChecklist==='inyectores'&&<button className={`${styles.btn} ${vistaChecklist==='procedimiento'?styles.navActive:''}`} onClick={()=>setVistaChecklist('procedimiento')}>📋 Ver procedimiento</button>}
+              <button className={styles.btnPrimary} onClick={()=>{setVistaChecklist('nuevo');setEditandoChecklist(false);setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',tipo:tipoChecklist,fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:itemsVacios(tipoChecklist)})}}>+ Nuevo checklist</button>
+            </div>
             {!admin&&!empleadoActual&&vistaChecklist==='lista'&&<div className={styles.card} style={{marginBottom:'1rem'}}><div className={styles.cardTitle}>¿Quién sos?</div><div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'8px'}}>{mecanicos.map(e=><button key={e.id} className={styles.btnPrimary} style={{fontSize:'13px',padding:'8px 16px'}} onClick={()=>setEmpleadoActual(e.nombre)}>{e.nombre}</button>)}</div></div>}
             {!admin&&empleadoActual&&<div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'8px',padding:'8px 14px',marginBottom:'12px',fontSize:'13px',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>👷 Mostrando registros de <b>{empleadoActual}</b></span><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setEmpleadoActual('')}>Cambiar</button></div>}
+            {vistaChecklist==='procedimiento'&&(
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>Procedimiento de reparación de inyectores</div>
+                <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
+                  {PROCEDIMIENTO_INYECTORES.map((paso,idx)=>(
+                    <div key={idx} style={{display:'flex',gap:'14px',padding:'14px 0',borderBottom:idx<PROCEDIMIENTO_INYECTORES.length-1?'1px solid #EDF2F7':'none'}}>
+                      <div style={{width:'28px',height:'28px',borderRadius:'50%',background:'#EFF6FF',color:'#2563EB',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',fontWeight:'700',flexShrink:0}}>{idx+1}</div>
+                      <div>
+                        <div style={{fontSize:'14px',fontWeight:'600',color:'#2D3748',marginBottom:'2px'}}>{paso.titulo}</div>
+                        <div style={{fontSize:'13px',color:'#718096',lineHeight:1.5}}>{paso.descripcion}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {vistaChecklist==='nuevo'&&(
               <div>
                 <div className={styles.card}>
@@ -917,7 +979,7 @@ return (
                 <div className={styles.card}>
                   <div className={styles.cardTitle}>Checklist</div>
                   <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
-                    {CHECKLIST_ITEMS.map((item,idx)=>(
+                    {CHECKLIST_ITEMS_POR_TIPO[formChecklist.tipo||tipoChecklist].map((item,idx)=>(
                       <div key={item} style={{display:'grid',gridTemplateColumns:'1fr auto auto 1fr',gap:'8px',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #EDF2F7'}}>
                         <span style={{fontSize:'13px',fontWeight:'500',color:'#2D3748'}}>{item}</span>
                         <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer',padding:'6px 12px',borderRadius:'6px',background:formChecklist.items[item]?.valor==='si'?'#DCFCE7':'#F7FAFC',border:'1px solid',borderColor:formChecklist.items[item]?.valor==='si'?'#86EFAC':'#E2E8F0',whiteSpace:'nowrap'}}>
