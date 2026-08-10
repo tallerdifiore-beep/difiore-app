@@ -196,6 +196,13 @@ export default function Home({ rol, cerrarSesion }) {
   const [busquedaChecklist, setBusquedaChecklist] = useState('')
   const [dolarBlue, setDolarBlue] = useState(null)
   const [numeracion, setNumeracion] = useState({presupuesto:0, recibo:0})
+  const [presupuestos, setPresupuestos] = useState([])
+  const [presupuestosDetalle, setPresupuestosDetalle] = useState([])
+  const [vistaPresupuesto, setVistaPresupuesto] = useState('nuevo') // 'nuevo' | 'lista'
+  const [presupuestoActivo, setPresupuestoActivo] = useState(null)
+  const [editandoPresupuesto, setEditandoPresupuesto] = useState(false)
+  const [guardandoPresupuesto, setGuardandoPresupuesto] = useState(false)
+  const [busquedaPresupuestos, setBusquedaPresupuestos] = useState('')
   const [mesInforme, setMesInforme] = useState(new Date().toISOString().slice(0,7))
   const [empleados, setEmpleados] = useState([])
   const [checklists, setChecklists] = useState([])
@@ -250,7 +257,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [subiendo, setSubiendo] = useState(false)
   const [presupuesto, setPresupuesto] = useState({
     numero:'001-00001', fecha:new Date().toISOString().split('T')[0],
-    cliente:'', vehiculo:'',
+    cliente:'', vehiculo:'', trabajo_id:'',
     items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],
     notas:'', moneda_mano_obra:'ARS',
     descuento_concepto:'Descuento por diagnóstico', descuento_monto:'', aplicar_descuento:false,
@@ -285,7 +292,7 @@ export default function Home({ rol, cerrarSesion }) {
 
   const [verPapelera, setVerPapelera] = useState(false)
 
-  useEffect(() => { cargarDatos(); cargarNumeracion() }, [])
+  useEffect(() => { cargarDatos(); cargarNumeracion(); cargarPresupuestos() }, [])
   useEffect(() => {
     async function fetchDolar() {
       try {
@@ -298,7 +305,7 @@ export default function Home({ rol, cerrarSesion }) {
   }, [])
 
   function seleccionarClientePresupuesto(t) {
-    setPresupuesto({...presupuesto,cliente:t.vehiculos?.clientes?.nombre||'',vehiculo:t.vehiculos?.marca_modelo||''})
+    setPresupuesto({...presupuesto,cliente:t.vehiculos?.clientes?.nombre||'',vehiculo:t.vehiculos?.marca_modelo||'',trabajo_id:t.id})
   }
   function seleccionarClienteRecibo(t) {
     setRecibo({...recibo,cliente:t.vehiculos?.clientes?.nombre||'',vehiculo:t.vehiculos?.marca_modelo||'',patente:t.vehiculos?.patente||''})
@@ -359,6 +366,87 @@ export default function Home({ rol, cerrarSesion }) {
     await supabase.from('numeracion').update({ultimo_numero:nuevo}).eq('tipo',tipo)
     setNumeracion(prev=>({...prev,[tipo]:nuevo}))
     return nuevo
+  }
+
+  async function cargarPresupuestos() {
+    const{data}=await supabase.from('presupuestos').select('*').order('created_at',{ascending:false})
+    setPresupuestos(data||[])
+  }
+
+  async function cargarPresupuestosVehiculo(vehiculoId){
+    if(!vehiculoId){setPresupuestosDetalle([]);return}
+    const{data:trabajosVeh}=await supabase.from('trabajos').select('id').eq('vehiculo_id',vehiculoId)
+    const ids=(trabajosVeh||[]).map(t=>t.id)
+    if(ids.length===0){setPresupuestosDetalle([]);return}
+    const{data}=await supabase.from('presupuestos').select('*').in('trabajo_id',ids).order('created_at',{ascending:false})
+    setPresupuestosDetalle(data||[])
+  }
+
+  // guarda o actualiza el presupuesto actual en la base, sin imprimir. Devuelve el id guardado.
+  async function guardarPresupuestoDB(){
+    const datos={trabajo_id:presupuesto.trabajo_id||null,numero:presupuesto.numero,fecha:presupuesto.fecha,cliente:presupuesto.cliente,vehiculo:presupuesto.vehiculo,items:presupuesto.items,notas:presupuesto.notas,moneda_mano_obra:presupuesto.moneda_mano_obra,descuento_concepto:presupuesto.descuento_concepto,descuento_monto:presupuesto.descuento_monto,aplicar_descuento:presupuesto.aplicar_descuento,mostrar_transferencia:presupuesto.mostrar_transferencia,transferencia_repuestos:presupuesto.transferencia_repuestos,transferencia_mano_obra:presupuesto.transferencia_mano_obra}
+    if(editandoPresupuesto&&presupuestoActivo){
+      const{error}=await supabase.from('presupuestos').update(datos).eq('id',presupuestoActivo.id)
+      if(error){avisar('No se pudo guardar: '+error.message,'error');return null}
+      return presupuestoActivo.id
+    } else {
+      const{data,error}=await supabase.from('presupuestos').insert(datos).select().single()
+      if(error){avisar('No se pudo guardar: '+error.message,'error');return null}
+      return data.id
+    }
+  }
+
+  async function guardarPresupuesto(){
+    if(guardandoPresupuesto)return
+    setGuardandoPresupuesto(true)
+    const id=await guardarPresupuestoDB()
+    if(id){
+      avisar('Presupuesto guardado','exito')
+      setPresupuestoActivo({...presupuesto,id})
+      setEditandoPresupuesto(true)
+      await cargarPresupuestos()
+    }
+    setGuardandoPresupuesto(false)
+  }
+
+  function abrirPresupuesto(p){
+    setPresupuesto({
+      numero:p.numero||'',fecha:p.fecha||new Date().toISOString().split('T')[0],cliente:p.cliente||'',vehiculo:p.vehiculo||'',trabajo_id:p.trabajo_id||'',
+      items:p.items&&p.items.length?p.items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],
+      notas:p.notas||'',moneda_mano_obra:p.moneda_mano_obra||'ARS',
+      descuento_concepto:p.descuento_concepto||'Descuento por diagnóstico',descuento_monto:p.descuento_monto||'',aplicar_descuento:p.aplicar_descuento||false,
+      mostrar_transferencia:p.mostrar_transferencia||false,transferencia_repuestos:p.transferencia_repuestos!==false,transferencia_mano_obra:p.transferencia_mano_obra||false
+    })
+    setPresupuestoActivo(p)
+    setEditandoPresupuesto(true)
+    setVistaPresupuesto('nuevo')
+  }
+
+  function nuevoPresupuesto(){
+    setPresupuesto({numero:formatNumeroDoc(numeracion.presupuesto),fecha:new Date().toISOString().split('T')[0],cliente:'',vehiculo:'',trabajo_id:'',items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],notas:'',moneda_mano_obra:'ARS',descuento_concepto:'Descuento por diagnóstico',descuento_monto:'',aplicar_descuento:false,mostrar_transferencia:false,transferencia_repuestos:true,transferencia_mano_obra:false})
+    setPresupuestoActivo(null)
+    setEditandoPresupuesto(false)
+    setVistaPresupuesto('nuevo')
+  }
+
+  async function borrarPresupuesto(p){
+    pedirConfirmacion(`¿Borrar el presupuesto ${p.numero}?`, async()=>{
+      await supabase.from('presupuestos').delete().eq('id',p.id)
+      await cargarPresupuestos()
+      avisar('Presupuesto borrado','exito')
+    })
+  }
+
+  const presupuestosFiltrados = presupuestos.filter(p=>{
+    if(!busquedaPresupuestos.trim())return true
+    const q=busquedaPresupuestos.toLowerCase()
+    return p.cliente?.toLowerCase().includes(q)||p.vehiculo?.toLowerCase().includes(q)||p.numero?.toLowerCase().includes(q)
+  })
+
+  function totalAproxPresupuesto(p){
+    try{
+      return (p.items||[]).filter(i=>!i.es_mano_obra).reduce((a,i)=>a+(parseFloat((i.total||'0').toString().replace(/\./g,''))||0),0)
+    }catch(e){return 0}
   }
 
   async function cargarFotos(id){const{data,error}=await supabase.from('fotos').select('*').eq('trabajo_id',id).order('created_at',{ascending:false});if(!error)setFotos(data||[])}
@@ -558,8 +646,19 @@ export default function Home({ rol, cerrarSesion }) {
       `${totalRepuestosPesos>0?`<div class="total-sub" style="border-radius:6px 6px 0 0;border-top:1px solid #e0e0e0"><span>Repuestos</span><span>$${formatPeso(totalRepuestosPesos)}</span></div>`:''}${descMonto>0?`<div class="total-sub"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span style="color:#16A34A">-$${formatPeso(descMonto)}</span></div>`:''}${mostrarTransferencia?`<div class="total-transferencia" style="margin-top:8px"><span>🏦 Transferencia</span><span>$${formatPeso(Math.round(totalTransferencia))}</span></div><div class="total-efectivo"><span>💵 Efectivo (descuento)</span><span>$${formatPeso(Math.round(totalEfectivo))}</span></div>`:`<div class="total-unico" style="margin-top:8px"><span>TOTAL</span><span>$${formatPeso(Math.round(totalEfectivo))}</span></div>`}`
     )}</div></div><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600 — ¡Gracias por confiar en nosotros!</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
-    const nuevo=await incrementarNumeracion('presupuesto')
-    setPresupuesto(p=>({...p,numero:formatNumeroDoc(nuevo)}))
+    const eraNuevo=!editandoPresupuesto
+    const id=await guardarPresupuestoDB()
+    if(id){
+      await cargarPresupuestos()
+      if(eraNuevo){
+        const nuevoNum=await incrementarNumeracion('presupuesto')
+        setPresupuesto({numero:formatNumeroDoc(nuevoNum),fecha:new Date().toISOString().split('T')[0],cliente:'',vehiculo:'',trabajo_id:'',items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],notas:'',moneda_mano_obra:'ARS',descuento_concepto:'Descuento por diagnóstico',descuento_monto:'',aplicar_descuento:false,mostrar_transferencia:false,transferencia_repuestos:true,transferencia_mano_obra:false})
+        setPresupuestoActivo(null)
+        setEditandoPresupuesto(false)
+      } else {
+        setPresupuestoActivo({...presupuesto,id})
+      }
+    }
   }
 
   async function imprimirRecibo(){
@@ -723,7 +822,7 @@ export default function Home({ rol, cerrarSesion }) {
   async function borrarFotoModal(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotosModal(modalFotos.id)}
   async function subirFoto(e){const files=Array.from(e.target.files);if(!files.length||!clienteDetalle)return;setSubiendo(true);for(const f of files){const url=await subirFotoStorage(f,clienteDetalle.id);if(url)await supabase.from('fotos').insert({trabajo_id:clienteDetalle.id,url})}await cargarFotos(clienteDetalle.id);setSubiendo(false);e.target.value=''}
   async function borrarFoto(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotos(clienteDetalle.id)}
-  function verDetalle(t){setClienteDetalle(t);setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarHistorial(t.vehiculos?.id);cargarRepuestos(t.id)}
+  function verDetalle(t){setClienteDetalle(t);setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarHistorial(t.vehiculos?.id);cargarRepuestos(t.id);cargarPresupuestosVehiculo(t.vehiculos?.id)}
   function abrirEditar(t){setFormEditar({trabajo_id:t.id,cliente_id:t.vehiculos?.clientes?.id,vehiculo_id:t.vehiculos?.id,nombre:t.vehiculos?.clientes?.nombre,telefono:t.vehiculos?.clientes?.telefono,email:t.vehiculos?.clientes?.email,marca_modelo:t.vehiculos?.marca_modelo,patente:t.vehiculos?.patente,anio:t.vehiculos?.anio,kilometraje:t.vehiculos?.kilometraje,color:t.vehiculos?.color,motivo:t.motivo,estado:t.estado,mecanico:t.mecanico,taller:t.taller,taller_anterior:t.taller,llego_en_grua:t.llego_en_grua||false,tiene_seguro:t.tiene_seguro||false});setModalEditar(true)}
   function badgeClass(e){if(e==='Listo')return styles.badgeGreen;if(e==='En proceso')return styles.badgeAmber;if(e==='En espera')return styles.badgeBlue;if(e==='Desarmando')return styles.badgeRed;if(e==='Salio')return styles.badgeGray;return styles.badgeGray}
   function generarInforme(){const[anio,mes]=mesInforme.split('-').map(Number);const inicio=new Date(anio,mes-1,1),fin=new Date(anio,mes,0,23,59,59);const ingresados=trabajos.filter(t=>{const d=new Date(t.fecha_ingreso);return d>=inicio&&d<=fin});const salidos=trabajos.filter(t=>{if(!t.fecha_salida)return false;const d=new Date(t.fecha_salida);return d>=inicio&&d<=fin});const mc={};ingresados.forEach(t=>{const m=getMarca(t.vehiculos?.marca_modelo);mc[m]=(mc[m]||0)+1});const marcaTop=Object.entries(mc).sort((a,b)=>b[1]-a[1])[0];const nombreMes=new Date(anio,mes-1,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});return{ingresados,salidos,marcaTop,marcasCount:mc,nombreMes}}
@@ -933,8 +1032,44 @@ return (
 
         {seccion==='presupuesto'&&admin&&(
           <div>
-            <div className={styles.topBar}><h1 className={styles.pageTitle}>Nuevo presupuesto</h1><div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>{dolarBlue&&<span style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0'}}>💵 Venta: ${formatPeso(dolarBlue.venta)} | Compra: ${formatPeso(dolarBlue.compra)}</span>}<button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir</button></div></div>
+            <div className={styles.topBar}>
+              <h1 className={styles.pageTitle}>Presupuesto</h1>
+              <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+                {dolarBlue&&<span style={{fontSize:'12px',color:'#718096',background:'#F7FAFC',padding:'6px 12px',borderRadius:'6px',border:'1px solid #E2E8F0'}}>💵 Venta: ${formatPeso(dolarBlue.venta)} | Compra: ${formatPeso(dolarBlue.compra)}</span>}
+                <button className={`${styles.btn} ${vistaPresupuesto==='lista'?styles.navActive:''}`} onClick={()=>setVistaPresupuesto('lista')}>Ver historial</button>
+                <button className={styles.btnPrimary} onClick={nuevoPresupuesto}>+ Nuevo</button>
+              </div>
+            </div>
             <div className={styles.divider}></div>
+
+            {vistaPresupuesto==='lista'&&(
+              <div>
+                <div className={styles.searchBar} style={{marginBottom:'12px'}}><input type="text" placeholder="Buscar por cliente, vehículo o número..." value={busquedaPresupuestos} onChange={e=>setBusquedaPresupuestos(e.target.value)}/></div>
+                <div className={styles.tblWrap}>
+                  <table className={styles.table}>
+                    <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Vehículo</th><th>Total aprox.</th><th>Acciones</th></tr></thead>
+                    <tbody>
+                      {presupuestosFiltrados.map(p=>(
+                        <tr key={p.id}>
+                          <td style={{fontFamily:'monospace',fontSize:'12px'}} onClick={()=>abrirPresupuesto(p)}>{p.numero}</td>
+                          <td onClick={()=>abrirPresupuesto(p)} style={{fontSize:'12px',color:'#718096'}}>{p.fecha?new Date(p.fecha+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td>
+                          <td onClick={()=>abrirPresupuesto(p)}>{p.cliente||'—'}</td>
+                          <td onClick={()=>abrirPresupuesto(p)}>{p.vehiculo||'—'}</td>
+                          <td onClick={()=>abrirPresupuesto(p)}>${formatPeso(totalAproxPresupuesto(p))}</td>
+                          <td style={{display:'flex',gap:'5px',cursor:'default'}}>
+                            <button className={styles.btnEdit} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>abrirPresupuesto(p)}>✏️ Editar</button>
+                            <button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarPresupuesto(p)}>🗑️</button>
+                          </td>
+                        </tr>
+                      ))}
+                      {presupuestosFiltrados.length===0&&<tr><td colSpan="6" style={{textAlign:'center',color:'#A0AEC0',padding:'2rem'}}>Sin presupuestos guardados todavía</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {vistaPresupuesto==='nuevo'&&(<>
             <div className={styles.card}><div className={styles.cardTitle}>Datos generales</div><div className={styles.formGrid}><div className={styles.formGroup}><label>N° de presupuesto</label><input value={presupuesto.numero} onChange={e=>setPresupuesto({...presupuesto,numero:e.target.value})} placeholder="001-00001"/></div><div className={styles.formGroup}><label>Fecha</label><input type="date" value={presupuesto.fecha} onChange={e=>setPresupuesto({...presupuesto,fecha:e.target.value})}/></div><div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Buscar cliente existente</label><BuscadorCliente trabajos={trabajos} onSeleccionar={seleccionarClientePresupuesto}/></div><div className={styles.formGroup}><label>Cliente</label><input value={presupuesto.cliente} onChange={e=>setPresupuesto({...presupuesto,cliente:e.target.value})} placeholder="Nombre del cliente"/></div><div className={styles.formGroup}><label>Vehículo</label><input value={presupuesto.vehiculo} onChange={e=>setPresupuesto({...presupuesto,vehiculo:e.target.value})} placeholder="Ej: Volkswagen Amarok V6"/></div></div></div>
             <div className={styles.card}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}><div className={styles.cardTitle} style={{margin:0}}>Ítems del presupuesto</div><button className={styles.btnPrimary} style={{fontSize:'12px',padding:'6px 12px'}} onClick={()=>setPresupuesto({...presupuesto,items:[...presupuesto.items,{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}]})}>+ Agregar ítem</button></div>
@@ -947,7 +1082,8 @@ return (
               {usandoUSD&&<div style={{background:'#1a56db',color:'white',borderRadius:'8px',padding:'12px 16px',marginTop:'4px',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontSize:'13px',fontWeight:'600'}}>TOTAL MANO DE OBRA</span><span style={{fontSize:'18px',fontWeight:'900'}}>USS {formatPeso(totalManoObraUSD)}</span></div>}
             </div>
             <div className={styles.card}><div className={styles.cardTitle}>Notas / Observaciones</div><div className={styles.formGroup}><label>Una por línea (aparecerán con ✅)</label><textarea value={presupuesto.notas} onChange={e=>setPresupuesto({...presupuesto,notas:e.target.value})} placeholder={'Kit de distribución de origen Alemán.\nRepuestos originales. Trabajo garantizado.'} style={{minHeight:'80px'}}/></div></div>
-            <div className={styles.formActions}><button className={styles.btn} onClick={()=>setPresupuesto({numero:formatNumeroDoc(numeracion.presupuesto),fecha:new Date().toISOString().split('T')[0],cliente:'',vehiculo:'',items:[{descripcion:'',precio_unitario:'',total:'',es_mano_obra:false}],notas:'',moneda_mano_obra:'ARS',descuento_concepto:'Descuento por diagnóstico',descuento_monto:'',aplicar_descuento:false,mostrar_transferencia:false,transferencia_repuestos:true,transferencia_mano_obra:false})}>Limpiar</button><button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir presupuesto</button></div>
+            <div className={styles.formActions}><button className={styles.btn} onClick={nuevoPresupuesto}>Limpiar</button><button className={styles.btn} onClick={guardarPresupuesto} disabled={guardandoPresupuesto}>{guardandoPresupuesto?'Guardando...':'💾 Guardar'}</button><button className={styles.btnPrimary} onClick={imprimirPresupuesto}>🖨️ Imprimir presupuesto</button></div>
+            </>)}
           </div>
         )}
 {seccion==='recibo'&&admin&&(
@@ -1098,6 +1234,7 @@ return (
               <div className={styles.card}><div className={styles.cardTitle}>Trabajo</div><p className={styles.detText}>{clienteDetalle.motivo||'Sin descripción'}</p><div className={styles.detFecha}>Ingresó: {new Date(clienteDetalle.fecha_ingreso).toLocaleDateString('es-AR')}</div>{clienteDetalle.fecha_salida&&<div className={styles.detFecha}>Salió: {new Date(clienteDetalle.fecha_salida).toLocaleDateString('es-AR')}</div>}{clienteDetalle.observacion_final&&<div className={styles.detText} style={{marginTop:'8px'}}><b>Obs. final:</b> {clienteDetalle.observacion_final}</div>}</div>
             </div>
             <div className={styles.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}><div className={styles.cardTitle} style={{margin:0}}>Repuestos</div>{admin&&repuestos.length>0&&<button className={styles.btn} style={{fontSize:'12px',padding:'4px 10px'}} onClick={()=>imprimirRepuestos(clienteDetalle,repuestos)}>🖨️ Imprimir</button>}</div>{repuestos.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin repuestos registrados</div>}{repuestos.length>0&&<table className={styles.table}><thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th>{admin&&<th></th>}</tr></thead><tbody>{repuestos.map(r=>(<tr key={r.id}><td>{r.nombre}</td><td>${formatPeso(r.valor)}</td><td>{r.lugar||'—'}</td><td style={{fontSize:'12px',color:'#718096'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>{admin&&<td style={{display:'flex',gap:'4px',cursor:'default'}}><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:formatNum(r.valor.toString()),lugar:r.lugar||'',fecha:r.fecha});setModalEditarRepuesto(true)}}>✏️</button><button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>borrarRepuesto(r)}>🗑️</button></td>}</tr>))}<tr><td style={{fontWeight:'700',color:'#2D3748'}}>Total</td><td style={{fontWeight:'700',color:'#16A34A'}}>${formatPeso(repuestos.reduce((a,r)=>a+Number(r.valor),0))}</td><td colSpan={admin?3:2}></td></tr></tbody></table>}</div>
+            {admin&&<div className={styles.card}><div className={styles.cardTitle}>Presupuestos</div>{presupuestosDetalle.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin presupuestos guardados para este vehículo</div>}{presupuestosDetalle.length>0&&<table className={styles.table}><thead><tr><th>N°</th><th>Fecha</th><th>Total aprox.</th><th></th></tr></thead><tbody>{presupuestosDetalle.map(p=>(<tr key={p.id}><td style={{fontFamily:'monospace',fontSize:'12px'}}>{p.numero}</td><td style={{fontSize:'12px',color:'#718096'}}>{p.fecha?new Date(p.fecha+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td><td>${formatPeso(totalAproxPresupuesto(p))}</td><td><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{abrirPresupuesto(p);setSeccion('presupuesto')}}>Ver / Editar</button></td></tr>))}</tbody></table>}</div>}
             <div className={styles.card}><div className={styles.cardTitle}>Historial</div>{historial.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin historial todavía</div>}{historial.map(h=>(<div key={h.id} className={styles.histItem}><span className={styles.histIcon}>{tipoHistorial[h.tipo]||'⚪'}</span><div style={{flex:1}}><div style={{fontSize:'13px',color:'#2D3748'}}>{h.descripcion}</div><div style={{fontSize:'11px',color:'#718096',marginTop:'2px'}}>{new Date(h.fecha).toLocaleString('es-AR')}</div></div></div>))}</div>
             <div className={styles.card}><div className={styles.cardTitle}>Fotos del vehículo</div><input type="file" accept="image/*" multiple ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>{admin&&<button className={styles.btnPrimary} onClick={()=>fileRef.current.click()} style={{marginBottom:'1rem'}}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{fotos.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/><button style={{position:'absolute',bottom:'4px',left:'4px',fontSize:'11px',padding:'3px 7px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>enviarFotoWsp(clienteDetalle,f.url)}>💬</button>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFoto(f)}>✕</button>}</div>)}{fotos.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div></div>
           </div>
