@@ -411,14 +411,19 @@ export default function Home({ rol, cerrarSesion }) {
   // guarda o actualiza el presupuesto actual en la base, sin imprimir. Devuelve el id guardado.
   async function guardarPresupuestoDB(){
     const datos={trabajo_id:presupuesto.trabajo_id||null,numero:presupuesto.numero,fecha:presupuesto.fecha,cliente:presupuesto.cliente,vehiculo:presupuesto.vehiculo,items:presupuesto.items,notas:presupuesto.notas,moneda_mano_obra:presupuesto.moneda_mano_obra,descuento_concepto:presupuesto.descuento_concepto,descuento_monto:presupuesto.descuento_monto,aplicar_descuento:presupuesto.aplicar_descuento,mostrar_transferencia:presupuesto.mostrar_transferencia,transferencia_repuestos:presupuesto.transferencia_repuestos,transferencia_mano_obra:presupuesto.transferencia_mano_obra}
-    if(editandoPresupuesto&&presupuestoActivo){
-      const{error}=await supabase.from('presupuestos').update(datos).eq('id',presupuestoActivo.id)
-      if(error){avisar('No se pudo guardar: '+error.message,'error');return null}
-      return presupuestoActivo.id
-    } else {
-      const{data,error}=await supabase.from('presupuestos').insert(datos).select().single()
-      if(error){avisar('No se pudo guardar: '+error.message,'error');return null}
-      return data.id
+    try{
+      if(editandoPresupuesto&&presupuestoActivo){
+        const{error}=await supabase.from('presupuestos').update(datos).eq('id',presupuestoActivo.id)
+        if(error){avisar('No se pudo guardar: '+error.message,'error');return null}
+        return presupuestoActivo.id
+      } else {
+        const{data,error}=await supabase.from('presupuestos').insert(datos).select().single()
+        if(error){avisar('No se pudo guardar: '+error.message,'error');return null}
+        return data.id
+      }
+    }catch(e){
+      avisar('No se pudo guardar el presupuesto: '+(e?.message||'error desconocido'),'error')
+      return null
     }
   }
 
