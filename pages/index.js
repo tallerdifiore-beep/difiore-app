@@ -554,6 +554,22 @@ export default function Home({ rol, cerrarSesion }) {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,'_blank')
   }
 
+  function imprimirPlanDiario(){
+    const fechaF=new Date(fechaPlan+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
+    const bloques=planPorMecanico.map(([mecanico,tareas])=>{
+      const filas=tareas.map(p=>{
+        const trabajoRef=p.tipo==='vehiculo'?trabajos.find(t=>t.id===p.trabajo_id):null
+        const texto=p.tipo==='vehiculo'
+          ?`${trabajoRef?.vehiculos?.marca_modelo||'Vehículo'} (${trabajoRef?.vehiculos?.clientes?.nombre||'—'})${p.descripcion?' — '+p.descripcion:''}`
+          :p.descripcion
+        return `<tr><td class="check"><span class="checkbox"></span></td><td>${texto}</td></tr>`
+      }).join('')
+      return `<div class="mecanico">${mecanico}</div><table>${filas}</table>`
+    }).join('')
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Plan del día</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:16px;max-width:720px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:2px solid #000;padding-bottom:8px;}.header-logo{font-weight:900;font-size:18px;color:#1a56db;}.header h1{font-size:16px;font-weight:900;}.header p{font-size:11px;color:#555;text-transform:capitalize;}.mecanico{font-weight:900;font-size:12px;margin:12px 0 4px;text-transform:uppercase;}table{width:100%;border-collapse:collapse;margin-bottom:4px;}td{padding:5px 4px;border-bottom:1px solid #ddd;font-size:11.5px;}.check{width:20px;}.checkbox{width:13px;height:13px;border:1.5px solid #000;display:inline-block;}@media print{body{padding:8px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo">DiFiore Performance</div><div style="text-align:right"><h1>PLAN DEL DÍA</h1><p>${fechaF}</p></div></div>${bloques||'<p style="color:#999;padding:20px 0;text-align:center;">Sin tareas planificadas para este día.</p>'}<script>window.onload=()=>{window.print()}<\/script></body></html>`
+    abrirVentana(html)
+  }
+
   async function actualizarTodo(){
     await Promise.all([cargarDatos(),cargarNumeracion(),cargarPresupuestos(),cargarReingresos(),cargarPlanDiario(fechaPlan),cargarActualizacionesGlobal()])
     if(clienteDetalle?.vehiculos?.id){
@@ -1278,6 +1294,7 @@ return (
                 <button className={styles.btn} onClick={()=>cambiarDiaPlan(1)}>›</button>
                 <button className={styles.btn} onClick={()=>{const hoy=new Date().toISOString().split('T')[0];setFechaPlan(hoy);cargarPlanDiario(hoy)}}>Hoy</button>
                 <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',fontFamily:'inherit',fontWeight:'600'}} onClick={compartirPlanDiario}>💬 Compartir</button>
+                <button className={styles.btn} onClick={imprimirPlanDiario}>🖨️ Imprimir</button>
                 {admin&&<button className={styles.btnPrimary} onClick={()=>setModalAgregarPlan('elegir')}>+ Agregar</button>}
               </div>
             </div>
