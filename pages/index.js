@@ -182,6 +182,77 @@ function BuscadorCliente({ trabajos, onSeleccionar, placeholder }) {
   )
 }
 
+// visor de foto ampliada con zoom (scroll/pellizco) y arrastre para mover cuando está ampliada
+function FotoZoomViewer({ url, onClose, styles }) {
+  const [escala, setEscala] = useState(1)
+  const [pos, setPos] = useState({x:0,y:0})
+  const arrastrando = useRef(false)
+  const ultimoPunto = useRef({x:0,y:0})
+  const distanciaPellizco = useRef(null)
+
+  function manejarWheel(e){
+    e.preventDefault()
+    const delta = e.deltaY < 0 ? 0.3 : -0.3
+    setEscala(prev => { const n = Math.min(5, Math.max(1, prev + delta)); if(n===1) setPos({x:0,y:0}); return n })
+  }
+  function puntoDe(e){ return e.touches ? e.touches[0] : e }
+  function distanciaEntre(t1,t2){ return Math.hypot(t1.clientX-t2.clientX, t1.clientY-t2.clientY) }
+
+  function iniciar(e){
+    if(e.touches && e.touches.length===2){
+      distanciaPellizco.current = distanciaEntre(e.touches[0], e.touches[1])
+      return
+    }
+    if(escala<=1) return
+    arrastrando.current = true
+    const p = puntoDe(e)
+    ultimoPunto.current = {x:p.clientX, y:p.clientY}
+  }
+  function mover(e){
+    if(e.touches && e.touches.length===2 && distanciaPellizco.current){
+      const nueva = distanciaEntre(e.touches[0], e.touches[1])
+      const factor = nueva / distanciaPellizco.current
+      distanciaPellizco.current = nueva
+      setEscala(prev => Math.min(5, Math.max(1, prev * factor)))
+      return
+    }
+    if(!arrastrando.current) return
+    const p = puntoDe(e)
+    const dx = p.clientX - ultimoPunto.current.x
+    const dy = p.clientY - ultimoPunto.current.y
+    ultimoPunto.current = {x:p.clientX, y:p.clientY}
+    setPos(prev => ({x:prev.x+dx, y:prev.y+dy}))
+  }
+  function terminar(){ arrastrando.current = false; distanciaPellizco.current = null }
+  function dobleClick(e){
+    e.stopPropagation()
+    if(escala>1){ setEscala(1); setPos({x:0,y:0}) } else { setEscala(2.5) }
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={e=>{if(e.target===e.currentTarget)onClose()}} style={{cursor:escala>1?'grab':'default',touchAction:'none',overflow:'hidden'}}>
+      <div style={{position:'fixed',top:'16px',right:'16px',display:'flex',gap:'8px',zIndex:10}}>
+        <button onClick={e=>{e.stopPropagation();setEscala(s=>Math.max(1,s-0.5));if(escala-0.5<=1)setPos({x:0,y:0})}} style={{width:'36px',height:'36px',borderRadius:'8px',border:'none',background:'rgba(255,255,255,.9)',fontSize:'18px',cursor:'pointer',fontWeight:'700'}}>−</button>
+        <button onClick={e=>{e.stopPropagation();setEscala(1);setPos({x:0,y:0})}} style={{padding:'0 12px',height:'36px',borderRadius:'8px',border:'none',background:'rgba(255,255,255,.9)',fontSize:'12px',cursor:'pointer',fontWeight:'700'}}>1:1</button>
+        <button onClick={e=>{e.stopPropagation();setEscala(s=>Math.min(5,s+0.5))}} style={{width:'36px',height:'36px',borderRadius:'8px',border:'none',background:'rgba(255,255,255,.9)',fontSize:'18px',cursor:'pointer',fontWeight:'700'}}>+</button>
+        <button onClick={e=>{e.stopPropagation();onClose()}} style={{width:'36px',height:'36px',borderRadius:'8px',border:'none',background:'rgba(255,255,255,.9)',fontSize:'16px',cursor:'pointer',fontWeight:'700'}}>✕</button>
+      </div>
+      <img
+        src={url} alt="zoom" draggable={false}
+        onWheel={manejarWheel} onDoubleClick={dobleClick}
+        onMouseDown={iniciar} onMouseMove={mover} onMouseUp={terminar} onMouseLeave={terminar}
+        onTouchStart={iniciar} onTouchMove={mover} onTouchEnd={terminar}
+        style={{
+          maxWidth:'90vw',maxHeight:'90vh',objectFit:'contain',borderRadius:'8px',
+          transform:`scale(${escala}) translate(${pos.x/escala}px, ${pos.y/escala}px)`,
+          transition:arrastrando.current?'none':'transform .15s',
+          cursor:escala>1?'grab':'zoom-in',userSelect:'none'
+        }}
+      />
+    </div>
+  )
+}
+
 export default function Home({ rol, cerrarSesion }) {
   const admin = rol === 'admin'
   const [seccion, setSeccion] = useState('dashboard')
@@ -962,7 +1033,7 @@ return (
 
       {confirmDialog&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Confirmar</div><div style={{marginTop:'1rem',fontSize:'14px',color:'#2D3748',lineHeight:1.5}}>{confirmDialog.mensaje}</div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setConfirmDialog(null)}>Cancelar</button><button className={styles.btnDangerSolid} onClick={()=>{confirmDialog.onConfirm();setConfirmDialog(null)}}>Confirmar</button></div></div></div>}
 
-      {fotoZoom&&<div className={styles.modalOverlay} onClick={()=>setFotoZoom(null)} style={{cursor:'zoom-out'}}><img src={fotoZoom} alt="zoom" style={{maxWidth:'90vw',maxHeight:'90vh',objectFit:'contain',borderRadius:'8px'}}/></div>}
+      {fotoZoom&&<FotoZoomViewer url={fotoZoom} onClose={()=>setFotoZoom(null)} styles={styles}/>}
 
       {/* SIDEBAR */}
       <div className={`${styles.sidebar} ${sidebarOpen?styles.sidebarOpen:''}`}>
