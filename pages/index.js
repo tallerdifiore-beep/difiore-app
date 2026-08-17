@@ -24,6 +24,37 @@ function formatNumeroFicha(ultimoUsado) { return 'C-' + String((ultimoUsado||0)+
 const UMBRAL_ESTANCADO_DIAS = 2
 function diasDesde(fecha){ return Math.floor((new Date() - new Date(fecha)) / (1000*60*60*24)) }
 
+const CATEGORIA_POR_TIPO = {
+  ingreso:'Diagnóstico sin iniciar',
+  estado:'En proceso',
+  prueba:'En prueba',
+  motor:'Arreglo de motor',
+  movimiento:'Cambio de taller',
+  reingreso:'Reingreso',
+  terceros:'Esperando a terceros',
+  repuestos:'Esperando repuestos',
+  aprobacion:'Esperando aprobación del cliente',
+  elevador:'Esperando mecánico/elevador',
+}
+const CATEGORIAS_MUERTAS = ['Diagnóstico sin iniciar','Esperando a terceros','Esperando repuestos','Esperando aprobación del cliente','Esperando mecánico/elevador']
+
+// calcula, para un trabajo, cuántas horas pasó en cada categoría, a partir del ingreso, cada actualización, y la salida (o ahora si sigue en curso)
+function calcularTiemposTrabajo(trabajo, actualizacionesTrabajo){
+  const eventos=[{tipo:'ingreso',fecha:trabajo.fecha_ingreso},...actualizacionesTrabajo]
+    .filter(e=>e.fecha)
+    .sort((a,b)=>new Date(a.fecha)-new Date(b.fecha))
+  const fin=trabajo.fecha_salida?new Date(trabajo.fecha_salida):new Date()
+  const categorias={}
+  for(let i=0;i<eventos.length;i++){
+    const inicio=new Date(eventos[i].fecha)
+    const finSeg=i+1<eventos.length?new Date(eventos[i+1].fecha):fin
+    const horas=Math.max(0,(finSeg-inicio)/(1000*60*60))
+    const cat=CATEGORIA_POR_TIPO[eventos[i].tipo]||'Otro'
+    categorias[cat]=(categorias[cat]||0)+horas
+  }
+  return categorias
+}
+
 // redimensiona y comprime una foto en el navegador antes de subirla, para no llenar el storage con fotos de celular sin comprimir
 function comprimirImagen(file, maxAncho=1600, calidad=0.75) {
   return new Promise((resolve) => {
@@ -311,6 +342,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [editandoTurno, setEditandoTurno] = useState(null)
   const [mostrarFormTurno, setMostrarFormTurno] = useState(false)
   const [verRecordatorios, setVerRecordatorios] = useState(false)
+  const [mesTiempos, setMesTiempos] = useState(new Date().toISOString().slice(0,7))
   const [diaSeleccionado, setDiaSeleccionado] = useState(null)
   const [mesCalendario, setMesCalendario] = useState(new Date())
   const [form, setForm] = useState({
@@ -332,6 +364,9 @@ export default function Home({ rol, cerrarSesion }) {
   const [historial, setHistorial] = useState([])
   const [repuestos, setRepuestos] = useState([])
   const [modalActualizar, setModalActualizar] = useState(null)
+  const [modalEditarFecha, setModalEditarFecha] = useState(null)
+  const [nuevaFechaHistorial, setNuevaFechaHistorial] = useState('')
+  const [guardandoFechaHistorial, setGuardandoFechaHistorial] = useState(false)
   const [modalRepuesto, setModalRepuesto] = useState(null)
   const [modalEditarRepuesto, setModalEditarRepuesto] = useState(null)
   const [formEditarRepuesto, setFormEditarRepuesto] = useState({nombre:'',valor:'',lugar:'',fecha:''})
@@ -475,7 +510,7 @@ export default function Home({ rol, cerrarSesion }) {
   }
 
   async function cargarActualizacionesGlobal(){
-    const{data}=await supabase.from('actualizaciones').select('trabajo_id, fecha')
+    const{data}=await supabase.from('actualizaciones').select('trabajo_id, fecha, tipo')
     setActualizacionesRaw(data||[])
   }
 
@@ -675,7 +710,11 @@ export default function Home({ rol, cerrarSesion }) {
     if(ids.length===0){setHistorial([]);return}
     const{data:h1}=await supabase.from('historial').select('*').in('trabajo_id',ids)
     const{data:h2}=await supabase.from('actualizaciones').select('*').in('trabajo_id',ids)
-    setHistorial([...(h1||[]),...(h2||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)))
+    const combinado=[
+      ...(h1||[]).map(h=>({...h,_origen:'historial'})),
+      ...(h2||[]).map(h=>({...h,_origen:'actualizaciones'}))
+    ]
+    setHistorial(combinado.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)))
   }
   async function cargarRepuestos(id){const{data}=await supabase.from('repuestos').select('*').eq('trabajo_id',id).order('fecha',{ascending:false});setRepuestos(data||[])}
   async function agregarHistorial(trabajoId,tipo,descripcion){await supabase.from('historial').insert({trabajo_id:trabajoId,tipo,descripcion})}
@@ -1025,6 +1064,9 @@ export default function Home({ rol, cerrarSesion }) {
     else if(tipo==='prueba')desc=`En prueba. ${desc}`
     else if(tipo==='motor')desc=`Arreglo de motor. ${desc}`
     else if(tipo==='terceros')desc=`Esperando a terceros. ${desc}`
+    else if(tipo==='repuestos')desc=`Esperando repuestos. ${desc}`
+    else if(tipo==='aprobacion')desc=`Esperando aprobación del cliente. ${desc}`
+    else if(tipo==='elevador')desc=`Esperando mecánico/elevador. ${desc}`
     await supabase.from('actualizaciones').insert({trabajo_id:t.id,tipo,descripcion:desc})
     setModalActualizar(null)
     setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'})
@@ -1032,6 +1074,26 @@ export default function Home({ rol, cerrarSesion }) {
     await cargarActualizacionesGlobal()
     if(clienteDetalle?.id===t.id){await cargarHistorial(t.vehiculos?.id);await cargarRepuestos(t.id)}
     setGuardandoActualizacion(false)
+  }
+
+  function abrirEditarFechaHistorial(item){
+    const d=new Date(item.fecha)
+    const pad=n=>String(n).padStart(2,'0')
+    const local=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    setNuevaFechaHistorial(local)
+    setModalEditarFecha(item)
+  }
+
+  async function guardarFechaHistorial(){
+    if(guardandoFechaHistorial)return
+    if(!nuevaFechaHistorial){avisar('Elegí una fecha y hora','error');return}
+    setGuardandoFechaHistorial(true)
+    const{error}=await supabase.from('actualizaciones').update({fecha:new Date(nuevaFechaHistorial).toISOString()}).eq('id',modalEditarFecha.id)
+    if(error){avisar('No se pudo guardar: '+error.message,'error');setGuardandoFechaHistorial(false);return}
+    setModalEditarFecha(null)
+    await cargarActualizacionesGlobal()
+    if(clienteDetalle?.vehiculos?.id)await cargarHistorial(clienteDetalle.vehiculos.id)
+    setGuardandoFechaHistorial(false)
   }
 
   async function guardarRepuesto(){
@@ -1086,6 +1148,20 @@ export default function Home({ rol, cerrarSesion }) {
     XLSX.writeFile(libro,`informe-difiore-${nombreMes.replace(' ','-')}.xlsx`)
   }
 
+  function exportarTiemposExcel(){
+    const todasCategorias=Object.keys(CATEGORIA_POR_TIPO).map(k=>CATEGORIA_POR_TIPO[k]).filter((v,i,arr)=>arr.indexOf(v)===i)
+    const hojaDetalle=XLSX.utils.json_to_sheet(tiemposDelMes.porTrabajo.map(({trabajo,categorias,totalHoras,motivoPrincipal})=>{
+      const fila={Vehiculo:trabajo.vehiculos?.marca_modelo||'',Cliente:trabajo.vehiculos?.clientes?.nombre||'',Patente:trabajo.vehiculos?.patente||'','Total horas':Math.round(totalHoras*10)/10,'Motivo principal':motivoPrincipal?motivoPrincipal[0]:'—'}
+      todasCategorias.forEach(cat=>{fila[cat]=Math.round((categorias[cat]||0)*10)/10})
+      return fila
+    }))
+    const hojaResumen=XLSX.utils.json_to_sheet(Object.entries(tiemposDelMes.totalesPorCategoria).sort((a,b)=>b[1]-a[1]).map(([categoria,horas])=>({Categoria:categoria,Horas:Math.round(horas*10)/10})))
+    const libro=XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(libro,hojaResumen,'Resumen')
+    XLSX.utils.book_append_sheet(libro,hojaDetalle,'Detalle por vehiculo')
+    XLSX.writeFile(libro,`tiempos-difiore-${mesTiempos}.xlsx`)
+  }
+
   function imprimirInforme(){const{ingresados,salidos,marcaTop,marcasCount,nombreMes}=generarInforme();const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Mensual</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a56db;padding-bottom:16px;}.header-logo img{width:180px;}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}.stat-box{border:2px solid #1a56db;border-radius:10px;padding:16px;text-align:center;}.stat-box .num{font-size:36px;font-weight:900;color:#1a56db;}.stat-box .lbl{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;}.section{margin-bottom:20px;}.section-title{background:#222;color:#fff;font-weight:bold;font-size:11px;padding:6px 12px;margin-bottom:8px;letter-spacing:1px;}table{width:100%;border-collapse:collapse;}thead th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;border-bottom:2px solid #ccc;}tbody td{padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.marcas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}.marca-item{border:1px solid #e0e0e0;border-radius:6px;padding:10px;display:flex;justify-content:space-between;align-items:center;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div style="text-align:right"><h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">INFORME MENSUAL</h1><p style="font-size:14px;font-weight:700;color:#333;margin-bottom:4px">${nombreMes.toUpperCase()}</p><p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p></div></div><div class="stats"><div class="stat-box"><div class="num">${ingresados.length}</div><div class="lbl">Vehículos ingresados</div></div><div class="stat-box"><div class="num">${salidos.length}</div><div class="lbl">Vehículos entregados</div></div><div class="stat-box" style="border-color:#16A34A"><div class="num" style="color:#16A34A;font-size:24px">${marcaTop?marcaTop[0]:'—'}</div><div class="lbl">Marca más frecuente${marcaTop?` (${marcaTop[1]})`:''}</div></div></div><div class="section"><div class="section-title">VEHÍCULOS INGRESADOS (${ingresados.length})</div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>${ingresados.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>`).join('')}${ingresados.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin ingresos este mes</td></tr>':''}</tbody></table></div><div class="section"><div class="section-title">VEHÍCULOS ENTREGADOS (${salidos.length})</div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead><tbody>${salidos.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>`).join('')}${salidos.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin entregas este mes</td></tr>':''}</tbody></table></div><div class="section"><div class="section-title">MARCAS ATENDIDAS</div><div class="marcas">${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="marca-item"><span style="font-size:13px;color:#555">${m}</span><b style="font-size:18px;color:#1a56db">${n}</b></div>`).join('')}</div></div><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
 
   const trabajosVivos=trabajos.filter(t=>!t.borrado)
@@ -1098,7 +1174,7 @@ export default function Home({ rol, cerrarSesion }) {
   const stats={total:clientes.length,enTaller:trabajosActivos.length,listos:trabajosVivos.filter(t=>t.estado==='Listo').length,salidos:trabajosEntregados.length}
   const listaVistaStats={enTaller:trabajosVivos.filter(t=>t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),listos:trabajosVivos.filter(t=>t.estado==='Listo').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),salidos:trabajosEntregados}
   const titulosVistaStats={enTaller:'Autos en taller',listos:'Listos para entregar',salidos:'Vehículos entregados'}
-  const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠',motor:'🔧',terceros:'⏳'}
+  const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠',motor:'🔧',terceros:'⏳',repuestos:'📦',aprobacion:'✍️',elevador:'🅿️'}
   const trabajosTaller=tallerVista?trabajosVivos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)):[]
   const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)):[]
   const ultimaActualizacionPorTrabajo=(()=>{
@@ -1139,6 +1215,28 @@ export default function Home({ rol, cerrarSesion }) {
     })
     return Object.values(mapa).sort((a,b)=>b.cantidad-a.cantidad)
   })()
+
+  const tiemposDelMes=(()=>{
+    const trabajosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos)
+    const porTrabajo=trabajosDelMes.map(t=>{
+      const eventos=actualizacionesRaw.filter(a=>a.trabajo_id===t.id)
+      const categorias=calcularTiemposTrabajo(t,eventos)
+      const totalHoras=Object.values(categorias).reduce((a,b)=>a+b,0)
+      const motivoPrincipal=Object.entries(categorias).sort((a,b)=>b[1]-a[1])[0]
+      return{trabajo:t,categorias,totalHoras,motivoPrincipal}
+    })
+    const totalesPorCategoria={}
+    porTrabajo.forEach(({categorias})=>{
+      Object.entries(categorias).forEach(([cat,horas])=>{totalesPorCategoria[cat]=(totalesPorCategoria[cat]||0)+horas})
+    })
+    const horasMuertas=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)).reduce((a,[,h])=>a+h,0)
+    const horasTotales=Object.values(totalesPorCategoria).reduce((a,b)=>a+b,0)
+    const eficiencia=horasTotales>0?Math.round(((horasTotales-horasMuertas)/horasTotales)*100):0
+    const tiempoMuertoProm=porTrabajo.length>0?Math.round(horasMuertas/porTrabajo.length):0
+    const motivoGeneral=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)).sort((a,b)=>b[1]-a[1])[0]
+    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral}
+  })()
+
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
   const mecanicos=empleados.filter(e=>e.rol==='mecanico')
   const hoy=new Date().toISOString().split('T')[0]
@@ -1197,7 +1295,9 @@ return (
 
       {modalEditar&&admin&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'520px',maxHeight:'80vh',overflowY:'auto'}}><div className={styles.modalTitle}>Editar cliente</div><div style={{marginTop:'1rem'}}><div className={styles.cardTitle}>Datos del cliente</div><div className={styles.formGrid} style={{marginBottom:'1rem'}}><div className={styles.formGroup}><label>Nombre</label><input value={formEditar.nombre||''} onChange={e=>setFormEditar({...formEditar,nombre:e.target.value})}/></div><div className={styles.formGroup}><label>Teléfono</label><input value={formEditar.telefono||''} onChange={e=>setFormEditar({...formEditar,telefono:e.target.value})}/></div><div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Email</label><input value={formEditar.email||''} onChange={e=>setFormEditar({...formEditar,email:e.target.value})}/></div></div><div className={styles.cardTitle}>Datos del vehículo</div><div className={styles.formGrid} style={{marginBottom:'1rem'}}><div className={styles.formGroup}><label>Modelo</label><input value={formEditar.marca_modelo||''} onChange={e=>setFormEditar({...formEditar,marca_modelo:e.target.value})}/></div><div className={styles.formGroup}><label>Patente</label><input value={formEditar.patente||''} onChange={e=>setFormEditar({...formEditar,patente:e.target.value})}/></div><div className={styles.formGroup}><label>Año</label><input value={formEditar.anio||''} onChange={e=>setFormEditar({...formEditar,anio:e.target.value})}/></div><div className={styles.formGroup}><label>Km</label><input value={formEditar.kilometraje||''} onChange={e=>setFormEditar({...formEditar,kilometraje:e.target.value})}/></div><div className={styles.formGroup}><label>Color</label><input value={formEditar.color||''} onChange={e=>setFormEditar({...formEditar,color:e.target.value})}/></div><div className={styles.formGroup}><label>Llegó en grúa</label><select value={formEditar.llego_en_grua?'si':'no'} onChange={e=>setFormEditar({...formEditar,llego_en_grua:e.target.value==='si'})}><option value="no">No — Andando</option><option value="si">Sí — En grúa</option></select></div><div className={styles.formGroup}><label>Tiene seguro</label><select value={formEditar.tiene_seguro?'si':'no'} onChange={e=>setFormEditar({...formEditar,tiene_seguro:e.target.value==='si'})}><option value="no">No</option><option value="si">Sí</option></select></div><div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Motivo</label><textarea value={formEditar.motivo||''} onChange={e=>setFormEditar({...formEditar,motivo:e.target.value})}/></div><div className={styles.formGroup}><label>Mecánico</label><input value={formEditar.mecanico||''} onChange={e=>setFormEditar({...formEditar,mecanico:e.target.value})}/></div><div className={styles.formGroup}><label>Estado</label><select value={formEditar.estado||''} onChange={e=>setFormEditar({...formEditar,estado:e.target.value})}><option>Diagnóstico</option><option>En proceso</option><option>En espera</option><option>Desarmando</option><option>Listo</option><option>Salio</option></select></div><div className={styles.formGroup}><label>Taller</label><select value={formEditar.taller||''} onChange={e=>setFormEditar({...formEditar,taller:e.target.value})}><option>Malvinas 2084</option><option>Malvinas 3906</option></select></div></div></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalEditar(null)}>Cancelar</button><button className={styles.btnPrimary} onClick={guardarEdicion} disabled={guardandoEdicion}>{guardandoEdicion?'Guardando...':'Guardar cambios'}</button></div></div></div>}
 
-      {modalActualizar&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Registrar actualización</div><div className={styles.modalSub}><b>{modalActualizar.vehiculos?.marca_modelo}</b> — {modalActualizar.vehiculos?.clientes?.nombre}</div><div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}><div className={styles.formGroup}><label>Tipo</label><select value={formActualizar.tipo} onChange={e=>setFormActualizar({...formActualizar,tipo:e.target.value})}><option value="estado">Actualización de estado</option><option value="prueba">En prueba</option><option value="motor">Arreglo de motor</option><option value="terceros">Esperando a terceros</option><option value="taller">Cambio de taller</option></select></div>{formActualizar.tipo==='taller'&&<div className={styles.formGroup}><label>Mover a</label><select value={formActualizar.taller_nuevo} onChange={e=>setFormActualizar({...formActualizar,taller_nuevo:e.target.value})}><option>Malvinas 2084</option><option>Malvinas 3906</option></select></div>}<div className={styles.formGroup}><label>Descripción</label><textarea value={formActualizar.descripcion} onChange={e=>setFormActualizar({...formActualizar,descripcion:e.target.value})} placeholder="Detallá la actualización..."/></div></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalActualizar(null)}>Cancelar</button><button className={styles.btnSuccess} onClick={guardarActualizacion} disabled={guardandoActualizacion}>{guardandoActualizacion?'Guardando...':'Guardar'}</button></div></div></div>}
+      {modalActualizar&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Registrar actualización</div><div className={styles.modalSub}><b>{modalActualizar.vehiculos?.marca_modelo}</b> — {modalActualizar.vehiculos?.clientes?.nombre}</div><div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}><div className={styles.formGroup}><label>Tipo</label><select value={formActualizar.tipo} onChange={e=>setFormActualizar({...formActualizar,tipo:e.target.value})}><option value="estado">Actualización de estado</option><option value="prueba">En prueba</option><option value="motor">Arreglo de motor</option><option value="terceros">Esperando a terceros</option><option value="repuestos">Esperando repuestos</option><option value="aprobacion">Esperando aprobación del cliente</option><option value="elevador">Esperando mecánico/elevador</option><option value="taller">Cambio de taller</option></select></div>{formActualizar.tipo==='taller'&&<div className={styles.formGroup}><label>Mover a</label><select value={formActualizar.taller_nuevo} onChange={e=>setFormActualizar({...formActualizar,taller_nuevo:e.target.value})}><option>Malvinas 2084</option><option>Malvinas 3906</option></select></div>}<div className={styles.formGroup}><label>Descripción</label><textarea value={formActualizar.descripcion} onChange={e=>setFormActualizar({...formActualizar,descripcion:e.target.value})} placeholder="Detallá la actualización..."/></div></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalActualizar(null)}>Cancelar</button><button className={styles.btnSuccess} onClick={guardarActualizacion} disabled={guardandoActualizacion}>{guardandoActualizacion?'Guardando...':'Guardar'}</button></div></div></div>}
+
+      {modalEditarFecha&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Editar hora de la actualización</div><div className={styles.modalSub}>{modalEditarFecha.descripcion}</div><div className={styles.formGroup} style={{marginTop:'1rem'}}><label>Fecha y hora correcta</label><input type="datetime-local" value={nuevaFechaHistorial} onChange={e=>setNuevaFechaHistorial(e.target.value)}/></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalEditarFecha(null)}>Cancelar</button><button className={styles.btnPrimary} onClick={guardarFechaHistorial} disabled={guardandoFechaHistorial}>{guardandoFechaHistorial?'Guardando...':'Guardar'}</button></div></div></div>}
 
       {modalRepuesto&&admin&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Agregar repuesto</div><div className={styles.modalSub}><b>{modalRepuesto.vehiculos?.marca_modelo}</b> — {modalRepuesto.vehiculos?.clientes?.nombre}</div><div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}><div className={styles.formGroup}><label>Repuesto *</label><input value={formRepuesto.nombre} onChange={e=>setFormRepuesto({...formRepuesto,nombre:e.target.value})} placeholder="Ej: Filtro de aceite..."/></div><div className={styles.formGrid}><div className={styles.formGroup}><label>Valor ($)</label><input value={formRepuesto.valor} onChange={e=>setFormRepuesto({...formRepuesto,valor:formatNum(e.target.value)})} placeholder="0"/></div><div className={styles.formGroup}><label>Fecha</label><input type="date" value={formRepuesto.fecha} onChange={e=>setFormRepuesto({...formRepuesto,fecha:e.target.value})}/></div></div><div className={styles.formGroup}><label>Lugar</label><input value={formRepuesto.lugar} onChange={e=>setFormRepuesto({...formRepuesto,lugar:e.target.value})} placeholder="Ej: Casa del repuesto..."/></div></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalRepuesto(null)}>Cancelar</button><button className={styles.btnPrimary} onClick={guardarRepuesto} disabled={guardandoRepuesto}>{guardandoRepuesto?'Guardando...':'Agregar'}</button></div></div></div>}
 
@@ -1261,6 +1361,7 @@ return (
         {[
           {id:'dashboard',label:'Dashboard'},
           {id:'plandia',label:'📋 Plan del día'},
+          {id:'tiempos',label:'⏱️ Control de tiempos'},
           {id:'clientes',label:'Clientes'},
           ...(admin?[{id:'turnos',label:'📅 Turnos'}]:[]),
           ...(admin?[{id:'nuevo',label:'Nuevo cliente'}]:[]),
@@ -1283,6 +1384,46 @@ return (
       </div>
 
       <div className={styles.main}>
+
+        {seccion==='tiempos'&&admin&&(
+          <div>
+            <div className={styles.topBar}>
+              <h1 className={styles.pageTitle}>⏱️ Control de tiempos</h1>
+              <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+                <input type="month" value={mesTiempos} onChange={e=>setMesTiempos(e.target.value)} style={{padding:'8px 12px',borderRadius:'6px',border:'1px solid #CBD5E0',fontSize:'13px',fontFamily:'inherit'}}/>
+                <button style={{padding:'8px 16px',borderRadius:'6px',fontSize:'13px',cursor:'pointer',background:'#15803D',color:'#fff',border:'none',fontFamily:'inherit',fontWeight:'600'}} onClick={exportarTiemposExcel}>📊 Exportar a Excel</button>
+              </div>
+            </div>
+            <div className={styles.divider}></div>
+
+            <div className={styles.stats} style={{marginBottom:'1rem'}}>
+              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{tiemposDelMes.eficiencia}%</div><div className={styles.statL}>Eficiencia de flujo</div></div>
+              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{tiemposDelMes.tiempoMuertoProm}h</div><div className={styles.statL}>Tiempo muerto prom.</div></div>
+              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{fontSize:'15px'}}>{tiemposDelMes.motivoGeneral?tiemposDelMes.motivoGeneral[0]:'—'}</div><div className={styles.statL}>Motivo principal</div></div>
+            </div>
+
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>¿Dónde se van las horas este mes?</div>
+              {Object.keys(tiemposDelMes.totalesPorCategoria).length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
+              {Object.entries(tiemposDelMes.totalesPorCategoria).sort((a,b)=>b[1]-a[1]).map(([cat,horas])=>{
+                const max=Math.max(...Object.values(tiemposDelMes.totalesPorCategoria),1)
+                const esMuerta=CATEGORIAS_MUERTAS.includes(cat)
+                return(
+                  <div key={cat} style={{marginBottom:'10px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',marginBottom:'3px'}}><span>{cat}</span><span style={{fontFamily:'monospace'}}>{Math.round(horas)}h</span></div>
+                    <div style={{height:'8px',background:'#F1F5F9',borderRadius:'4px'}}><div style={{width:`${(horas/max)*100}%`,height:'100%',background:esMuerta?'#DC2626':'#2563EB',borderRadius:'4px'}}></div></div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Detalle por vehículo</div>
+              {tiemposDelMes.porTrabajo.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
+              {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id} onClick={()=>verDetalle(trabajo)}><td><b>{trabajo.vehiculos?.marca_modelo}</b></td><td>{trabajo.vehiculos?.clientes?.nombre}</td><td style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td style={{fontFamily:'monospace'}}>{Math.round(totalHoras)}h</td></tr>))}</tbody></table>}
+            </div>
+          </div>
+        )}
 
         {seccion==='plandia'&&(
           <div>
@@ -1646,7 +1787,7 @@ return (
             <div className={styles.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}><div className={styles.cardTitle} style={{margin:0}}>Repuestos</div>{admin&&repuestos.length>0&&<button className={styles.btn} style={{fontSize:'12px',padding:'4px 10px'}} onClick={()=>imprimirRepuestos(clienteDetalle,repuestos)}>🖨️ Imprimir</button>}</div>{repuestos.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin repuestos registrados</div>}{repuestos.length>0&&<table className={styles.table}><thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th>{admin&&<th></th>}</tr></thead><tbody>{repuestos.map(r=>(<tr key={r.id}><td>{r.nombre}</td><td>${formatPeso(r.valor)}</td><td>{r.lugar||'—'}</td><td style={{fontSize:'12px',color:'#718096'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>{admin&&<td style={{display:'flex',gap:'4px',cursor:'default'}}><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:formatNum(r.valor.toString()),lugar:r.lugar||'',fecha:r.fecha});setModalEditarRepuesto(true)}}>✏️</button><button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>borrarRepuesto(r)}>🗑️</button></td>}</tr>))}<tr><td style={{fontWeight:'700',color:'#2D3748'}}>Total</td><td style={{fontWeight:'700',color:'#16A34A'}}>${formatPeso(repuestos.reduce((a,r)=>a+Number(r.valor),0))}</td><td colSpan={admin?3:2}></td></tr></tbody></table>}</div>
             {admin&&<div className={styles.card}><div className={styles.cardTitle}>Presupuestos</div>{presupuestosDetalle.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin presupuestos guardados para este vehículo</div>}{presupuestosDetalle.length>0&&<table className={styles.table}><thead><tr><th>N°</th><th>Fecha</th><th>Total aprox.</th><th></th></tr></thead><tbody>{presupuestosDetalle.map(p=>(<tr key={p.id}><td style={{fontFamily:'monospace',fontSize:'12px'}}>{p.numero}</td><td style={{fontSize:'12px',color:'#718096'}}>{p.fecha?new Date(p.fecha+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td><td>${formatPeso(totalAproxPresupuesto(p))}</td><td><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{abrirPresupuesto(p);setSeccion('presupuesto')}}>Ver / Editar</button></td></tr>))}</tbody></table>}</div>}
             <div className={styles.card}><div className={styles.cardTitle}>Checklists</div>{checklistsDetalle.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin checklists hechos para este vehículo</div>}{checklistsDetalle.length>0&&<table className={styles.table}><thead><tr><th>Tipo</th><th>Fecha</th><th>Mecánico</th><th></th></tr></thead><tbody>{checklistsDetalle.map(ch=>(<tr key={ch.id}><td><span className={badgeClass()} style={{background:(ch.tipo||'entrega')==='inyectores'?'#EFF6FF':'#F7FAFC',color:(ch.tipo||'entrega')==='inyectores'?'#2563EB':'#4A5568'}}>{CHECKLIST_TITULO_POR_TIPO[ch.tipo||'entrega'].replace('Checklist de ','')}</span></td><td style={{fontSize:'12px',color:'#718096'}}>{ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td><td style={{fontWeight:'600'}}>{ch.mecanico||'—'}</td><td><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>setChecklistActivo(ch)}>Ver</button></td></tr>))}</tbody></table>}</div>
-            <div className={styles.card}><div className={styles.cardTitle}>Historial</div>{historial.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin historial todavía</div>}{historial.map(h=>(<div key={h.id} className={styles.histItem}><span className={styles.histIcon}>{tipoHistorial[h.tipo]||'⚪'}</span><div style={{flex:1}}><div style={{fontSize:'13px',color:'#2D3748'}}>{h.descripcion}</div><div style={{fontSize:'11px',color:'#718096',marginTop:'2px'}}>{new Date(h.fecha).toLocaleString('es-AR')}</div></div></div>))}</div>
+            <div className={styles.card}><div className={styles.cardTitle}>Historial</div>{historial.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin historial todavía</div>}{historial.map(h=>(<div key={h.id} className={styles.histItem}><span className={styles.histIcon}>{tipoHistorial[h.tipo]||'⚪'}</span><div style={{flex:1}}><div style={{fontSize:'13px',color:'#2D3748'}}>{h.descripcion}</div><div style={{fontSize:'11px',color:'#718096',marginTop:'2px'}}>{new Date(h.fecha).toLocaleString('es-AR')}</div></div>{admin&&h._origen==='actualizaciones'&&<button className={styles.btnEdit} style={{fontSize:'10px',padding:'3px 7px'}} onClick={()=>abrirEditarFechaHistorial(h)}>✏️ Hora</button>}</div>))}</div>
             <div className={styles.card}><div className={styles.cardTitle}>Fotos del vehículo</div><input type="file" accept="image/*" multiple ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>{admin&&<button className={styles.btnPrimary} onClick={()=>fileRef.current.click()} style={{marginBottom:'1rem'}}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{fotos.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/><button style={{position:'absolute',bottom:'4px',left:'4px',fontSize:'11px',padding:'3px 7px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>enviarFotoWsp(clienteDetalle,f.url)}>💬</button>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFoto(f)}>✕</button>}</div>)}{fotos.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div></div>
           </div>
         )}
