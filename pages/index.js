@@ -26,6 +26,8 @@ function diasDesde(fecha){ return Math.floor((new Date() - new Date(fecha)) / (1
 
 const CATEGORIA_POR_TIPO = {
   ingreso:'Diagnóstico sin iniciar',
+  diagnostico:'Diagnóstico',
+  reparacion:'Reparación',
   estado:'En proceso',
   prueba:'En prueba',
   motor:'Arreglo de motor',
@@ -53,6 +55,31 @@ function calcularTiemposTrabajo(trabajo, actualizacionesTrabajo){
     categorias[cat]=(categorias[cat]||0)+horas
   }
   return categorias
+}
+
+// para un tipo de evento puntual (diagnostico, reparacion) con mecánico asignado, calcula cantidad y horas promedio por mecánico
+// para cada actualización que tenga mecánico asignado (cualquier categoría), calcula cantidad y horas promedio por mecánico + categoría
+function calcularStatsMecanicoGeneral(trabajosDelMes, actualizacionesRaw){
+  const stats={}
+  trabajosDelMes.forEach(t=>{
+    const eventos=[{tipo:'ingreso',fecha:t.fecha_ingreso},...actualizacionesRaw.filter(a=>a.trabajo_id===t.id)]
+      .filter(e=>e.fecha).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha))
+    const fin=t.fecha_salida?new Date(t.fecha_salida):new Date()
+    for(let i=0;i<eventos.length;i++){
+      if(eventos[i].mecanico){
+        const inicio=new Date(eventos[i].fecha)
+        const finSeg=i+1<eventos.length?new Date(eventos[i+1].fecha):fin
+        const horas=Math.max(0,(finSeg-inicio)/(1000*60*60))
+        const m=eventos[i].mecanico
+        const cat=CATEGORIA_POR_TIPO[eventos[i].tipo]||'Otro'
+        const clave=`${m}|${cat}`
+        if(!stats[clave])stats[clave]={mecanico:m,categoria:cat,cantidad:0,horas:0}
+        stats[clave].cantidad++
+        stats[clave].horas+=horas
+      }
+    }
+  })
+  return Object.values(stats).map(s=>({...s,horasPromedio:Math.round(s.horas/s.cantidad)})).sort((a,b)=>a.mecanico.localeCompare(b.mecanico)||b.cantidad-a.cantidad)
 }
 
 // redimensiona y comprime una foto en el navegador antes de subirla, para no llenar el storage con fotos de celular sin comprimir
@@ -377,7 +404,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [modalWsp, setModalWsp] = useState(null)
   const [msgWsp, setMsgWsp] = useState('')
   const [formRepuesto, setFormRepuesto] = useState({nombre:'',valor:'',lugar:'',fecha:new Date().toISOString().split('T')[0]})
-  const [formActualizar, setFormActualizar] = useState({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'})
+  const [formActualizar, setFormActualizar] = useState({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906',mecanico:''})
   const [subiendo, setSubiendo] = useState(false)
   const [presupuesto, setPresupuesto] = useState({
     numero:'001-00001', fecha:new Date().toISOString().split('T')[0],
@@ -511,7 +538,7 @@ export default function Home({ rol, cerrarSesion }) {
   }
 
   async function cargarActualizacionesGlobal(){
-    const{data}=await supabase.from('actualizaciones').select('trabajo_id, fecha, tipo')
+    const{data}=await supabase.from('actualizaciones').select('trabajo_id, fecha, tipo, mecanico')
     setActualizacionesRaw(data||[])
   }
 
@@ -1068,9 +1095,12 @@ export default function Home({ rol, cerrarSesion }) {
     else if(tipo==='repuestos')desc=`Esperando repuestos. ${desc}`
     else if(tipo==='aprobacion')desc=`Esperando aprobación del cliente. ${desc}`
     else if(tipo==='elevador')desc=`Esperando mecánico/elevador. ${desc}`
-    await supabase.from('actualizaciones').insert({trabajo_id:t.id,tipo,descripcion:desc})
+    else if(tipo==='diagnostico')desc=`Diagnóstico iniciado. ${desc}`
+    else if(tipo==='reparacion')desc=`Reparación iniciada. ${desc}`
+    if(formActualizar.mecanico)desc=`${desc} (${formActualizar.mecanico})`
+    await supabase.from('actualizaciones').insert({trabajo_id:t.id,tipo,descripcion:desc,mecanico:formActualizar.mecanico||null})
     setModalActualizar(null)
-    setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906'})
+    setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906',mecanico:''})
     await cargarTrabajos()
     await cargarActualizacionesGlobal()
     if(clienteDetalle?.id===t.id){await cargarHistorial(t.vehiculos?.id);await cargarRepuestos(t.id)}
@@ -1193,7 +1223,7 @@ export default function Home({ rol, cerrarSesion }) {
   const stats={total:clientes.length,enTaller:trabajosActivos.length,listos:trabajosVivos.filter(t=>t.estado==='Listo').length,salidos:trabajosEntregados.length}
   const listaVistaStats={enTaller:trabajosVivos.filter(t=>t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),listos:trabajosVivos.filter(t=>t.estado==='Listo').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),salidos:trabajosEntregados}
   const titulosVistaStats={enTaller:'Autos en taller',listos:'Listos para entregar',salidos:'Vehículos entregados'}
-  const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠',motor:'🔧',terceros:'⏳',repuestos:'📦',aprobacion:'✍️',elevador:'🅿️'}
+  const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠',motor:'🔧',terceros:'⏳',repuestos:'📦',aprobacion:'✍️',elevador:'🅿️',diagnostico:'🔍',reparacion:'🛠️'}
   const trabajosTaller=tallerVista?trabajosVivos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)):[]
   const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)):[]
   const ultimaActualizacionPorTrabajo=(()=>{
@@ -1254,7 +1284,8 @@ export default function Home({ rol, cerrarSesion }) {
     const eficiencia=horasTotales>0?Math.round(((horasTotales-horasMuertas)/horasTotales)*100):0
     const tiempoMuertoProm=porTrabajo.length>0?Math.round(horasMuertas/porTrabajo.length):0
     const motivoGeneral=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)).sort((a,b)=>b[1]-a[1])[0]
-    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral,excluidos:excluidosDelMes}
+    const statsPorMecanico=calcularStatsMecanicoGeneral(trabajosDelMes,actualizacionesRaw)
+    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral,excluidos:excluidosDelMes,statsPorMecanico}
   })()
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
@@ -1315,7 +1346,7 @@ return (
 
       {modalEditar&&admin&&<div className={styles.modalOverlay}><div className={styles.modal} style={{width:'100%',maxWidth:'520px',maxHeight:'80vh',overflowY:'auto'}}><div className={styles.modalTitle}>Editar cliente</div><div style={{marginTop:'1rem'}}><div className={styles.cardTitle}>Datos del cliente</div><div className={styles.formGrid} style={{marginBottom:'1rem'}}><div className={styles.formGroup}><label>Nombre</label><input value={formEditar.nombre||''} onChange={e=>setFormEditar({...formEditar,nombre:e.target.value})}/></div><div className={styles.formGroup}><label>Teléfono</label><input value={formEditar.telefono||''} onChange={e=>setFormEditar({...formEditar,telefono:e.target.value})}/></div><div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Email</label><input value={formEditar.email||''} onChange={e=>setFormEditar({...formEditar,email:e.target.value})}/></div></div><div className={styles.cardTitle}>Datos del vehículo</div><div className={styles.formGrid} style={{marginBottom:'1rem'}}><div className={styles.formGroup}><label>Modelo</label><input value={formEditar.marca_modelo||''} onChange={e=>setFormEditar({...formEditar,marca_modelo:e.target.value})}/></div><div className={styles.formGroup}><label>Patente</label><input value={formEditar.patente||''} onChange={e=>setFormEditar({...formEditar,patente:e.target.value})}/></div><div className={styles.formGroup}><label>Año</label><input value={formEditar.anio||''} onChange={e=>setFormEditar({...formEditar,anio:e.target.value})}/></div><div className={styles.formGroup}><label>Km</label><input value={formEditar.kilometraje||''} onChange={e=>setFormEditar({...formEditar,kilometraje:e.target.value})}/></div><div className={styles.formGroup}><label>Color</label><input value={formEditar.color||''} onChange={e=>setFormEditar({...formEditar,color:e.target.value})}/></div><div className={styles.formGroup}><label>Llegó en grúa</label><select value={formEditar.llego_en_grua?'si':'no'} onChange={e=>setFormEditar({...formEditar,llego_en_grua:e.target.value==='si'})}><option value="no">No — Andando</option><option value="si">Sí — En grúa</option></select></div><div className={styles.formGroup}><label>Tiene seguro</label><select value={formEditar.tiene_seguro?'si':'no'} onChange={e=>setFormEditar({...formEditar,tiene_seguro:e.target.value==='si'})}><option value="no">No</option><option value="si">Sí</option></select></div><div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Motivo</label><textarea value={formEditar.motivo||''} onChange={e=>setFormEditar({...formEditar,motivo:e.target.value})}/></div><div className={styles.formGroup}><label>Mecánico</label><input value={formEditar.mecanico||''} onChange={e=>setFormEditar({...formEditar,mecanico:e.target.value})}/></div><div className={styles.formGroup}><label>Estado</label><select value={formEditar.estado||''} onChange={e=>setFormEditar({...formEditar,estado:e.target.value})}><option>Diagnóstico</option><option>En proceso</option><option>En espera</option><option>Desarmando</option><option>Listo</option><option>Salio</option></select></div><div className={styles.formGroup}><label>Taller</label><select value={formEditar.taller||''} onChange={e=>setFormEditar({...formEditar,taller:e.target.value})}><option>Malvinas 2084</option><option>Malvinas 3906</option></select></div></div></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalEditar(null)}>Cancelar</button><button className={styles.btnPrimary} onClick={guardarEdicion} disabled={guardandoEdicion}>{guardandoEdicion?'Guardando...':'Guardar cambios'}</button></div></div></div>}
 
-      {modalActualizar&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Registrar actualización</div><div className={styles.modalSub}><b>{modalActualizar.vehiculos?.marca_modelo}</b> — {modalActualizar.vehiculos?.clientes?.nombre}</div><div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}><div className={styles.formGroup}><label>Tipo</label><select value={formActualizar.tipo} onChange={e=>setFormActualizar({...formActualizar,tipo:e.target.value})}><option value="estado">Actualización de estado</option><option value="prueba">En prueba</option><option value="motor">Arreglo de motor</option><option value="terceros">Esperando a terceros</option><option value="repuestos">Esperando repuestos</option><option value="aprobacion">Esperando aprobación del cliente</option><option value="elevador">Esperando mecánico/elevador</option><option value="taller">Cambio de taller</option></select></div>{formActualizar.tipo==='taller'&&<div className={styles.formGroup}><label>Mover a</label><select value={formActualizar.taller_nuevo} onChange={e=>setFormActualizar({...formActualizar,taller_nuevo:e.target.value})}><option>Malvinas 2084</option><option>Malvinas 3906</option></select></div>}<div className={styles.formGroup}><label>Descripción</label><textarea value={formActualizar.descripcion} onChange={e=>setFormActualizar({...formActualizar,descripcion:e.target.value})} placeholder="Detallá la actualización..."/></div></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalActualizar(null)}>Cancelar</button><button className={styles.btnSuccess} onClick={guardarActualizacion} disabled={guardandoActualizacion}>{guardandoActualizacion?'Guardando...':'Guardar'}</button></div></div></div>}
+      {modalActualizar&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Registrar actualización</div><div className={styles.modalSub}><b>{modalActualizar.vehiculos?.marca_modelo}</b> — {modalActualizar.vehiculos?.clientes?.nombre}</div><div style={{marginTop:'1rem',display:'flex',flexDirection:'column',gap:'10px'}}><div className={styles.formGroup}><label>Categoría</label><select value={formActualizar.tipo} onChange={e=>setFormActualizar({...formActualizar,tipo:e.target.value})}><option value="diagnostico">Diagnóstico iniciado</option><option value="reparacion">Reparación iniciada</option><option value="estado">Actualización de estado</option><option value="prueba">En prueba</option><option value="motor">Arreglo de motor</option><option value="terceros">Esperando a terceros</option><option value="repuestos">Esperando repuestos</option><option value="aprobacion">Esperando aprobación del cliente</option><option value="elevador">Esperando mecánico/elevador</option><option value="taller">Cambio de taller</option></select></div><div className={styles.formGroup}><label>Mecánico (opcional)</label><select value={formActualizar.mecanico} onChange={e=>setFormActualizar({...formActualizar,mecanico:e.target.value})}><option value="">— Sin asignar —</option>{mecanicos.map(m=><option key={m.id} value={m.nombre}>{m.nombre}</option>)}</select></div>{formActualizar.tipo==='taller'&&<div className={styles.formGroup}><label>Mover a</label><select value={formActualizar.taller_nuevo} onChange={e=>setFormActualizar({...formActualizar,taller_nuevo:e.target.value})}><option>Malvinas 2084</option><option>Malvinas 3906</option></select></div>}<div className={styles.formGroup}><label>Descripción</label><textarea value={formActualizar.descripcion} onChange={e=>setFormActualizar({...formActualizar,descripcion:e.target.value})} placeholder="Detallá la actualización..."/></div></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalActualizar(null)}>Cancelar</button><button className={styles.btnSuccess} onClick={guardarActualizacion} disabled={guardandoActualizacion}>{guardandoActualizacion?'Guardando...':'Guardar'}</button></div></div></div>}
 
       {modalEditarFecha&&<div className={styles.modalOverlay}><div className={styles.modal}><div className={styles.modalTitle}>Editar hora de la actualización</div><div className={styles.modalSub}>{modalEditarFecha.descripcion}</div><div className={styles.formGroup} style={{marginTop:'1rem'}}><label>Fecha y hora correcta</label><input type="datetime-local" value={nuevaFechaHistorial} onChange={e=>setNuevaFechaHistorial(e.target.value)}/></div><div className={styles.modalActions}><button className={styles.btn} onClick={()=>setModalEditarFecha(null)}>Cancelar</button><button className={styles.btnPrimary} onClick={guardarFechaHistorial} disabled={guardandoFechaHistorial}>{guardandoFechaHistorial?'Guardando...':'Guardar'}</button></div></div></div>}
 
@@ -1436,6 +1467,12 @@ return (
                 )
               })}
             </div>
+
+            {tiemposDelMes.statsPorMecanico.length>0&&<div className={styles.card}>
+              <div className={styles.cardTitle}>Tiempo por mecánico</div>
+              <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Cada fila es una categoría que un mecánico tuvo asignada, con cuántas veces y cuánto tardó en promedio.</div>
+              <table className={styles.table}><thead><tr><th>Mecánico</th><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsPorMecanico.map(s=>(<tr key={s.mecanico+s.categoria}><td><b>{s.mecanico}</b></td><td>{s.categoria}</td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{s.horasPromedio}h</td></tr>))}</tbody></table>
+            </div>}
 
             <div className={styles.card}>
               <div className={styles.cardTitle}>Detalle por vehículo</div>
