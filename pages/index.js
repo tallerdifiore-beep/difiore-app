@@ -373,6 +373,8 @@ export default function Home({ rol, cerrarSesion }) {
   const [mesTiempos, setMesTiempos] = useState(new Date().toISOString().slice(0,7))
   const [umbralEstancados, setUmbralEstancados] = useState(UMBRAL_ESTANCADOS_DEFAULT)
   const [editandoUmbral, setEditandoUmbral] = useState(false)
+  const [mostrarExcluidosEstancados, setMostrarExcluidosEstancados] = useState(false)
+  const [mostrarExcluidosTiempos, setMostrarExcluidosTiempos] = useState(false)
   const [umbralTemp, setUmbralTemp] = useState('')
   const [diaSeleccionado, setDiaSeleccionado] = useState(null)
   const [mesCalendario, setMesCalendario] = useState(new Date())
@@ -1507,9 +1509,14 @@ return (
             </div>
 
             {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
-              <div className={styles.cardTitle}>Excluidos del cálculo este mes</div>
-              <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico de arriba.</div>
-              <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosTiempos(v=>!v)}>
+                <div className={styles.cardTitle} style={{margin:0}}>Excluidos del cálculo este mes ({tiemposDelMes.excluidos.length})</div>
+                <span style={{fontSize:'12px',color:'#718096'}}>{mostrarExcluidosTiempos?'▲ Ocultar':'▼ Ver'}</span>
+              </div>
+              {mostrarExcluidosTiempos&&<>
+                <div style={{fontSize:'12px',color:'#A0AEC0',margin:'10px 0'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico de arriba.</div>
+                <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
+              </>}
             </div>}
           </div>
         )}
@@ -1579,9 +1586,14 @@ return (
 
         {seccion==='dashboard'&&!tallerVista&&vistaStats==='estancados'&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVistaStats(null)}>← Volver</button><h1 className={styles.pageTitle}>⚠️ Vehículos estancados (+{umbralEstancados} días sin cambiar de estado)</h1>{!editandoUmbral?<button className={styles.btn} onClick={()=>{setUmbralTemp(String(umbralEstancados));setEditandoUmbral(true)}}>⚙️ Cambiar umbral</button>:<div style={{display:'flex',gap:'6px',alignItems:'center'}}><input type="number" min="1" value={umbralTemp} onChange={e=>setUmbralTemp(e.target.value)} style={{width:'60px',padding:'6px 8px',borderRadius:'6px',border:'1px solid #CBD5E0',fontSize:'13px',fontFamily:'inherit'}}/><span style={{fontSize:'12px',color:'#718096'}}>días</span><button className={styles.btnPrimary} style={{fontSize:'12px',padding:'6px 12px'}} onClick={guardarUmbralEstancados}>Guardar</button><button className={styles.btn} style={{fontSize:'12px',padding:'6px 12px'}} onClick={()=>setEditandoUmbral(false)}>Cancelar</button></div>}</div><div className={styles.divider}></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Días</th><th></th></tr></thead><tbody>{trabajosEstancados.map((t,i)=><tr key={t.id}><td style={{color:'#A0AEC0'}}>{i+1}</td><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.patente}</td><td onClick={()=>verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td><td onClick={()=>verDetalle(t)} style={{fontWeight:'700',color:'#DC2626'}}>{diasDesde(fechaReferenciaEstancado(t))} días</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirEstancados(t)}>🚫 Excluir</button></td></tr>)}{trabajosEstancados.length===0&&<tr><td colSpan="7" style={{textAlign:'center',color:'#A0AEC0',padding:'2rem'}}>Ningún vehículo estancado 🎉</td></tr>}</tbody></table></div>
         {estancadosExcluidos.length>0&&<div className={styles.card} style={{marginTop:'1rem'}}>
-          <div className={styles.cardTitle}>Excluidos de la alerta</div>
-          <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Estos vehículos llevan más de {umbralEstancados} días sin cambiar de estado, pero elegiste no contarlos.</div>
-          <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Días</th><th></th></tr></thead><tbody>{estancadosExcluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(t)} style={{color:'#718096'}}>{diasDesde(fechaReferenciaEstancado(t))} días</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirEstancados(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosEstancados(v=>!v)}>
+            <div className={styles.cardTitle} style={{margin:0}}>Excluidos de la alerta ({estancadosExcluidos.length})</div>
+            <span style={{fontSize:'12px',color:'#718096'}}>{mostrarExcluidosEstancados?'▲ Ocultar':'▼ Ver'}</span>
+          </div>
+          {mostrarExcluidosEstancados&&<>
+            <div style={{fontSize:'12px',color:'#A0AEC0',margin:'10px 0'}}>Estos vehículos llevan más de {umbralEstancados} días sin cambiar de estado, pero elegiste no contarlos.</div>
+            <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Días</th><th></th></tr></thead><tbody>{estancadosExcluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(t)} style={{color:'#718096'}}>{diasDesde(fechaReferenciaEstancado(t))} días</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirEstancados(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
+          </>}
         </div>}
         </div>)}
 
