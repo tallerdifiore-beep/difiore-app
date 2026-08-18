@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import '../styles/globals.css'
-
 const LOGO_URL = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/assets/ChatGPT%20Image%2017%20jul%202026,%2015_11_05.png'
 
 export default function App({ Component, pageProps }) {
@@ -8,11 +7,19 @@ export default function App({ Component, pageProps }) {
   const [rol, setRol] = useState(null)
   const [pass, setPass] = useState('')
   const [error, setError] = useState('')
+  const [mayusActivo, setMayusActivo] = useState(false)
+  const [verPass, setVerPass] = useState(false)
 
   useEffect(() => {
     const r = sessionStorage.getItem('rol')
     if (r) { setRol(r); setAutenticado(true) }
   }, [])
+
+  function revisarMayus(e) {
+    if (typeof e.getModifierState === 'function') {
+      setMayusActivo(e.getModifierState('CapsLock'))
+    }
+  }
 
   function login(e) {
     e.preventDefault()
@@ -24,6 +31,7 @@ export default function App({ Component, pageProps }) {
       setRol('empleado'); setAutenticado(true); setError('')
     } else {
       setError('Contraseña incorrecta')
+      setPass('')
     }
   }
 
@@ -44,15 +52,28 @@ export default function App({ Component, pageProps }) {
         <form onSubmit={login}>
           <div style={{marginBottom:'1rem'}}>
             <label style={{fontSize:'11px',color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.5px',fontWeight:'600',display:'block',marginBottom:'6px'}}>Contraseña</label>
-            <input
-              type="password"
-              value={pass}
-              onChange={e => setPass(e.target.value)}
-              placeholder="Ingresá tu contraseña"
-              autoFocus
-              style={{width:'100%',padding:'10px 14px',borderRadius:'8px',border:'1px solid #2D3748',background:'#0F1117',color:'#F1F5F9',fontSize:'14px',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
-            />
+            <div style={{position:'relative'}}>
+              <input
+                type={verPass ? 'text' : 'password'}
+                value={pass}
+                onChange={e => setPass(e.target.value)}
+                onKeyDown={revisarMayus}
+                onKeyUp={revisarMayus}
+                placeholder="Ingresá tu contraseña"
+                autoFocus
+                style={{width:'100%',padding:'10px 42px 10px 14px',borderRadius:'8px',border:'1px solid #2D3748',background:'#0F1117',color:'#F1F5F9',fontSize:'14px',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
+              />
+              <button
+                type="button"
+                onClick={() => setVerPass(v => !v)}
+                style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#64748B',padding:'4px',lineHeight:1}}
+                tabIndex={-1}
+              >
+                {verPass ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
+          {mayusActivo && <div style={{color:'#FBBF24',fontSize:'12px',marginBottom:'12px',textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>⚠️ Bloq Mayús activado</div>}
           {error && <div style={{color:'#F87171',fontSize:'13px',marginBottom:'12px',textAlign:'center'}}>{error}</div>}
           <button type="submit" style={{width:'100%',padding:'11px',borderRadius:'8px',background:'#2563EB',color:'#fff',border:'none',fontSize:'14px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit'}}>
             Ingresar
@@ -61,6 +82,5 @@ export default function App({ Component, pageProps }) {
       </div>
     </div>
   )
-
   return <Component {...pageProps} rol={rol} cerrarSesion={cerrarSesion} />
 }
