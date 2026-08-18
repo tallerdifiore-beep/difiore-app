@@ -1148,6 +1148,11 @@ export default function Home({ rol, cerrarSesion }) {
     XLSX.writeFile(libro,`informe-difiore-${nombreMes.replace(' ','-')}.xlsx`)
   }
 
+  async function toggleExcluirTiempos(trabajo){
+    await supabase.from('trabajos').update({excluir_tiempos:!trabajo.excluir_tiempos}).eq('id',trabajo.id)
+    await cargarTrabajos()
+  }
+
   function exportarTiemposExcel(){
     const todasCategorias=Object.keys(CATEGORIA_POR_TIPO).map(k=>CATEGORIA_POR_TIPO[k]).filter((v,i,arr)=>arr.indexOf(v)===i)
     const hojaDetalle=XLSX.utils.json_to_sheet(tiemposDelMes.porTrabajo.map(({trabajo,categorias,totalHoras,motivoPrincipal})=>{
@@ -1217,7 +1222,8 @@ export default function Home({ rol, cerrarSesion }) {
   })()
 
   const tiemposDelMes=(()=>{
-    const trabajosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos)
+    const trabajosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos&&!t.excluir_tiempos)
+    const excluidosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos&&t.excluir_tiempos)
     const porTrabajo=trabajosDelMes.map(t=>{
       const eventos=actualizacionesRaw.filter(a=>a.trabajo_id===t.id)
       const categorias=calcularTiemposTrabajo(t,eventos)
@@ -1234,7 +1240,7 @@ export default function Home({ rol, cerrarSesion }) {
     const eficiencia=horasTotales>0?Math.round(((horasTotales-horasMuertas)/horasTotales)*100):0
     const tiempoMuertoProm=porTrabajo.length>0?Math.round(horasMuertas/porTrabajo.length):0
     const motivoGeneral=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)).sort((a,b)=>b[1]-a[1])[0]
-    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral}
+    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral,excluidos:excluidosDelMes}
   })()
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
@@ -1420,8 +1426,14 @@ return (
             <div className={styles.card}>
               <div className={styles.cardTitle}>Detalle por vehículo</div>
               {tiemposDelMes.porTrabajo.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
-              {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id} onClick={()=>verDetalle(trabajo)}><td><b>{trabajo.vehiculos?.marca_modelo}</b></td><td>{trabajo.vehiculos?.clientes?.nombre}</td><td style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td style={{fontFamily:'monospace'}}>{Math.round(totalHoras)}h</td></tr>))}</tbody></table>}
+              {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id}><td onClick={()=>verDetalle(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>verDetalle(trabajo)} style={{fontFamily:'monospace'}}>{Math.round(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>))}</tbody></table>}
             </div>
+
+            {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
+              <div className={styles.cardTitle}>Excluidos del cálculo este mes</div>
+              <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico de arriba.</div>
+              <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
+            </div>}
           </div>
         )}
 
