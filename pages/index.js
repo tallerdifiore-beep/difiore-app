@@ -1167,12 +1167,14 @@ export default function Home({ rol, cerrarSesion }) {
     else if(tipo==='diagnostico')desc=`Diagnóstico iniciado. ${desc}`
     else if(tipo==='reparacion')desc=`Reparación iniciada. ${desc}`
     if(formActualizar.mecanico)desc=`${desc} (${formActualizar.mecanico})`
-    await supabase.from('actualizaciones').insert({trabajo_id:t.id,tipo,descripcion:desc,mecanico:formActualizar.mecanico||null})
+    const{error}=await supabase.from('actualizaciones').insert({trabajo_id:t.id,tipo,descripcion:desc,mecanico:formActualizar.mecanico||null,fecha:new Date().toISOString()})
+    if(error){avisar('No se pudo registrar: '+error.message,'error');setGuardandoActualizacion(false);return}
     setModalActualizar(null)
     setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906',mecanico:''})
     await cargarTrabajos()
     await cargarActualizacionesGlobal()
     if(clienteDetalle?.id===t.id){await cargarHistorial(t.vehiculos?.id);await cargarRepuestos(t.id)}
+    avisar('Actualización registrada','exito')
     setGuardandoActualizacion(false)
   }
 
