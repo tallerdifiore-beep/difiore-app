@@ -24,6 +24,29 @@ function formatNumeroFicha(ultimoUsado) { return 'C-' + String((ultimoUsado||0)+
 const UMBRAL_ESTANCADOS_DEFAULT = 2
 function diasDesde(fecha){ return Math.floor((new Date() - new Date(fecha)) / (1000*60*60*24)) }
 
+// Argentina no tiene horario de verano (siempre UTC-3), así que fijamos el offset a mano en vez de
+// confiar en el huso horario configurado en cada dispositivo — así la hora sale bien sin importar
+// cómo esté configurado el celu o la compu que use cada uno.
+function datetimeLocalAFechaISO(str){
+  if(!str) return null
+  return new Date(str+':00-03:00').toISOString()
+}
+function fechaISOAInputLocal(iso){
+  if(!iso) return ''
+  const ms=new Date(iso).getTime()-3*60*60*1000
+  const d=new Date(ms)
+  const pad=n=>String(n).padStart(2,'0')
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+}
+function formatFechaAR(iso,conHora){
+  if(!iso) return '—'
+  const ms=new Date(iso).getTime()-3*60*60*1000
+  const d=new Date(ms)
+  const pad=n=>String(n).padStart(2,'0')
+  const fecha=`${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)}/${d.getUTCFullYear()}`
+  return conHora?`${fecha} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`:fecha
+}
+
 const CATEGORIA_POR_TIPO = {
   ingreso:'Diagnóstico sin iniciar',
   diagnostico:'Diagnóstico',
@@ -1027,7 +1050,7 @@ export default function Home({ rol, cerrarSesion }) {
     if(guardandoReingreso) return // ya se está guardando, ignorar clics extra
     setGuardandoReingreso(true)
     const trabajo=modalReingreso
-    const fechaIngreso=formReingreso.fecha_ingreso_manual?new Date(formReingreso.fecha_ingreso_manual).toISOString():new Date().toISOString()
+    const fechaIngreso=formReingreso.fecha_ingreso_manual?datetimeLocalAFechaISO(formReingreso.fecha_ingreso_manual):new Date().toISOString()
     const{data:nt}=await supabase.from('trabajos').insert({vehiculo_id:trabajo.vehiculos?.id,motivo:formReingreso.motivo,estado:formReingreso.estado,mecanico:formReingreso.mecanico,taller:formReingreso.taller,llego_en_grua:formReingreso.llego_en_grua,tiene_seguro:trabajo.tiene_seguro,fecha_ingreso:fechaIngreso}).select('*, vehiculos(*, clientes(*))').single()
     if(nt){await agregarHistorial(nt.id,'reingreso',`Reingreso al taller ${formReingreso.taller}. Motivo: ${formReingreso.motivo}`,fechaIngreso);await agregarHistorial(nt.id,'estado',`Historial anterior conservado (trabajo N° ${trabajo.id.slice(0,8)}).`)}
     setModalReingreso(null)
@@ -1046,7 +1069,7 @@ export default function Home({ rol, cerrarSesion }) {
     if(errC){setMensaje('Error al guardar cliente');setGuardandoCliente(false);return}
     const{data:vehiculo,error:errV}=await supabase.from('vehiculos').insert({cliente_id:cliente.id,marca_modelo:form.marca_modelo,patente:form.patente,anio:form.anio,kilometraje:form.kilometraje,color:form.color}).select().single()
     if(errV){setMensaje('Error al guardar vehículo');setGuardandoCliente(false);return}
-    const fechaIngreso=form.fecha_ingreso_manual?new Date(form.fecha_ingreso_manual).toISOString():new Date().toISOString()
+    const fechaIngreso=form.fecha_ingreso_manual?datetimeLocalAFechaISO(form.fecha_ingreso_manual):new Date().toISOString()
     const{data:trabajo}=await supabase.from('trabajos').insert({vehiculo_id:vehiculo.id,motivo:form.motivo,estado:form.estado,mecanico:form.mecanico,taller:form.taller,llego_en_grua:form.llego_en_grua,tiene_seguro:form.tiene_seguro,fecha_ingreso:fechaIngreso}).select('*, vehiculos(*, clientes(*))').single()
     if(fotoNuevo.length>0&&trabajo)for(const f of fotoNuevo){const url=await subirFotoStorage(f,trabajo.id);if(url)await supabase.from('fotos').insert({trabajo_id:trabajo.id,url})}
     await agregarHistorial(trabajo.id,'ingreso',`Ingresó al taller ${form.taller} ${form.llego_en_grua?'(en grúa)':'(andando)'}. Seguro: ${form.tiene_seguro?'Sí':'No'}. Motivo: ${form.motivo}`,fechaIngreso)
@@ -1111,7 +1134,7 @@ export default function Home({ rol, cerrarSesion }) {
     if(guardandoEdicion) return
     setGuardandoEdicion(true)
     const ant=formEditar.taller_anterior,nvo=formEditar.taller
-    const nuevaFechaIngreso=formEditar.fecha_ingreso?new Date(formEditar.fecha_ingreso).toISOString():null
+    const nuevaFechaIngreso=formEditar.fecha_ingreso?datetimeLocalAFechaISO(formEditar.fecha_ingreso):null
     await supabase.from('clientes').update({nombre:formEditar.nombre,telefono:formEditar.telefono,email:formEditar.email}).eq('id',formEditar.cliente_id)
     await supabase.from('vehiculos').update({marca_modelo:formEditar.marca_modelo,patente:formEditar.patente,anio:formEditar.anio,kilometraje:formEditar.kilometraje,color:formEditar.color}).eq('id',formEditar.vehiculo_id)
     const datosTrabajo={motivo:formEditar.motivo,estado:formEditar.estado,mecanico:formEditar.mecanico,taller:formEditar.taller,llego_en_grua:formEditar.llego_en_grua,tiene_seguro:formEditar.tiene_seguro}
@@ -1154,10 +1177,7 @@ export default function Home({ rol, cerrarSesion }) {
   }
 
   function abrirEditarFechaHistorial(item){
-    const d=new Date(item.fecha)
-    const pad=n=>String(n).padStart(2,'0')
-    const local=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-    setNuevaFechaHistorial(local)
+    setNuevaFechaHistorial(fechaISOAInputLocal(item.fecha))
     setModalEditarFecha(item)
   }
 
@@ -1165,7 +1185,7 @@ export default function Home({ rol, cerrarSesion }) {
     if(guardandoFechaHistorial)return
     if(!nuevaFechaHistorial){avisar('Elegí una fecha y hora','error');return}
     setGuardandoFechaHistorial(true)
-    const{error}=await supabase.from('actualizaciones').update({fecha:new Date(nuevaFechaHistorial).toISOString()}).eq('id',modalEditarFecha.id)
+    const{error}=await supabase.from('actualizaciones').update({fecha:datetimeLocalAFechaISO(nuevaFechaHistorial)}).eq('id',modalEditarFecha.id)
     if(error){avisar('No se pudo guardar: '+error.message,'error');setGuardandoFechaHistorial(false);return}
     setModalEditarFecha(null)
     await cargarActualizacionesGlobal()
@@ -1215,10 +1235,7 @@ export default function Home({ rol, cerrarSesion }) {
   async function borrarFoto(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotos(clienteDetalle.id)}
   function verDetalle(t){setClienteDetalle(t);setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarFotosAnteriores(t.vehiculos?.id,t.id);cargarHistorial(t.vehiculos?.id);cargarRepuestos(t.id);cargarPresupuestosVehiculo(t.vehiculos?.id);cargarChecklistsVehiculo(t.vehiculos?.id)}
   function abrirEditar(t){
-    const d=new Date(t.fecha_ingreso)
-    const pad=n=>String(n).padStart(2,'0')
-    const fechaLocal=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-    setFormEditar({trabajo_id:t.id,cliente_id:t.vehiculos?.clientes?.id,vehiculo_id:t.vehiculos?.id,nombre:t.vehiculos?.clientes?.nombre,telefono:t.vehiculos?.clientes?.telefono,email:t.vehiculos?.clientes?.email,marca_modelo:t.vehiculos?.marca_modelo,patente:t.vehiculos?.patente,anio:t.vehiculos?.anio,kilometraje:t.vehiculos?.kilometraje,color:t.vehiculos?.color,motivo:t.motivo,estado:t.estado,mecanico:t.mecanico,taller:t.taller,taller_anterior:t.taller,llego_en_grua:t.llego_en_grua||false,tiene_seguro:t.tiene_seguro||false,fecha_ingreso:fechaLocal})
+    setFormEditar({trabajo_id:t.id,cliente_id:t.vehiculos?.clientes?.id,vehiculo_id:t.vehiculos?.id,nombre:t.vehiculos?.clientes?.nombre,telefono:t.vehiculos?.clientes?.telefono,email:t.vehiculos?.clientes?.email,marca_modelo:t.vehiculos?.marca_modelo,patente:t.vehiculos?.patente,anio:t.vehiculos?.anio,kilometraje:t.vehiculos?.kilometraje,color:t.vehiculos?.color,motivo:t.motivo,estado:t.estado,mecanico:t.mecanico,taller:t.taller,taller_anterior:t.taller,llego_en_grua:t.llego_en_grua||false,tiene_seguro:t.tiene_seguro||false,fecha_ingreso:fechaISOAInputLocal(t.fecha_ingreso)})
     setModalEditar(true)
   }
   function badgeClass(e){if(e==='Listo')return styles.badgeGreen;if(e==='En proceso')return styles.badgeAmber;if(e==='En espera')return styles.badgeBlue;if(e==='Desarmando')return styles.badgeRed;if(e==='Salio')return styles.badgeGray;return styles.badgeGray}
@@ -1925,12 +1942,12 @@ return (
             <div className={styles.detailHeader}><div className={styles.detailAvatar}>{clienteDetalle.vehiculos?.clientes?.nombre?.charAt(0)}</div><div style={{flex:1}}><div className={styles.detailNombre}>{clienteDetalle.vehiculos?.clientes?.nombre}</div><div className={styles.detailSub}>{clienteDetalle.vehiculos?.clientes?.telefono} · {clienteDetalle.llego_en_grua?'Llegó en grúa':'Llegó andando'} · {clienteDetalle.tiene_seguro?'🛡️ Con seguro':'Sin seguro'} · N° {clienteDetalle.vehiculos?.clientes?.numero_ficha||'—'}</div></div><span className={badgeClass(clienteDetalle.estado)}>{clienteDetalle.estado}</span></div>
             <div className={styles.detGrid}>
               <div className={styles.card}><div className={styles.cardTitle}>Vehículo</div>{[['Modelo',clienteDetalle.vehiculos?.marca_modelo],['Patente',clienteDetalle.vehiculos?.patente],['Color',clienteDetalle.vehiculos?.color],['Año',clienteDetalle.vehiculos?.anio],['Km',clienteDetalle.vehiculos?.kilometraje],['Mecánico',clienteDetalle.mecanico],['Taller',clienteDetalle.taller],['Seguro',clienteDetalle.tiene_seguro?'Sí':'No']].map(([k,v])=><div key={k} className={styles.detRow}><span className={styles.detLabel}>{k}</span><span className={styles.detVal}>{v||'—'}</span></div>)}</div>
-              <div className={styles.card}><div className={styles.cardTitle}>Trabajo</div><p className={styles.detText}>{clienteDetalle.motivo||'Sin descripción'}</p><div className={styles.detFecha}>Ingresó: {new Date(clienteDetalle.fecha_ingreso).toLocaleDateString('es-AR')}</div>{clienteDetalle.fecha_salida&&<div className={styles.detFecha}>Salió: {new Date(clienteDetalle.fecha_salida).toLocaleDateString('es-AR')}</div>}{clienteDetalle.observacion_final&&<div className={styles.detText} style={{marginTop:'8px'}}><b>Obs. final:</b> {clienteDetalle.observacion_final}</div>}</div>
+              <div className={styles.card}><div className={styles.cardTitle}>Trabajo</div><p className={styles.detText}>{clienteDetalle.motivo||'Sin descripción'}</p><div className={styles.detFecha}>Ingresó: {formatFechaAR(clienteDetalle.fecha_ingreso,true)}</div>{clienteDetalle.fecha_salida&&<div className={styles.detFecha}>Salió: {formatFechaAR(clienteDetalle.fecha_salida,true)}</div>}{clienteDetalle.observacion_final&&<div className={styles.detText} style={{marginTop:'8px'}}><b>Obs. final:</b> {clienteDetalle.observacion_final}</div>}</div>
             </div>
             <div className={styles.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}><div className={styles.cardTitle} style={{margin:0}}>Repuestos</div>{admin&&repuestos.length>0&&<button className={styles.btn} style={{fontSize:'12px',padding:'4px 10px'}} onClick={()=>imprimirRepuestos(clienteDetalle,repuestos)}>🖨️ Imprimir</button>}</div>{repuestos.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin repuestos registrados</div>}{repuestos.length>0&&<table className={styles.table}><thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th>{admin&&<th></th>}</tr></thead><tbody>{repuestos.map(r=>(<tr key={r.id}><td>{r.nombre}</td><td>${formatPeso(r.valor)}</td><td>{r.lugar||'—'}</td><td style={{fontSize:'12px',color:'#718096'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>{admin&&<td style={{display:'flex',gap:'4px',cursor:'default'}}><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:formatNum(r.valor.toString()),lugar:r.lugar||'',fecha:r.fecha});setModalEditarRepuesto(true)}}>✏️</button><button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>borrarRepuesto(r)}>🗑️</button></td>}</tr>))}<tr><td style={{fontWeight:'700',color:'#2D3748'}}>Total</td><td style={{fontWeight:'700',color:'#16A34A'}}>${formatPeso(repuestos.reduce((a,r)=>a+Number(r.valor),0))}</td><td colSpan={admin?3:2}></td></tr></tbody></table>}</div>
             {admin&&<div className={styles.card}><div className={styles.cardTitle}>Presupuestos</div>{presupuestosDetalle.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin presupuestos guardados para este vehículo</div>}{presupuestosDetalle.length>0&&<table className={styles.table}><thead><tr><th>N°</th><th>Fecha</th><th>Total aprox.</th><th></th></tr></thead><tbody>{presupuestosDetalle.map(p=>(<tr key={p.id}><td style={{fontFamily:'monospace',fontSize:'12px'}}>{p.numero}</td><td style={{fontSize:'12px',color:'#718096'}}>{p.fecha?new Date(p.fecha+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td><td>${formatPeso(totalAproxPresupuesto(p))}</td><td><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{abrirPresupuesto(p);setSeccion('presupuesto')}}>Ver / Editar</button></td></tr>))}</tbody></table>}</div>}
             <div className={styles.card}><div className={styles.cardTitle}>Checklists</div>{checklistsDetalle.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin checklists hechos para este vehículo</div>}{checklistsDetalle.length>0&&<table className={styles.table}><thead><tr><th>Tipo</th><th>Fecha</th><th>Mecánico</th><th></th></tr></thead><tbody>{checklistsDetalle.map(ch=>(<tr key={ch.id}><td><span className={badgeClass()} style={{background:(ch.tipo||'entrega')==='inyectores'?'#EFF6FF':'#F7FAFC',color:(ch.tipo||'entrega')==='inyectores'?'#2563EB':'#4A5568'}}>{CHECKLIST_TITULO_POR_TIPO[ch.tipo||'entrega'].replace('Checklist de ','')}</span></td><td style={{fontSize:'12px',color:'#718096'}}>{ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td><td style={{fontWeight:'600'}}>{ch.mecanico||'—'}</td><td><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>setChecklistActivo(ch)}>Ver</button></td></tr>))}</tbody></table>}</div>
-            <div className={styles.card}><div className={styles.cardTitle}>Historial</div>{historial.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin historial todavía</div>}{historial.map(h=>(<div key={h.id} className={styles.histItem}><span className={styles.histIcon}>{tipoHistorial[h.tipo]||'⚪'}</span><div style={{flex:1}}><div style={{fontSize:'13px',color:'#2D3748'}}>{h.descripcion}</div><div style={{fontSize:'11px',color:'#718096',marginTop:'2px'}}>{new Date(h.fecha).toLocaleString('es-AR')}</div></div>{admin&&h._origen==='actualizaciones'&&<button className={styles.btnEdit} style={{fontSize:'10px',padding:'3px 7px'}} onClick={()=>abrirEditarFechaHistorial(h)}>✏️ Hora</button>}{admin&&h._origen==='actualizaciones'&&<button className={styles.btnDelete} style={{fontSize:'10px',padding:'3px 7px',marginLeft:'4px'}} onClick={()=>borrarActualizacion(h)}>🗑️</button>}</div>))}</div>
+            <div className={styles.card}><div className={styles.cardTitle}>Historial</div>{historial.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin historial todavía</div>}{historial.map(h=>(<div key={h.id} className={styles.histItem}><span className={styles.histIcon}>{tipoHistorial[h.tipo]||'⚪'}</span><div style={{flex:1}}><div style={{fontSize:'13px',color:'#2D3748'}}>{h.descripcion}</div><div style={{fontSize:'11px',color:'#718096',marginTop:'2px'}}>{formatFechaAR(h.fecha,true)}</div></div>{admin&&h._origen==='actualizaciones'&&<button className={styles.btnEdit} style={{fontSize:'10px',padding:'3px 7px'}} onClick={()=>abrirEditarFechaHistorial(h)}>✏️ Hora</button>}{admin&&h._origen==='actualizaciones'&&<button className={styles.btnDelete} style={{fontSize:'10px',padding:'3px 7px',marginLeft:'4px'}} onClick={()=>borrarActualizacion(h)}>🗑️</button>}</div>))}</div>
             <div className={styles.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><div className={styles.cardTitle} style={{margin:0}}>Fotos del vehículo</div>{fotosAnteriores.length>0&&<button className={styles.btn} style={{fontSize:'12px',padding:'6px 12px'}} onClick={()=>setModalFotosAnteriores(true)}>📷 Ver fotos de ingresos anteriores ({fotosAnteriores.length})</button>}</div><input type="file" accept="image/*" multiple ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>{admin&&<button className={styles.btnPrimary} onClick={()=>fileRef.current.click()} style={{marginTop:'1rem',marginBottom:'1rem'}}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{fotos.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/><button style={{position:'absolute',bottom:'4px',left:'4px',fontSize:'11px',padding:'3px 7px',background:'#DCFCE7',color:'#16A34A',border:'1px solid #86EFAC',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>enviarFotoWsp(clienteDetalle,f.url)}>💬</button>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFoto(f)}>✕</button>}</div>)}{fotos.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div></div>
           </div>
         )}
