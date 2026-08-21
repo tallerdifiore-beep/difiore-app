@@ -23,6 +23,11 @@ function formatNumeroFicha(ultimoUsado) { return 'C-' + String((ultimoUsado||0)+
 
 const UMBRAL_ESTANCADOS_DEFAULT = 2
 function diasDesde(fecha){ return Math.floor((new Date() - new Date(fecha)) / (1000*60*60*24)) }
+// redondea a la media hora más cercana (0, 0.5, 1, 1.5...) y muestra sin decimales de más
+function formatHoras(h){
+  const redondeado=Math.ceil((h||0)*2)/2
+  return redondeado%1===0?String(redondeado):redondeado.toFixed(1)
+}
 
 // Argentina no tiene horario de verano (siempre UTC-3), así que fijamos el offset a mano en vez de
 // confiar en el huso horario configurado en cada dispositivo — así la hora sale bien sin importar
@@ -139,7 +144,7 @@ function calcularStatsMecanicoGeneral(trabajosDelMes, actualizacionesRaw){
       }
     }
   })
-  return Object.values(stats).map(s=>({...s,horasPromedio:Math.round(s.horas/s.cantidad)})).sort((a,b)=>a.mecanico.localeCompare(b.mecanico)||b.cantidad-a.cantidad)
+  return Object.values(stats).map(s=>({...s,horasPromedio:Math.ceil((s.horas/s.cantidad)*2)/2})).sort((a,b)=>a.mecanico.localeCompare(b.mecanico)||b.cantidad-a.cantidad)
 }
 
 // redimensiona y comprime una foto en el navegador antes de subirla, para no llenar el storage con fotos de celular sin comprimir
@@ -1586,9 +1591,9 @@ return (
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{tiemposDelMes.tiempoMuertoProm}h</div><div className={styles.statL}>Tiempo muerto prom.</div></div>
               <div className={styles.stat} style={{cursor:'default'}}>
                 <div className={styles.statN} style={{fontSize:'15px'}}>{tiemposDelMes.motivoGeneral?`${tiemposDelMes.motivoGeneral[0]} ${Math.round((tiemposDelMes.motivoGeneral[1]/(tiemposDelMes.horasMuertasSinCerrado||1))*100)}%`:'—'}</div>
-                <div className={styles.statL}>Motivo principal{tiemposDelMes.motivoGeneral&&<span style={{display:'block',fontSize:'11px',color:'#A0AEC0',marginTop:'2px'}}>({Math.round(tiemposDelMes.motivoGeneral[1])}hs de {Math.round(tiemposDelMes.horasMuertasSinCerrado)}hs, sin contar taller cerrado)</span>}</div>
+                <div className={styles.statL}>Motivo principal{tiemposDelMes.motivoGeneral&&<span style={{display:'block',fontSize:'11px',color:'#A0AEC0',marginTop:'2px'}}>({formatHoras(tiemposDelMes.motivoGeneral[1])}hs de {formatHoras(tiemposDelMes.horasMuertasSinCerrado)}hs, sin contar taller cerrado)</span>}</div>
               </div>
-              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{color:'#DC2626'}}>{Math.round(tiemposDelMes.horasClientes)}h</div><div className={styles.statL}>👤 Perdidas por clientes</div></div>
+              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{color:'#DC2626'}}>{formatHoras(tiemposDelMes.horasClientes)}h</div><div className={styles.statL}>👤 Perdidas por clientes</div></div>
             </div>
 
             <div className={styles.card}>
@@ -1599,7 +1604,7 @@ return (
                 const esMuerta=CATEGORIAS_MUERTAS.includes(cat)
                 return(
                   <div key={cat} style={{marginBottom:'10px'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',marginBottom:'3px'}}><span>{cat}</span><span style={{fontFamily:'monospace'}}>{Math.round(horas)}h</span></div>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',marginBottom:'3px'}}><span>{cat}</span><span style={{fontFamily:'monospace'}}>{formatHoras(horas)}h</span></div>
                     <div style={{height:'8px',background:'#F1F5F9',borderRadius:'4px'}}><div style={{width:`${(horas/max)*100}%`,height:'100%',background:esMuerta?'#DC2626':'#2563EB',borderRadius:'4px'}}></div></div>
                   </div>
                 )
@@ -1609,19 +1614,19 @@ return (
             {tiemposDelMes.statsPorMecanico.length>0&&<div className={styles.card}>
               <div className={styles.cardTitle}>Tiempo por mecánico</div>
               <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Cada fila es una categoría que un mecánico tuvo asignada, con cuántas veces y cuánto tardó en promedio.</div>
-              <table className={styles.table}><thead><tr><th>Mecánico</th><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsPorMecanico.map(s=>(<tr key={s.mecanico+s.categoria}><td><b>{s.mecanico}</b></td><td>{s.categoria}</td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{s.horasPromedio}h</td></tr>))}</tbody></table>
+              <table className={styles.table}><thead><tr><th>Mecánico</th><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsPorMecanico.map(s=>(<tr key={s.mecanico+s.categoria}><td><b>{s.mecanico}</b></td><td>{s.categoria}</td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{formatHoras(s.horasPromedio)}h</td></tr>))}</tbody></table>
             </div>}
 
             {tiemposDelMes.statsOficina.length>0&&<div className={styles.card}>
               <div className={styles.cardTitle}>🏢 Oficina</div>
               <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Tareas asignadas a "Oficina" en vez de a un mecánico puntual (ej: comprar repuestos).</div>
-              <table className={styles.table}><thead><tr><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsOficina.map(s=>(<tr key={s.categoria}><td><b>{s.categoria}</b></td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{s.horasPromedio}h</td></tr>))}</tbody></table>
+              <table className={styles.table}><thead><tr><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsOficina.map(s=>(<tr key={s.categoria}><td><b>{s.categoria}</b></td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{formatHoras(s.horasPromedio)}h</td></tr>))}</tbody></table>
             </div>}
 
             <div className={styles.card}>
               <div className={styles.cardTitle}>Detalle por vehículo</div>
               {tiemposDelMes.porTrabajo.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
-              {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id}><td onClick={()=>verDetalle(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>verDetalle(trabajo)} style={{fontFamily:'monospace'}}>{Math.round(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>))}</tbody></table>}
+              {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id}><td onClick={()=>verDetalle(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>verDetalle(trabajo)} style={{fontFamily:'monospace'}}>{formatHoras(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>))}</tbody></table>}
             </div>
 
             {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
