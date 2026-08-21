@@ -68,10 +68,34 @@ const CATEGORIA_POR_TIPO = {
   aprobacion:'Esperando aprobación del cliente',
   elevador:'Esperando mecánico/elevador',
 }
-const CATEGORIAS_MUERTAS = ['Diagnóstico sin iniciar','Esperando a terceros','Esperando repuestos','Esperando aprobación del cliente','Esperando mecánico/elevador','Esperando pago de repuestos','Esperando que vayan a comprar repuestos','Esperando inicio de reparación','Tiempo perdido por mal pedido de repuestos']
+const CATEGORIAS_MUERTAS = ['Diagnóstico sin iniciar','Esperando a terceros','Esperando repuestos','Esperando aprobación del cliente','Esperando mecánico/elevador','Esperando pago de repuestos','Esperando que vayan a comprar repuestos','Esperando inicio de reparación','Tiempo perdido por mal pedido de repuestos','Taller cerrado']
 const CATEGORIAS_CLIENTE = ['Esperando aprobación del cliente','Esperando pago de repuestos']
 
 // calcula, para un trabajo, cuántas horas pasó en cada categoría, a partir del ingreso, cada actualización, y la salida (o ahora si sigue en curso)
+const HORARIO_APERTURA_HORA=8, HORARIO_APERTURA_MIN=30, HORARIO_CIERRE=18
+const DIAS_LABORALES=[1,2,3,4,5] // lunes a viernes (0=domingo, 6=sábado)
+
+// separa las horas entre dos fechas en "laborales" (dentro del horario del taller) y "no laborales" (de noche o fin de semana)
+function horasLaboralesEntre(inicio,fin){
+  let laborales=0
+  let cursor=new Date(inicio.getTime()-3*60*60*1000) // pasamos a hora Argentina para que los límites de día caigan bien
+  const finAR=new Date(fin.getTime()-3*60*60*1000)
+  const inicioAR=new Date(inicio.getTime()-3*60*60*1000)
+  while(cursor<finAR){
+    const diaSemana=cursor.getUTCDay()
+    const inicioDiaLaboral=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth(),cursor.getUTCDate(),HORARIO_APERTURA_HORA,HORARIO_APERTURA_MIN,0))
+    const finDiaLaboral=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth(),cursor.getUTCDate(),HORARIO_CIERRE,0,0))
+    if(DIAS_LABORALES.includes(diaSemana)){
+      const inicioEfectivo=cursor>inicioDiaLaboral?cursor:inicioDiaLaboral
+      const finEfectivo=finAR<finDiaLaboral?finAR:finDiaLaboral
+      if(inicioEfectivo<finEfectivo)laborales+=(finEfectivo-inicioEfectivo)/(1000*60*60)
+    }
+    cursor=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth(),cursor.getUTCDate()+1,0,0,0))
+  }
+  const totalHoras=(finAR-inicioAR)/(1000*60*60)
+  return{laborales:Math.max(0,laborales),noLaborales:Math.max(0,totalHoras-laborales)}
+}
+
 function calcularTiemposTrabajo(trabajo, actualizacionesTrabajo){
   const eventos=[{tipo:'ingreso',fecha:trabajo.fecha_ingreso},...actualizacionesTrabajo]
     .filter(e=>e.fecha)
@@ -81,9 +105,11 @@ function calcularTiemposTrabajo(trabajo, actualizacionesTrabajo){
   for(let i=0;i<eventos.length;i++){
     const inicio=new Date(eventos[i].fecha)
     const finSeg=i+1<eventos.length?new Date(eventos[i+1].fecha):fin
-    const horas=Math.max(0,(finSeg-inicio)/(1000*60*60))
+    if(finSeg<=inicio)continue
+    const{laborales,noLaborales}=horasLaboralesEntre(inicio,finSeg)
     const cat=CATEGORIA_POR_TIPO[eventos[i].tipo]||'Otro'
-    categorias[cat]=(categorias[cat]||0)+horas
+    categorias[cat]=(categorias[cat]||0)+laborales
+    if(noLaborales>0)categorias['Taller cerrado']=(categorias['Taller cerrado']||0)+noLaborales
   }
   return categorias
 }
@@ -1363,7 +1389,7 @@ export default function Home({ rol, cerrarSesion }) {
   },[seccion,reingresosRaw,trabajos])
 
   const tiemposDelMes=useMemo(()=>{
-    if(seccion!=='tiempos')return{porTrabajo:[],totalesPorCategoria:{},eficiencia:0,tiempoMuertoProm:0,motivoGeneral:null,excluidos:[],statsPorMecanico:[],statsOficina:[],horasClientes:0}
+    if(seccion!=='tiempos')return{porTrabajo:[],totalesPorCategoria:{},eficiencia:0,tiempoMuertoProm:0,motivoGeneral:null,excluidos:[],statsPorMecanico:[],statsOficina:[],horasClientes:0,horasMuertas:0}
     const trabajosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos&&!t.excluir_tiempos)
     const excluidosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos&&t.excluir_tiempos)
     const porTrabajo=trabajosDelMes.map(t=>{
@@ -1386,7 +1412,7 @@ export default function Home({ rol, cerrarSesion }) {
     const statsPorMecanicoTodos=calcularStatsMecanicoGeneral(trabajosDelMes,actualizacionesRaw)
     const statsOficina=statsPorMecanicoTodos.filter(s=>s.mecanico==='Oficina')
     const statsPorMecanico=statsPorMecanicoTodos.filter(s=>s.mecanico!=='Oficina')
-    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral,excluidos:excluidosDelMes,statsPorMecanico,statsOficina,horasClientes}
+    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral,excluidos:excluidosDelMes,statsPorMecanico,statsOficina,horasClientes,horasMuertas}
   },[seccion,trabajosVivos,actualizacionesRaw,mesTiempos])
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
@@ -1553,7 +1579,10 @@ return (
             <div className={styles.stats} style={{marginBottom:'1rem'}}>
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{tiemposDelMes.eficiencia}%</div><div className={styles.statL}>Eficiencia de flujo</div></div>
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{tiemposDelMes.tiempoMuertoProm}h</div><div className={styles.statL}>Tiempo muerto prom.</div></div>
-              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{fontSize:'15px'}}>{tiemposDelMes.motivoGeneral?tiemposDelMes.motivoGeneral[0]:'—'}</div><div className={styles.statL}>Motivo principal</div></div>
+              <div className={styles.stat} style={{cursor:'default'}}>
+                <div className={styles.statN} style={{fontSize:'15px'}}>{tiemposDelMes.motivoGeneral?`${tiemposDelMes.motivoGeneral[0]} ${Math.round((tiemposDelMes.motivoGeneral[1]/(tiemposDelMes.horasMuertas||1))*100)}%`:'—'}</div>
+                <div className={styles.statL}>Motivo principal{tiemposDelMes.motivoGeneral&&<span style={{display:'block',fontSize:'11px',color:'#A0AEC0',marginTop:'2px'}}>({Math.round(tiemposDelMes.motivoGeneral[1])}hs de {Math.round(tiemposDelMes.horasMuertas)}hs)</span>}</div>
+              </div>
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{color:'#DC2626'}}>{Math.round(tiemposDelMes.horasClientes)}h</div><div className={styles.statL}>👤 Perdidas por clientes</div></div>
             </div>
 
