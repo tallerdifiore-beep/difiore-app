@@ -440,6 +440,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [mostrarFormTurno, setMostrarFormTurno] = useState(false)
   const [verRecordatorios, setVerRecordatorios] = useState(false)
   const [mesTiempos, setMesTiempos] = useState(new Date().toISOString().slice(0,7))
+  const [vistaTiempos, setVistaTiempos] = useState('motivos')
   const [umbralEstancados, setUmbralEstancados] = useState(UMBRAL_ESTANCADOS_DEFAULT)
   const [editandoUmbral, setEditandoUmbral] = useState(false)
   const [mostrarExcluidosEstancados, setMostrarExcluidosEstancados] = useState(false)
@@ -1401,7 +1402,7 @@ export default function Home({ rol, cerrarSesion }) {
   },[seccion,reingresosRaw,trabajos])
 
   const tiemposDelMes=useMemo(()=>{
-    if(seccion!=='tiempos')return{porTrabajo:[],totalesPorCategoria:{},eficiencia:0,tiempoMuertoProm:0,motivoGeneral:null,excluidos:[],statsPorMecanico:[],statsOficina:[],horasClientes:0,horasMuertas:0,horasMuertasSinCerrado:0}
+    if(seccion!=='tiempos')return{porTrabajo:[],totalesPorCategoria:{},eficiencia:0,tiempoMuertoProm:0,motivoGeneral:null,excluidos:[],statsPorMecanico:[],statsOficina:[],horasClientes:0,horasMuertas:0,horasMuertasSinCerrado:0,porTerceros:[],porCliente:[]}
     const trabajosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos&&!t.excluir_tiempos)
     const excluidosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos&&t.excluir_tiempos)
     const porTrabajo=trabajosDelMes.map(t=>{
@@ -1425,7 +1426,9 @@ export default function Home({ rol, cerrarSesion }) {
     const statsPorMecanicoTodos=calcularStatsMecanicoGeneral(trabajosDelMes,actualizacionesRaw)
     const statsOficina=statsPorMecanicoTodos.filter(s=>s.mecanico==='Oficina')
     const statsPorMecanico=statsPorMecanicoTodos.filter(s=>s.mecanico!=='Oficina')
-    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral,excluidos:excluidosDelMes,statsPorMecanico,statsOficina,horasClientes,horasMuertas,horasMuertasSinCerrado}
+    const porTerceros=porTrabajo.filter(p=>p.categorias['Esperando a terceros']>0).map(p=>({trabajo:p.trabajo,horas:p.categorias['Esperando a terceros']})).sort((a,b)=>b.horas-a.horas)
+    const porCliente=porTrabajo.filter(p=>((p.categorias['Esperando aprobación del cliente']||0)+(p.categorias['Esperando pago de repuestos']||0))>0).map(p=>({trabajo:p.trabajo,horas:(p.categorias['Esperando aprobación del cliente']||0)+(p.categorias['Esperando pago de repuestos']||0)})).sort((a,b)=>b.horas-a.horas)
+    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral,excluidos:excluidosDelMes,statsPorMecanico,statsOficina,horasClientes,horasMuertas,horasMuertasSinCerrado,porTerceros,porCliente}
   },[seccion,trabajosVivos,actualizacionesRaw,mesTiempos])
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
@@ -1599,49 +1602,82 @@ return (
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{color:'#DC2626'}}>{formatHoras(tiemposDelMes.horasClientes)}h</div><div className={styles.statL}>👤 Perdidas por clientes</div></div>
             </div>
 
-            <div className={styles.card}>
-              <div className={styles.cardTitle}>¿Dónde se van las horas este mes?</div>
-              {Object.keys(tiemposDelMes.totalesPorCategoria).length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
-              {Object.entries(tiemposDelMes.totalesPorCategoria).sort((a,b)=>b[1]-a[1]).map(([cat,horas])=>{
-                const max=Math.max(...Object.values(tiemposDelMes.totalesPorCategoria),1)
-                const esMuerta=CATEGORIAS_MUERTAS.includes(cat)
-                return(
-                  <div key={cat} style={{marginBottom:'10px'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',marginBottom:'3px'}}><span>{cat}</span><span style={{fontFamily:'monospace'}}>{formatHoras(horas)}h</span></div>
-                    <div style={{height:'8px',background:'#F1F5F9',borderRadius:'4px'}}><div style={{width:`${(horas/max)*100}%`,height:'100%',background:esMuerta?'#DC2626':'#2563EB',borderRadius:'4px'}}></div></div>
-                  </div>
-                )
-              })}
+            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',borderBottom:'1px solid #E2E8F0',marginBottom:'1rem'}}>
+              {[['motivos','Motivos'],['vehiculo','Por vehículo'],['mecanico','Por mecánico'],['oficina','🏢 Oficina'],['terceros','Por terceros'],['cliente','Por cliente']].map(([id,label])=>(
+                <button key={id} onClick={()=>setVistaTiempos(id)} style={{padding:'8px 14px',fontSize:'13px',fontWeight:vistaTiempos===id?'600':'400',border:'none',background:'none',cursor:'pointer',color:vistaTiempos===id?'#2D3748':'#718096',borderBottom:vistaTiempos===id?'2px solid #2D3748':'2px solid transparent',fontFamily:'inherit'}}>{label}</button>
+              ))}
             </div>
 
-            {tiemposDelMes.statsPorMecanico.length>0&&<div className={styles.card}>
-              <div className={styles.cardTitle}>Tiempo por mecánico</div>
-              <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Cada fila es una categoría que un mecánico tuvo asignada, con cuántas veces y cuánto tardó en promedio.</div>
-              <table className={styles.table}><thead><tr><th>Mecánico</th><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsPorMecanico.map(s=>(<tr key={s.mecanico+s.categoria}><td><b>{s.mecanico}</b></td><td>{s.categoria}</td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{formatHoras(s.horasPromedio)}h</td></tr>))}</tbody></table>
-            </div>}
-
-            {tiemposDelMes.statsOficina.length>0&&<div className={styles.card}>
-              <div className={styles.cardTitle}>🏢 Oficina</div>
-              <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Tareas asignadas a "Oficina" en vez de a un mecánico puntual (ej: comprar repuestos).</div>
-              <table className={styles.table}><thead><tr><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsOficina.map(s=>(<tr key={s.categoria}><td><b>{s.categoria}</b></td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{formatHoras(s.horasPromedio)}h</td></tr>))}</tbody></table>
-            </div>}
-
-            <div className={styles.card}>
-              <div className={styles.cardTitle}>Detalle por vehículo</div>
-              {tiemposDelMes.porTrabajo.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
-              {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id}><td onClick={()=>verDetalle(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>verDetalle(trabajo)} style={{fontFamily:'monospace'}}>{formatHoras(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>))}</tbody></table>}
-            </div>
-
-            {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosTiempos(v=>!v)}>
-                <div className={styles.cardTitle} style={{margin:0}}>Excluidos del cálculo este mes ({tiemposDelMes.excluidos.length})</div>
-                <span style={{fontSize:'12px',color:'#718096'}}>{mostrarExcluidosTiempos?'▲ Ocultar':'▼ Ver'}</span>
+            {vistaTiempos==='motivos'&&(
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>¿Dónde se van las horas este mes?</div>
+                {Object.keys(tiemposDelMes.totalesPorCategoria).length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
+                {Object.entries(tiemposDelMes.totalesPorCategoria).sort((a,b)=>b[1]-a[1]).map(([cat,horas])=>{
+                  const max=Math.max(...Object.values(tiemposDelMes.totalesPorCategoria),1)
+                  const esMuerta=CATEGORIAS_MUERTAS.includes(cat)
+                  return(
+                    <div key={cat} style={{marginBottom:'10px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',marginBottom:'3px'}}><span>{cat}</span><span style={{fontFamily:'monospace'}}>{formatHoras(horas)}h</span></div>
+                      <div style={{height:'8px',background:'#F1F5F9',borderRadius:'4px'}}><div style={{width:`${(horas/max)*100}%`,height:'100%',background:esMuerta?'#DC2626':'#2563EB',borderRadius:'4px'}}></div></div>
+                    </div>
+                  )
+                })}
               </div>
-              {mostrarExcluidosTiempos&&<>
-                <div style={{fontSize:'12px',color:'#A0AEC0',margin:'10px 0'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico de arriba.</div>
-                <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
-              </>}
-            </div>}
+            )}
+
+            {vistaTiempos==='vehiculo'&&(<>
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>Detalle por vehículo</div>
+                {tiemposDelMes.porTrabajo.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
+                {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id}><td onClick={()=>verDetalle(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>verDetalle(trabajo)} style={{fontFamily:'monospace'}}>{formatHoras(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>))}</tbody></table>}
+              </div>
+              {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosTiempos(v=>!v)}>
+                  <div className={styles.cardTitle} style={{margin:0}}>Excluidos del cálculo este mes ({tiemposDelMes.excluidos.length})</div>
+                  <span style={{fontSize:'12px',color:'#718096'}}>{mostrarExcluidosTiempos?'▲ Ocultar':'▼ Ver'}</span>
+                </div>
+                {mostrarExcluidosTiempos&&<>
+                  <div style={{fontSize:'12px',color:'#A0AEC0',margin:'10px 0'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico.</div>
+                  <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
+                </>}
+              </div>}
+            </>)}
+
+            {vistaTiempos==='mecanico'&&(
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>Tiempo por mecánico</div>
+                <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Cada fila es una categoría que un mecánico tuvo asignada, con cuántas veces y cuánto tardó en promedio.</div>
+                {tiemposDelMes.statsPorMecanico.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
+                {tiemposDelMes.statsPorMecanico.length>0&&<table className={styles.table}><thead><tr><th>Mecánico</th><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsPorMecanico.map(s=>(<tr key={s.mecanico+s.categoria}><td><b>{s.mecanico}</b></td><td>{s.categoria}</td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{formatHoras(s.horasPromedio)}h</td></tr>))}</tbody></table>}
+              </div>
+            )}
+
+            {vistaTiempos==='oficina'&&(
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>🏢 Oficina</div>
+                <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Tareas asignadas a "Oficina" en vez de a un mecánico puntual (ej: comprar repuestos).</div>
+                {tiemposDelMes.statsOficina.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
+                {tiemposDelMes.statsOficina.length>0&&<table className={styles.table}><thead><tr><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsOficina.map(s=>(<tr key={s.categoria}><td><b>{s.categoria}</b></td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{formatHoras(s.horasPromedio)}h</td></tr>))}</tbody></table>}
+              </div>
+            )}
+
+            {vistaTiempos==='terceros'&&(
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>Horas perdidas por terceros</div>
+                <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Vehículos con horas en "Esperando a terceros" este mes, de mayor a menor.</div>
+                {tiemposDelMes.porTerceros.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin horas perdidas por terceros este mes 🎉</div>}
+                {tiemposDelMes.porTerceros.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.porTerceros.map(({trabajo,horas})=>(<tr key={trabajo.id} onClick={()=>verDetalle(trabajo)}><td><b>{trabajo.vehiculos?.marca_modelo}</b></td><td>{trabajo.vehiculos?.clientes?.nombre}</td><td style={{fontFamily:'monospace',color:'#DC2626'}}>{formatHoras(horas)}h</td></tr>))}</tbody></table>}
+              </div>
+            )}
+
+            {vistaTiempos==='cliente'&&(
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>👤 Horas perdidas por cliente</div>
+                <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Suma de "esperando aprobación" + "esperando pago de repuestos" por cliente, de mayor a menor.</div>
+                {tiemposDelMes.porCliente.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin horas perdidas por clientes este mes 🎉</div>}
+                {tiemposDelMes.porCliente.length>0&&<table className={styles.table}><thead><tr><th>Cliente</th><th>Vehículo</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.porCliente.map(({trabajo,horas})=>(<tr key={trabajo.id} onClick={()=>verDetalle(trabajo)}><td><b>{trabajo.vehiculos?.clientes?.nombre}</b></td><td>{trabajo.vehiculos?.marca_modelo}</td><td style={{fontFamily:'monospace',color:'#DC2626'}}>{formatHoras(horas)}h</td></tr>))}</tbody></table>}
+              </div>
+            )}
           </div>
         )}
 
