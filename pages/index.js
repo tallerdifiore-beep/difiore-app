@@ -75,7 +75,7 @@ const CATEGORIA_POR_TIPO = {
   aprobacion:'Esperando aprobación del cliente',
   elevador:'Esperando mecánico/elevador',
 }
-const CATEGORIAS_MUERTAS = ['Diagnóstico sin iniciar','Esperando a terceros','Esperando repuestos','Esperando aprobación del cliente','Esperando mecánico/elevador','Esperando pago de repuestos','Esperando que vayan a comprar repuestos','Esperando inicio de reparación','Tiempo perdido por mal pedido de repuestos','Taller cerrado']
+const CATEGORIAS_MUERTAS = ['Diagnóstico sin iniciar','Esperando a terceros','Esperando repuestos','Esperando aprobación del cliente','Esperando mecánico/elevador','Esperando pago de repuestos','Esperando que vayan a comprar repuestos','Esperando inicio de reparación','Tiempo perdido por mal pedido de repuestos']
 const CATEGORIAS_CLIENTE = ['Esperando aprobación del cliente','Esperando pago de repuestos']
 
 // calcula, para un trabajo, cuántas horas pasó en cada categoría, a partir del ingreso, cada actualización, y la salida (o ahora si sigue en curso)
@@ -119,7 +119,7 @@ function calcularTiemposTrabajo(trabajo, actualizacionesTrabajo){
     const siguienteEsTrabajoIniciado=(eventos[i+1]?.tipo==='trabajo_iniciado'||eventos[i+1]?.tipo==='reparacion')&&TIPOS_ELEGIBLES_ESPERANDO_MECANICO.includes(eventos[i].tipo)
     const cat=siguienteEsTrabajoIniciado?'Esperando mecánico/elevador':(CATEGORIA_POR_TIPO[eventos[i].tipo]||'Otro')
     categorias[cat]=(categorias[cat]||0)+laborales
-    if(noLaborales>0)categorias['Taller cerrado']=(categorias['Taller cerrado']||0)+noLaborales
+    // las horas fuera de horario (noLaborales) simplemente no se suman a ninguna categoría — no cuentan como "motivo", solo evitan que se infle otra categoría con la noche/fin de semana
   }
   return categorias
 }
@@ -1597,7 +1597,7 @@ return (
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{tiemposDelMes.tiempoMuertoProm}h</div><div className={styles.statL}>Tiempo muerto prom.</div></div>
               <div className={styles.stat} style={{cursor:'default'}}>
                 <div className={styles.statN} style={{fontSize:'15px'}}>{tiemposDelMes.motivoGeneral?`${tiemposDelMes.motivoGeneral[0]} ${Math.round((tiemposDelMes.motivoGeneral[1]/(tiemposDelMes.horasMuertasSinCerrado||1))*100)}%`:'—'}</div>
-                <div className={styles.statL}>Motivo principal{tiemposDelMes.motivoGeneral&&<span style={{display:'block',fontSize:'11px',color:'#A0AEC0',marginTop:'2px'}}>({formatHoras(tiemposDelMes.motivoGeneral[1])}hs de {formatHoras(tiemposDelMes.horasMuertasSinCerrado)}hs, sin contar taller cerrado)</span>}</div>
+                <div className={styles.statL}>Motivo principal{tiemposDelMes.motivoGeneral&&<span style={{display:'block',fontSize:'11px',color:'#A0AEC0',marginTop:'2px'}}>({formatHoras(tiemposDelMes.motivoGeneral[1])}hs de {formatHoras(tiemposDelMes.horasMuertasSinCerrado)}hs)</span>}</div>
               </div>
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{color:'#DC2626'}}>{formatHoras(tiemposDelMes.horasClientes)}h</div><div className={styles.statL}>👤 Perdidas por clientes</div></div>
             </div>
