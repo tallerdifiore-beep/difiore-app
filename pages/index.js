@@ -1671,10 +1671,17 @@ return (
                 </>):(()=>{
                   const s=tiemposDelMes.statsPorMecanico.find(x=>x.mecanico===mecanicoSeleccionadoTiempos)
                   if(!s)return null
+                  const agrupado={}
+                  s.items.forEach(it=>{
+                    const clave=it.trabajo.id+'|'+it.categoria
+                    if(!agrupado[clave])agrupado[clave]={trabajo:it.trabajo,categoria:it.categoria,horas:0}
+                    agrupado[clave].horas+=it.horas
+                  })
+                  const filas=Object.values(agrupado).sort((a,b)=>b.horas-a.horas)
                   return(<>
                     <div className={styles.cardTitle}>{s.mecanico}</div>
                     <div style={{fontSize:'12px',color:'#718096',marginBottom:'14px'}}>{Object.entries(s.items.reduce((acc,i)=>{acc[i.categoria]=(acc[i.categoria]||0)+i.horas;return acc},{})).map(([cat,h])=>`${formatHoras(h)}h ${cat.toLowerCase()}`).join(' · ')}</div>
-                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{s.items.map((it,i)=><tr key={i} onClick={()=>verDetalle(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
+                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>verDetalle(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
                     <button className={styles.btn} style={{marginTop:'14px'}} onClick={()=>setMecanicoSeleccionadoTiempos(null)}>← Volver a todos</button>
                   </>)
                 })()}
@@ -1686,7 +1693,16 @@ return (
                 <div className={styles.cardTitle}>🏢 Oficina</div>
                 <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Tareas asignadas a "Oficina" en vez de a un mecánico puntual (ej: comprar repuestos).</div>
                 {tiemposDelMes.statsOficina.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
-                {tiemposDelMes.statsOficina.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.statsOficina.flatMap(s=>s.items).sort((a,b)=>b.horas-a.horas).map((it,i)=><tr key={i} onClick={()=>verDetalle(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>}
+                {tiemposDelMes.statsOficina.length>0&&(()=>{
+                  const agrupado={}
+                  tiemposDelMes.statsOficina.flatMap(s=>s.items).forEach(it=>{
+                    const clave=it.trabajo.id+'|'+it.categoria
+                    if(!agrupado[clave])agrupado[clave]={trabajo:it.trabajo,categoria:it.categoria,horas:0}
+                    agrupado[clave].horas+=it.horas
+                  })
+                  const filas=Object.values(agrupado).sort((a,b)=>b.horas-a.horas)
+                  return <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>verDetalle(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
+                })()}
               </div>
             )}
 
