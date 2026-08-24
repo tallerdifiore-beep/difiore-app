@@ -77,6 +77,12 @@ const CATEGORIA_POR_TIPO = {
 }
 const CATEGORIAS_MUERTAS = ['Diagnóstico sin iniciar','Esperando a terceros','Esperando repuestos','Esperando aprobación del cliente','Esperando mecánico/elevador','Esperando pago de repuestos','Esperando que vayan a comprar repuestos','Esperando inicio de reparación','Tiempo perdido por mal pedido de repuestos']
 const CATEGORIAS_CLIENTE = ['Esperando aprobación del cliente','Esperando pago de repuestos']
+const TIPOS_ELEGIBLES_ESPERANDO_MECANICO=['ingreso','estado','elevador','repuestos_llegaron']
+// dado un evento y el que le sigue, devuelve la categoría correcta (con el override de "esperando mecánico" si corresponde)
+function categoriaDeEvento(eventos,i){
+  const siguienteEsTrabajoIniciado=(eventos[i+1]?.tipo==='trabajo_iniciado'||eventos[i+1]?.tipo==='reparacion')&&TIPOS_ELEGIBLES_ESPERANDO_MECANICO.includes(eventos[i].tipo)
+  return siguienteEsTrabajoIniciado?'Esperando mecánico/elevador':(CATEGORIA_POR_TIPO[eventos[i].tipo]||'Otro')
+}
 
 // calcula, para un trabajo, cuántas horas pasó en cada categoría, a partir del ingreso, cada actualización, y la salida (o ahora si sigue en curso)
 const HORARIO_APERTURA_HORA=8, HORARIO_APERTURA_MIN=30, HORARIO_CIERRE=18
@@ -113,13 +119,10 @@ function calcularTiemposTrabajo(trabajo, actualizacionesTrabajo){
     const inicio=new Date(eventos[i].fecha)
     const finSeg=i+1<eventos.length?new Date(eventos[i+1].fecha):fin
     if(finSeg<=inicio)continue
-    const{laborales,noLaborales}=horasLaboralesEntre(inicio,finSeg)
-    // si lo que viene después es "trabajo iniciado", el rato de horario laboral antes de eso cuenta como esperando mecánico
-    const TIPOS_ELEGIBLES_ESPERANDO_MECANICO=['ingreso','estado','elevador','repuestos_llegaron']
-    const siguienteEsTrabajoIniciado=(eventos[i+1]?.tipo==='trabajo_iniciado'||eventos[i+1]?.tipo==='reparacion')&&TIPOS_ELEGIBLES_ESPERANDO_MECANICO.includes(eventos[i].tipo)
-    const cat=siguienteEsTrabajoIniciado?'Esperando mecánico/elevador':(CATEGORIA_POR_TIPO[eventos[i].tipo]||'Otro')
+    const{laborales}=horasLaboralesEntre(inicio,finSeg)
+    const cat=categoriaDeEvento(eventos,i)
     categorias[cat]=(categorias[cat]||0)+laborales
-    // las horas fuera de horario (noLaborales) simplemente no se suman a ninguna categoría — no cuentan como "motivo", solo evitan que se infle otra categoría con la noche/fin de semana
+    // las horas fuera de horario simplemente no se suman a ninguna categoría — no cuentan como "motivo", solo evitan que se infle otra categoría con la noche/fin de semana
   }
   return categorias
 }
@@ -127,26 +130,29 @@ function calcularTiemposTrabajo(trabajo, actualizacionesTrabajo){
 // para un tipo de evento puntual (diagnostico, reparacion) con mecánico asignado, calcula cantidad y horas promedio por mecánico
 // para cada actualización que tenga mecánico asignado (cualquier categoría), calcula cantidad y horas promedio por mecánico + categoría
 function calcularStatsMecanicoGeneral(trabajosDelMes, actualizacionesRaw){
-  const stats={}
+  const porMecanico={}
   trabajosDelMes.forEach(t=>{
     const eventos=[{tipo:'ingreso',fecha:t.fecha_ingreso},...actualizacionesRaw.filter(a=>a.trabajo_id===t.id)]
       .filter(e=>e.fecha).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha))
     const fin=t.fecha_salida?new Date(t.fecha_salida):new Date()
     for(let i=0;i<eventos.length;i++){
-      if(eventos[i].mecanico){
-        const inicio=new Date(eventos[i].fecha)
-        const finSeg=i+1<eventos.length?new Date(eventos[i+1].fecha):fin
-        const horas=Math.max(0,(finSeg-inicio)/(1000*60*60))
-        const m=eventos[i].mecanico
-        const cat=CATEGORIA_POR_TIPO[eventos[i].tipo]||'Otro'
-        const clave=`${m}|${cat}`
-        if(!stats[clave])stats[clave]={mecanico:m,categoria:cat,cantidad:0,horas:0}
-        stats[clave].cantidad++
-        stats[clave].horas+=horas
-      }
+      if(!eventos[i].mecanico)continue
+      const inicio=new Date(eventos[i].fecha)
+      const finSeg=i+1<eventos.length?new Date(eventos[i+1].fecha):fin
+      if(finSeg<=inicio)continue
+      const{laborales}=horasLaboralesEntre(inicio,finSeg)
+      const cat=categoriaDeEvento(eventos,i)
+      const m=eventos[i].mecanico
+      if(!porMecanico[m])porMecanico[m]=[]
+      porMecanico[m].push({trabajo:t,categoria:cat,horas:laborales})
     }
   })
-  return Object.values(stats).map(s=>({...s,horasPromedio:Math.ceil((s.horas/s.cantidad)*2)/2})).sort((a,b)=>a.mecanico.localeCompare(b.mecanico)||b.cantidad-a.cantidad)
+  return Object.entries(porMecanico).map(([mecanico,items])=>({
+    mecanico,
+    cantidad:items.length,
+    horasTotal:items.reduce((a,i)=>a+i.horas,0),
+    items:items.sort((a,b)=>b.horas-a.horas)
+  })).sort((a,b)=>a.mecanico.localeCompare(b.mecanico))
 }
 
 // redimensiona y comprime una foto en el navegador antes de subirla, para no llenar el storage con fotos de celular sin comprimir
@@ -441,6 +447,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [verRecordatorios, setVerRecordatorios] = useState(false)
   const [mesTiempos, setMesTiempos] = useState(new Date().toISOString().slice(0,7))
   const [vistaTiempos, setVistaTiempos] = useState('motivos')
+  const [mecanicoSeleccionadoTiempos, setMecanicoSeleccionadoTiempos] = useState(null)
   const [umbralEstancados, setUmbralEstancados] = useState(UMBRAL_ESTANCADOS_DEFAULT)
   const [editandoUmbral, setEditandoUmbral] = useState(false)
   const [mostrarExcluidosEstancados, setMostrarExcluidosEstancados] = useState(false)
@@ -1610,7 +1617,7 @@ return (
 
             <div style={{display:'flex',gap:'6px',flexWrap:'wrap',borderBottom:'1px solid #E2E8F0',marginBottom:'1rem'}}>
               {[['motivos','Motivos'],['vehiculo','Por vehículo'],['mecanico','Por mecánico'],['oficina','🏢 Oficina'],['terceros','Por terceros'],['cliente','Por cliente']].map(([id,label])=>(
-                <button key={id} onClick={()=>setVistaTiempos(id)} style={{padding:'8px 14px',fontSize:'13px',fontWeight:vistaTiempos===id?'600':'400',border:'none',background:'none',cursor:'pointer',color:vistaTiempos===id?'#2D3748':'#718096',borderBottom:vistaTiempos===id?'2px solid #2D3748':'2px solid transparent',fontFamily:'inherit'}}>{label}</button>
+                <button key={id} onClick={()=>{setVistaTiempos(id);setMecanicoSeleccionadoTiempos(null)}} style={{padding:'8px 14px',fontSize:'13px',fontWeight:vistaTiempos===id?'600':'400',border:'none',background:'none',cursor:'pointer',color:vistaTiempos===id?'#2D3748':'#718096',borderBottom:vistaTiempos===id?'2px solid #2D3748':'2px solid transparent',fontFamily:'inherit'}}>{label}</button>
               ))}
             </div>
 
@@ -1651,10 +1658,26 @@ return (
 
             {vistaTiempos==='mecanico'&&(
               <div className={styles.card}>
-                <div className={styles.cardTitle}>Tiempo por mecánico</div>
-                <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Cada fila es una categoría que un mecánico tuvo asignada, con cuántas veces y cuánto tardó en promedio.</div>
-                {tiemposDelMes.statsPorMecanico.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
-                {tiemposDelMes.statsPorMecanico.length>0&&<table className={styles.table}><thead><tr><th>Mecánico</th><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsPorMecanico.map(s=>(<tr key={s.mecanico+s.categoria}><td><b>{s.mecanico}</b></td><td>{s.categoria}</td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{formatHoras(s.horasPromedio)}h</td></tr>))}</tbody></table>}
+                {!mecanicoSeleccionadoTiempos?(<>
+                  <div className={styles.cardTitle}>Tiempo por mecánico</div>
+                  {tiemposDelMes.statsPorMecanico.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    {tiemposDelMes.statsPorMecanico.map(s=>(
+                      <button key={s.mecanico} onClick={()=>setMecanicoSeleccionadoTiempos(s.mecanico)} style={{padding:'10px 16px',borderRadius:'10px',border:'1px solid #E2E8F0',background:'#F7FAFC',cursor:'pointer',fontFamily:'inherit',fontSize:'13px',fontWeight:'600',color:'#2D3748'}}>
+                        {s.mecanico}<span style={{opacity:.6,fontSize:'11px',marginLeft:'6px',fontWeight:'400'}}>{s.cantidad} registro{s.cantidad===1?'':'s'}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>):(()=>{
+                  const s=tiemposDelMes.statsPorMecanico.find(x=>x.mecanico===mecanicoSeleccionadoTiempos)
+                  if(!s)return null
+                  return(<>
+                    <div className={styles.cardTitle}>{s.mecanico}</div>
+                    <div style={{fontSize:'12px',color:'#718096',marginBottom:'14px'}}>{Object.entries(s.items.reduce((acc,i)=>{acc[i.categoria]=(acc[i.categoria]||0)+i.horas;return acc},{})).map(([cat,h])=>`${formatHoras(h)}h ${cat.toLowerCase()}`).join(' · ')}</div>
+                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{s.items.map((it,i)=><tr key={i} onClick={()=>verDetalle(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
+                    <button className={styles.btn} style={{marginTop:'14px'}} onClick={()=>setMecanicoSeleccionadoTiempos(null)}>← Volver a todos</button>
+                  </>)
+                })()}
               </div>
             )}
 
@@ -1663,7 +1686,7 @@ return (
                 <div className={styles.cardTitle}>🏢 Oficina</div>
                 <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Tareas asignadas a "Oficina" en vez de a un mecánico puntual (ej: comprar repuestos).</div>
                 {tiemposDelMes.statsOficina.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes</div>}
-                {tiemposDelMes.statsOficina.length>0&&<table className={styles.table}><thead><tr><th>Categoría</th><th>Cantidad</th><th>Horas promedio</th></tr></thead><tbody>{tiemposDelMes.statsOficina.map(s=>(<tr key={s.categoria}><td><b>{s.categoria}</b></td><td style={{fontFamily:'monospace'}}>{s.cantidad}</td><td style={{fontFamily:'monospace'}}>{formatHoras(s.horasPromedio)}h</td></tr>))}</tbody></table>}
+                {tiemposDelMes.statsOficina.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.statsOficina.flatMap(s=>s.items).sort((a,b)=>b.horas-a.horas).map((it,i)=><tr key={i} onClick={()=>verDetalle(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>}
               </div>
             )}
 
