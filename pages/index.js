@@ -448,6 +448,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [mesTiempos, setMesTiempos] = useState(new Date().toISOString().slice(0,7))
   const [vistaTiempos, setVistaTiempos] = useState('motivos')
   const [mecanicoSeleccionadoTiempos, setMecanicoSeleccionadoTiempos] = useState(null)
+  const [trabajoSeleccionadoTiempos, setTrabajoSeleccionadoTiempos] = useState(null)
   const [umbralEstancados, setUmbralEstancados] = useState(UMBRAL_ESTANCADOS_DEFAULT)
   const [editandoUmbral, setEditandoUmbral] = useState(false)
   const [mostrarExcluidosEstancados, setMostrarExcluidosEstancados] = useState(false)
@@ -1615,6 +1616,36 @@ return (
               <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{color:'#DC2626'}}>{formatHoras(tiemposDelMes.horasClientes)}h</div><div className={styles.statL}>👤 Perdidas por clientes</div></div>
             </div>
 
+            {trabajoSeleccionadoTiempos?(
+              <div className={styles.card}>
+                {(()=>{
+                  const p=tiemposDelMes.porTrabajo.find(x=>x.trabajo.id===trabajoSeleccionadoTiempos.id)
+                  const mecanicosDeEsteTrabajo=tiemposDelMes.statsPorMecanico.concat(tiemposDelMes.statsOficina).flatMap(s=>s.items.filter(it=>it.trabajo.id===trabajoSeleccionadoTiempos.id).map(it=>({mecanico:s.mecanico,...it})))
+                  return(<>
+                    <div className={styles.cardTitle}>{trabajoSeleccionadoTiempos.vehiculos?.marca_modelo}</div>
+                    <div style={{fontSize:'13px',color:'#718096',marginBottom:'14px'}}>{trabajoSeleccionadoTiempos.vehiculos?.clientes?.nombre} · {trabajoSeleccionadoTiempos.vehiculos?.patente||'—'}</div>
+                    <div style={{fontSize:'12px',fontWeight:'700',color:'#718096',textTransform:'uppercase',marginBottom:'8px'}}>Tiempo por categoría</div>
+                    {p?Object.entries(p.categorias).sort((a,b)=>b[1]-a[1]).map(([cat,horas])=>(
+                      <div key={cat} style={{display:'flex',justifyContent:'space-between',fontSize:'13px',padding:'6px 0',borderBottom:'1px solid #EDF2F7'}}>
+                        <span style={{color:CATEGORIAS_MUERTAS.includes(cat)?'#DC2626':'#2D3748'}}>{cat}</span>
+                        <span style={{fontFamily:'monospace'}}>{formatHoras(horas)}h</span>
+                      </div>
+                    )):<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos este mes para este vehículo</div>}
+                    {mecanicosDeEsteTrabajo.length>0&&<>
+                      <div style={{fontSize:'12px',fontWeight:'700',color:'#718096',textTransform:'uppercase',marginTop:'18px',marginBottom:'8px'}}>Quién trabajó en esto</div>
+                      {mecanicosDeEsteTrabajo.map((it,i)=>(
+                        <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:'13px',padding:'6px 0',borderBottom:'1px solid #EDF2F7'}}>
+                          <span>{it.mecanico==='Oficina'?'🏢 ':'👤 '}{it.mecanico} — {it.categoria}</span>
+                          <span style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</span>
+                        </div>
+                      ))}
+                    </>}
+                    <button className={styles.btn} style={{marginTop:'16px'}} onClick={()=>setTrabajoSeleccionadoTiempos(null)}>← Volver</button>
+                  </>)
+                })()}
+              </div>
+            ):(<>
+
             <div style={{display:'flex',gap:'6px',flexWrap:'wrap',borderBottom:'1px solid #E2E8F0',marginBottom:'1rem'}}>
               {[['motivos','Motivos'],['vehiculo','Por vehículo'],['mecanico','Por mecánico'],['oficina','🏢 Oficina'],['terceros','Por terceros'],['cliente','Por cliente']].map(([id,label])=>(
                 <button key={id} onClick={()=>{setVistaTiempos(id);setMecanicoSeleccionadoTiempos(null)}} style={{padding:'8px 14px',fontSize:'13px',fontWeight:vistaTiempos===id?'600':'400',border:'none',background:'none',cursor:'pointer',color:vistaTiempos===id?'#2D3748':'#718096',borderBottom:vistaTiempos===id?'2px solid #2D3748':'2px solid transparent',fontFamily:'inherit'}}>{label}</button>
@@ -1642,7 +1673,7 @@ return (
               <div className={styles.card}>
                 <div className={styles.cardTitle}>Detalle por vehículo</div>
                 {tiemposDelMes.porTrabajo.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
-                {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id}><td onClick={()=>verDetalle(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>verDetalle(trabajo)} style={{fontFamily:'monospace'}}>{formatHoras(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>))}</tbody></table>}
+                {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id}><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)} style={{fontFamily:'monospace'}}>{formatHoras(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>))}</tbody></table>}
               </div>
               {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosTiempos(v=>!v)}>
@@ -1651,7 +1682,7 @@ return (
                 </div>
                 {mostrarExcluidosTiempos&&<>
                   <div style={{fontSize:'12px',color:'#A0AEC0',margin:'10px 0'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico.</div>
-                  <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
+                  <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>setTrabajoSeleccionadoTiempos(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>setTrabajoSeleccionadoTiempos(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
                 </>}
               </div>}
             </>)}
@@ -1681,7 +1712,7 @@ return (
                   return(<>
                     <div className={styles.cardTitle}>{s.mecanico}</div>
                     <div style={{fontSize:'12px',color:'#718096',marginBottom:'14px'}}>{Object.entries(s.items.reduce((acc,i)=>{acc[i.categoria]=(acc[i.categoria]||0)+i.horas;return acc},{})).map(([cat,h])=>`${formatHoras(h)}h ${cat.toLowerCase()}`).join(' · ')}</div>
-                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>verDetalle(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
+                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>setTrabajoSeleccionadoTiempos(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
                     <button className={styles.btn} style={{marginTop:'14px'}} onClick={()=>setMecanicoSeleccionadoTiempos(null)}>← Volver a todos</button>
                   </>)
                 })()}
@@ -1701,7 +1732,7 @@ return (
                     agrupado[clave].horas+=it.horas
                   })
                   const filas=Object.values(agrupado).sort((a,b)=>b.horas-a.horas)
-                  return <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>verDetalle(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
+                  return <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>setTrabajoSeleccionadoTiempos(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
                 })()}
               </div>
             )}
@@ -1711,7 +1742,7 @@ return (
                 <div className={styles.cardTitle}>Horas perdidas por terceros</div>
                 <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Vehículos con horas en "Esperando a terceros" este mes, de mayor a menor.</div>
                 {tiemposDelMes.porTerceros.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin horas perdidas por terceros este mes 🎉</div>}
-                {tiemposDelMes.porTerceros.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.porTerceros.map(({trabajo,horas})=>(<tr key={trabajo.id} onClick={()=>verDetalle(trabajo)}><td><b>{trabajo.vehiculos?.marca_modelo}</b></td><td>{trabajo.vehiculos?.clientes?.nombre}</td><td style={{fontFamily:'monospace',color:'#DC2626'}}>{formatHoras(horas)}h</td></tr>))}</tbody></table>}
+                {tiemposDelMes.porTerceros.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.porTerceros.map(({trabajo,horas})=>(<tr key={trabajo.id} onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}><td><b>{trabajo.vehiculos?.marca_modelo}</b></td><td>{trabajo.vehiculos?.clientes?.nombre}</td><td style={{fontFamily:'monospace',color:'#DC2626'}}>{formatHoras(horas)}h</td></tr>))}</tbody></table>}
               </div>
             )}
 
@@ -1720,9 +1751,10 @@ return (
                 <div className={styles.cardTitle}>👤 Horas perdidas por cliente</div>
                 <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Suma de "esperando aprobación" + "esperando pago de repuestos" por cliente, de mayor a menor.</div>
                 {tiemposDelMes.porCliente.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin horas perdidas por clientes este mes 🎉</div>}
-                {tiemposDelMes.porCliente.length>0&&<table className={styles.table}><thead><tr><th>Cliente</th><th>Vehículo</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.porCliente.map(({trabajo,horas})=>(<tr key={trabajo.id} onClick={()=>verDetalle(trabajo)}><td><b>{trabajo.vehiculos?.clientes?.nombre}</b></td><td>{trabajo.vehiculos?.marca_modelo}</td><td style={{fontFamily:'monospace',color:'#DC2626'}}>{formatHoras(horas)}h</td></tr>))}</tbody></table>}
+                {tiemposDelMes.porCliente.length>0&&<table className={styles.table}><thead><tr><th>Cliente</th><th>Vehículo</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.porCliente.map(({trabajo,horas})=>(<tr key={trabajo.id} onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}><td><b>{trabajo.vehiculos?.clientes?.nombre}</b></td><td>{trabajo.vehiculos?.marca_modelo}</td><td style={{fontFamily:'monospace',color:'#DC2626'}}>{formatHoras(horas)}h</td></tr>))}</tbody></table>}
               </div>
             )}
+            </>)}
           </div>
         )}
 
