@@ -1621,8 +1621,9 @@ return (
                 {(()=>{
                   const p=tiemposDelMes.porTrabajo.find(x=>x.trabajo.id===trabajoSeleccionadoTiempos.id)
                   const mecanicosDeEsteTrabajo=tiemposDelMes.statsPorMecanico.concat(tiemposDelMes.statsOficina).flatMap(s=>s.items.filter(it=>it.trabajo.id===trabajoSeleccionadoTiempos.id).map(it=>({mecanico:s.mecanico,...it})))
+                  const esReingreso=reingresosRaw.some(h=>h.trabajo_id===trabajoSeleccionadoTiempos.id)
                   return(<>
-                    <div className={styles.cardTitle}>{trabajoSeleccionadoTiempos.vehiculos?.marca_modelo}</div>
+                    <div className={styles.cardTitle}>{trabajoSeleccionadoTiempos.vehiculos?.marca_modelo}{esReingreso&&<span style={{marginLeft:'8px',fontSize:'11px',fontWeight:'700',color:'#2563EB',background:'#EFF6FF',padding:'3px 9px',borderRadius:'20px'}}>🔄 Reingreso</span>}</div>
                     <div style={{fontSize:'13px',color:'#718096',marginBottom:'14px'}}>{trabajoSeleccionadoTiempos.vehiculos?.clientes?.nombre} · {trabajoSeleccionadoTiempos.vehiculos?.patente||'—'}</div>
                     <div style={{fontSize:'12px',fontWeight:'700',color:'#718096',textTransform:'uppercase',marginBottom:'8px'}}>Tiempo por categoría</div>
                     {p?Object.entries(p.categorias).sort((a,b)=>b[1]-a[1]).map(([cat,horas])=>(
@@ -1669,23 +1670,36 @@ return (
               </div>
             )}
 
-            {vistaTiempos==='vehiculo'&&(<>
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Detalle por vehículo</div>
-                {tiemposDelMes.porTrabajo.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
-                {tiemposDelMes.porTrabajo.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{tiemposDelMes.porTrabajo.map(({trabajo,motivoPrincipal,totalHoras})=>(<tr key={trabajo.id}><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)} style={{fontFamily:'monospace'}}>{formatHoras(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>))}</tbody></table>}
-              </div>
-              {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosTiempos(v=>!v)}>
-                  <div className={styles.cardTitle} style={{margin:0}}>Excluidos del cálculo este mes ({tiemposDelMes.excluidos.length})</div>
-                  <span style={{fontSize:'12px',color:'#718096'}}>{mostrarExcluidosTiempos?'▲ Ocultar':'▼ Ver'}</span>
+            {vistaTiempos==='vehiculo'&&(()=>{
+              const idsReingreso=new Set(reingresosRaw.map(h=>h.trabajo_id))
+              const normales=tiemposDelMes.porTrabajo.filter(p=>!idsReingreso.has(p.trabajo.id))
+              const reingresos=tiemposDelMes.porTrabajo.filter(p=>idsReingreso.has(p.trabajo.id))
+              const filaVehiculo=({trabajo,motivoPrincipal,totalHoras})=>(
+                <tr key={trabajo.id}><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#DC2626':'#4A5568'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)} style={{fontFamily:'monospace'}}>{formatHoras(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>🚫 Excluir</button></td></tr>
+              )
+              return(<>
+                <div className={styles.card}>
+                  <div className={styles.cardTitle}>Detalle por vehículo</div>
+                  {normales.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
+                  {normales.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{normales.map(filaVehiculo)}</tbody></table>}
                 </div>
-                {mostrarExcluidosTiempos&&<>
-                  <div style={{fontSize:'12px',color:'#A0AEC0',margin:'10px 0'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico.</div>
-                  <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>setTrabajoSeleccionadoTiempos(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>setTrabajoSeleccionadoTiempos(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
-                </>}
-              </div>}
-            </>)}
+                {reingresos.length>0&&<div className={styles.card}>
+                  <div className={styles.cardTitle}>🔄 Reingresos</div>
+                  <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Vehículos que volvieron al taller este mes (segunda visita o más).</div>
+                  <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{reingresos.map(filaVehiculo)}</tbody></table>
+                </div>}
+                {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosTiempos(v=>!v)}>
+                    <div className={styles.cardTitle} style={{margin:0}}>Excluidos del cálculo este mes ({tiemposDelMes.excluidos.length})</div>
+                    <span style={{fontSize:'12px',color:'#718096'}}>{mostrarExcluidosTiempos?'▲ Ocultar':'▼ Ver'}</span>
+                  </div>
+                  {mostrarExcluidosTiempos&&<>
+                    <div style={{fontSize:'12px',color:'#A0AEC0',margin:'10px 0'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico.</div>
+                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>setTrabajoSeleccionadoTiempos(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>setTrabajoSeleccionadoTiempos(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>↩️ Volver a incluir</button></td></tr>))}</tbody></table>
+                  </>}
+                </div>}
+              </>)
+            })()}
 
             {vistaTiempos==='mecanico'&&(
               <div className={styles.card}>
@@ -1704,15 +1718,15 @@ return (
                   if(!s)return null
                   const agrupado={}
                   s.items.forEach(it=>{
-                    const clave=it.trabajo.id+'|'+it.categoria
-                    if(!agrupado[clave])agrupado[clave]={trabajo:it.trabajo,categoria:it.categoria,horas:0}
-                    agrupado[clave].horas+=it.horas
+                    if(!agrupado[it.trabajo.id])agrupado[it.trabajo.id]={trabajo:it.trabajo,horas:0,categorias:[]}
+                    agrupado[it.trabajo.id].horas+=it.horas
+                    agrupado[it.trabajo.id].categorias.push(it.categoria)
                   })
                   const filas=Object.values(agrupado).sort((a,b)=>b.horas-a.horas)
                   return(<>
                     <div className={styles.cardTitle}>{s.mecanico}</div>
                     <div style={{fontSize:'12px',color:'#718096',marginBottom:'14px'}}>{Object.entries(s.items.reduce((acc,i)=>{acc[i.categoria]=(acc[i.categoria]||0)+i.horas;return acc},{})).map(([cat,h])=>`${formatHoras(h)}h ${cat.toLowerCase()}`).join(' · ')}</div>
-                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>setTrabajoSeleccionadoTiempos(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
+                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categorías</th><th>Horas totales</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>setTrabajoSeleccionadoTiempos(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td style={{fontSize:'12px',color:'#718096'}}>{[...new Set(it.categorias)].join(', ')}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
                     <button className={styles.btn} style={{marginTop:'14px'}} onClick={()=>setMecanicoSeleccionadoTiempos(null)}>← Volver a todos</button>
                   </>)
                 })()}
@@ -1727,12 +1741,12 @@ return (
                 {tiemposDelMes.statsOficina.length>0&&(()=>{
                   const agrupado={}
                   tiemposDelMes.statsOficina.flatMap(s=>s.items).forEach(it=>{
-                    const clave=it.trabajo.id+'|'+it.categoria
-                    if(!agrupado[clave])agrupado[clave]={trabajo:it.trabajo,categoria:it.categoria,horas:0}
-                    agrupado[clave].horas+=it.horas
+                    if(!agrupado[it.trabajo.id])agrupado[it.trabajo.id]={trabajo:it.trabajo,horas:0,categorias:[]}
+                    agrupado[it.trabajo.id].horas+=it.horas
+                    agrupado[it.trabajo.id].categorias.push(it.categoria)
                   })
                   const filas=Object.values(agrupado).sort((a,b)=>b.horas-a.horas)
-                  return <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categoría</th><th>Horas</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>setTrabajoSeleccionadoTiempos(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td>{it.categoria}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
+                  return <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categorías</th><th>Horas totales</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>setTrabajoSeleccionadoTiempos(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td style={{fontSize:'12px',color:'#718096'}}>{[...new Set(it.categorias)].join(', ')}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
                 })()}
               </div>
             )}
