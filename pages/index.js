@@ -86,6 +86,7 @@ function categoriaDeEvento(eventos,i){
 
 // calcula, para un trabajo, cuántas horas pasó en cada categoría, a partir del ingreso, cada actualización, y la salida (o ahora si sigue en curso)
 const HORARIO_APERTURA_HORA=8, HORARIO_APERTURA_MIN=30, HORARIO_CIERRE=18
+const MES_INICIO_CONTROL_TIEMPOS='2026-08' // no mirar hacia atrás de este mes en Histórico ni en Por marca
 const DIAS_LABORALES=[1,2,3,4,5] // lunes a viernes (0=domingo, 6=sábado)
 
 // separa las horas entre dos fechas en "laborales" (dentro del horario del taller) y "no laborales" (de noche o fin de semana)
@@ -1554,7 +1555,8 @@ export default function Home({ rol, cerrarSesion }) {
     const base=new Date(mesTiempos+'-15')
     for(let i=5;i>=0;i--){
       const d=new Date(base.getFullYear(),base.getMonth()-i,1)
-      meses.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
+      const m=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+      if(m>=MES_INICIO_CONTROL_TIEMPOS)meses.push(m)
     }
     return meses.map(m=>calcularResumenMes(trabajosVivos,actualizacionesRaw,m))
   },[seccion,vistaTiempos,trabajosVivos,actualizacionesRaw,mesTiempos])
@@ -1570,7 +1572,8 @@ export default function Home({ rol, cerrarSesion }) {
 
   const tiempoPorMarca=useMemo(()=>{
     if(seccion!=='tiempos'||vistaTiempos!=='marca')return[]
-    return calcularTiempoPorMarca(trabajosVivos,actualizacionesRaw)
+    const trabajosDesdeInicio=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)>=MES_INICIO_CONTROL_TIEMPOS)
+    return calcularTiempoPorMarca(trabajosDesdeInicio,actualizacionesRaw)
   },[seccion,vistaTiempos,trabajosVivos,actualizacionesRaw])
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
@@ -1959,7 +1962,7 @@ return (
             {vistaTiempos==='marca'&&(
               <div className={styles.card}>
                 <div className={styles.cardTitle}>🚗 Tiempo de reparación promedio por marca</div>
-                <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Con todo el historial (no solo el mes seleccionado). Útil para presupuestar mejor a futuro.</div>
+                <div style={{fontSize:'12px',color:'#A0AEC0',marginBottom:'10px'}}>Desde agosto 2026 (no solo el mes seleccionado). Útil para presupuestar mejor a futuro.</div>
                 {tiempoPorMarca.length===0&&<div style={{color:'#A0AEC0',fontSize:'13px'}}>Sin datos todavía</div>}
                 {tiempoPorMarca.length>0&&<table className={styles.table}><thead><tr><th>Marca</th><th>Horas promedio</th><th>Vehículos</th></tr></thead><tbody>{tiempoPorMarca.map(m=>(<tr key={m.marca}><td><b>{m.marca}</b></td><td style={{fontFamily:'monospace'}}>{formatHoras(m.promedio)}h</td><td style={{fontFamily:'monospace',color:'#718096'}}>{m.cantidad}</td></tr>))}</tbody></table>}
               </div>
