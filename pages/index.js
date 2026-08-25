@@ -1620,7 +1620,14 @@ return (
               <div className={styles.card}>
                 {(()=>{
                   const p=tiemposDelMes.porTrabajo.find(x=>x.trabajo.id===trabajoSeleccionadoTiempos.id)
-                  const mecanicosDeEsteTrabajo=tiemposDelMes.statsPorMecanico.concat(tiemposDelMes.statsOficina).flatMap(s=>s.items.filter(it=>it.trabajo.id===trabajoSeleccionadoTiempos.id).map(it=>({mecanico:s.mecanico,...it})))
+                  const mecanicosRaw=tiemposDelMes.statsPorMecanico.concat(tiemposDelMes.statsOficina).flatMap(s=>s.items.filter(it=>it.trabajo.id===trabajoSeleccionadoTiempos.id).map(it=>({mecanico:s.mecanico,...it})))
+                  const agrupadoMecanicos={}
+                  mecanicosRaw.forEach(it=>{
+                    const clave=it.mecanico+'|'+it.categoria
+                    if(!agrupadoMecanicos[clave])agrupadoMecanicos[clave]={mecanico:it.mecanico,categoria:it.categoria,horas:0}
+                    agrupadoMecanicos[clave].horas+=it.horas
+                  })
+                  const mecanicosDeEsteTrabajo=Object.values(agrupadoMecanicos).sort((a,b)=>b.horas-a.horas)
                   const esReingreso=reingresosRaw.some(h=>h.trabajo_id===trabajoSeleccionadoTiempos.id)
                   return(<>
                     <div className={styles.cardTitle}>{trabajoSeleccionadoTiempos.vehiculos?.marca_modelo}{esReingreso&&<span style={{marginLeft:'8px',fontSize:'11px',fontWeight:'700',color:'#2563EB',background:'#EFF6FF',padding:'3px 9px',borderRadius:'20px'}}>🔄 Reingreso</span>}</div>
