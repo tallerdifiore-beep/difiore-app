@@ -1704,7 +1704,7 @@ return (
         {[
           {id:'dashboard',label:'Dashboard'},
           {id:'plandia',label:'📋 Plan del día'},
-          {id:'tiempos',label:'⏱️ Control de tiempos'},
+          ...(admin?[{id:'tiempos',label:'⏱️ Control de tiempos'}]:[]),
           {id:'clientes',label:'Clientes'},
           ...(admin?[{id:'turnos',label:'📅 Turnos'}]:[]),
           ...(admin?[{id:'nuevo',label:'Nuevo cliente'}]:[]),
