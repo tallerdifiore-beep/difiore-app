@@ -31,14 +31,13 @@ export default function Service() {
     setMsg(''); setSrv(null); setVeh(null); setKmHoy('')
     if (p.length < 6) { setMsg('Escribí la patente completa (por ejemplo AB 123 CD o ABC 123).'); return }
     setCargando(true)
-    const variantes = `patente.ilike.${p},patente.ilike.${pretty(p)}`  // con o sin espacios
-    const { data: rows, error } = await supabase.from('services').select('*').or(variantes).order('fecha', { ascending: false }).order('created_at', { ascending: false }).limit(1)
+    const { data: rows, error } = await supabase.from('services').select('*').eq('patente_norm', p).order('fecha', { ascending: false }).order('created_at', { ascending: false }).limit(1)
     setCargando(false)
     if (error) { setMsg('No pudimos consultar ahora. Probá de nuevo en un momento.'); return }
     const s = (rows || [])[0]
     if (!s) { setMsg(`No encontramos ningún service registrado para ${pretty(p)}. Si ya te atendimos, escribinos por WhatsApp y lo cargamos.`); return }
     setSrv(s)
-    const { data: vs } = await supabase.from('vehiculos').select('marca_modelo, patente').or(variantes).limit(1)
+    const { data: vs } = await supabase.from('vehiculos').select('marca_modelo, patente').eq('patente_norm', p).limit(1)
     setVeh((vs || [])[0] || null)
     setTimeout(() => resRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
