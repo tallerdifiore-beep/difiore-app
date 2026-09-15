@@ -5,6 +5,11 @@ import Head from 'next/head'
 import { supabase } from '../lib/supabase'
 
 const norm = s => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+// mayúsculas, sin caracteres raros y con espacio automático: ABC 123 (patente vieja) o AB 123 CD (patente nueva)
+function formatPatente(val) {
+  const p = norm(val).slice(0, 7)
+  return p.length === 7 ? `${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5)}` : p.length === 6 ? `${p.slice(0, 3)} ${p.slice(3)}` : p
+}
 
 const vacio = {
   patente: '', fecha: new Date().toISOString().slice(0, 10), km: '',
@@ -63,7 +68,7 @@ export default function CargarService() {
           <form onSubmit={guardar}>
             <div style={S.row2}>
               <Campo label="Patente *">
-                <input style={S.input} value={form.patente} onChange={e => set('patente', e.target.value)} placeholder="AB123CD" />
+                <input style={S.input} value={form.patente} onChange={e => set('patente', formatPatente(e.target.value))} placeholder="AB 123 CD" />
               </Campo>
               <Campo label="Fecha">
                 <input style={S.input} type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
