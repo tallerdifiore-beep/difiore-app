@@ -5,6 +5,7 @@ import Head from 'next/head'
 import { supabase } from '../lib/supabase'
 
 const WA = '5492235299700'
+const LOGO = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/assets/logo-difiore.png'
 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('es-AR'))
 const norm = s => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 const pretty = p => (p.length === 7 ? `${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5)}` : p.length === 6 ? `${p.slice(0, 3)} ${p.slice(3)}` : p)
@@ -72,7 +73,7 @@ export default function Service() {
       <div className="wm" aria-hidden="true" />
       <div className="wrap">
         <header className="mast">
-          <img className="logoimg mast-logo" src="/logo-difiore.png" alt="DiFiore Performance" />
+          <img className="logoimg mast-logo" src={LOGO} alt="DiFiore Performance" />
           <div className="tag">Control de<br />service</div>
         </header>
 
@@ -102,7 +103,7 @@ export default function Service() {
 
             <div className="sticker">
               <div className="head">
-                <img className="logoimg stk-logo" src="/logo-difiore.png" alt="" />
+                <img className="logoimg stk-logo" src={LOGO} alt="" />
                 <div className="date">Fecha <b>{fecha(srv.fecha)}</b></div>
               </div>
               <div className="sheet">
@@ -168,7 +169,7 @@ export default function Service() {
           --blue:#1b4cff;--blue2:#2fa8ff;--blue-ink:#0a2a9c;--sticker:#2fa8ff;--paper:#f7f8fb;--paper-ink:#0e1118;--paper-line:#c9d0dd;--ok:#2ecc71;--warn:#f5b700;--bad:#ff4d4f}
         html,body{background:var(--bg)!important;color:var(--text);font-family:Barlow,system-ui,sans-serif}
         body{padding:0 16px 48px;min-height:100vh;background-image:radial-gradient(circle at 1px 1px,#1c2130 1px,transparent 0)!important;background-size:22px 22px!important}
-        .wm{position:fixed;inset:0;pointer-events:none;z-index:0;background:url('/logo-difiore.png') no-repeat center 58%/min(120vw,900px) auto;opacity:.045}
+        .wm{position:fixed;inset:0;pointer-events:none;z-index:0;background:url('https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/assets/logo-difiore.png') no-repeat center 58%/min(120vw,900px) auto;opacity:.045}
         .wrap{position:relative;z-index:1;max-width:560px;margin:0 auto}
         .mast{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0 14px;border-bottom:1px solid var(--line)}
         .logoimg{display:block;height:auto;max-width:100%}.mast-logo{width:min(250px,58vw)}.stk-logo{width:min(190px,50vw)}
