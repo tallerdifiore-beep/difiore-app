@@ -14,7 +14,7 @@
 .navItem:hover { color: #fff; background: #1C2130; }
 .navActive { color: #fff !important; background: linear-gradient(135deg,#1B4CFF,#0A2A9C) !important; font-weight: 700; }
 
-.navDivider { height: 1px; background: #262B38; margin: 8px 6px; }
+.navDivider { height: 1px; background: rgba(47,168,255,.4); margin: 6px 6px; box-shadow: 0 0 6px rgba(47,168,255,.45); }
 
 .navBottom { margin-top: auto; border-top: 1px solid #262B38; padding-top: 12px; }
 
