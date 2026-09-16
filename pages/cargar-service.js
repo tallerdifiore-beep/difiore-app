@@ -96,6 +96,14 @@ export default function CargarService() {
     setVista('lista')
   }
 
+  async function borrar(s, e) {
+    e.stopPropagation()
+    if (!window.confirm(`¿Borrar el service de ${pretty(norm(s.patente))} del ${fechaAR(s.fecha)}?`)) return
+    const { error } = await supabase.from('services').delete().eq('id', s.id)
+    if (error) { setMsg({ tipo: 'error', texto: 'No se pudo borrar: ' + error.message }); return }
+    await cargarServicios()
+  }
+
   const serviciosFiltrados = servicios.filter(s => {
     if (!busqueda.trim()) return true
     const q = busqueda.toUpperCase()
@@ -142,7 +150,10 @@ export default function CargarService() {
                     <span>{fechaAR(s.fecha)}</span>
                     <span>{s.km != null ? formatNum(String(s.km)) + ' km' : '—'}</span>
                   </div>
-                  <span className="itemEditar">Editar →</span>
+                  <div className="itemAcciones">
+                    <span className="itemEditar">Editar →</span>
+                    <button className="itemBorrar" type="button" onClick={e => borrar(s, e)}>Borrar</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -228,6 +239,9 @@ export default function CargarService() {
         .itemPlate{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:18px;letter-spacing:.06em;min-width:120px}
         .itemInfo{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--muted);flex:1}
         .itemEditar{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--blue2);white-space:nowrap}
+        .itemAcciones{display:flex;align-items:center;gap:10px}
+        .itemBorrar{border:1px solid rgba(255,77,79,.35);background:rgba(255,77,79,.08);color:var(--bad);cursor:pointer;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:6px;white-space:nowrap}
+        .itemBorrar:hover{background:rgba(255,77,79,.18);border-color:rgba(255,77,79,.55)}
         .sticker{background:var(--sticker);border-radius:10px;padding:10px;color:var(--paper-ink);box-shadow:0 14px 34px rgba(0,0,0,.5)}
         .sticker .head{background:#0d1018;border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px}
         .headLabel{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#fff;opacity:.7}
