@@ -1710,15 +1710,14 @@ return (
         {[
           {id:'dashboard',label:'Dashboard'},
           {id:'clientes',label:'Clientes'},
-          ...(admin?[{id:'turnos',label:'Turnos'}]:[]),
-          ...(admin?[{id:'nuevo',label:'Nuevo cliente'}]:[]),
-          ...(admin?[{id:'presupuesto',label:'Presupuesto'}]:[]),
-          ...(admin?[{id:'recibo',label:'Recibo'}]:[]),
+          ...(admin?[{divider:true},{id:'turnos',label:'Turnos'},{id:'nuevo',label:'Nuevo cliente'},{id:'presupuesto',label:'Presupuesto'},{id:'recibo',label:'Recibo'}]:[]),
+          {divider:true},
           {id:'checklist',label:'Checklist entrega'},
-          ...(admin?[{id:'informe',label:'Informe mensual'},{id:'empleados',label:'Empleados'}]:[])
-        ].map(item=>(
+          ...(admin?[{divider:true},{id:'informe',label:'Informe mensual'},{id:'empleados',label:'Empleados'}]:[])
+        ].map((item,i)=>item.divider?<div key={'div'+i} className={styles.navDivider}/>:(
           <button key={item.id} className={`${styles.navItem} ${seccion===item.id?styles.navActive:''}`} onClick={()=>{setSeccion(item.id);setTallerVista(null);setVistaStats(null);setVistaMarca(null);setVerEntregados(false);setVerPapelera(false);setSidebarOpen(false)}}>{item.label}</button>
         ))}
+        <div className={styles.navDivider}/>
         <a href="/cargar-service" className={styles.navItem} style={{textDecoration:'none'}}>Cargar service</a>
         <div className={styles.navBottom}>
           <div style={{display:'flex',flexDirection:'column',gap:'4px',padding:'4px 0'}}>
