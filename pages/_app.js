@@ -15,6 +15,33 @@ export default function App({ Component, pageProps }) {
     if (r) { setRol(r); setAutenticado(true) }
   }, [])
 
+  // Mayúscula automática en toda la app: se reescribe el valor del campo antes de que
+  // React procese el evento, así se guarda en mayúscula sin tocar cada onChange.
+  useEffect(() => {
+    function esCampoDeTexto(el) {
+      if (!el || el.dataset?.noUpper !== undefined) return false
+      const tag = el.tagName
+      if (tag === 'TEXTAREA') return true
+      if (tag === 'INPUT') {
+        const tipo = (el.type || 'text').toLowerCase()
+        return tipo === 'text' || tipo === 'search'
+      }
+      return false
+    }
+    function alEscribir(e) {
+      const el = e.target
+      if (!esCampoDeTexto(el)) return
+      const mayus = el.value.toUpperCase()
+      if (mayus === el.value) return
+      const inicio = el.selectionStart
+      const fin = el.selectionEnd
+      el.value = mayus
+      if (inicio !== null && fin !== null) { try { el.setSelectionRange(inicio, fin) } catch {} }
+    }
+    document.addEventListener('input', alEscribir, true)
+    return () => document.removeEventListener('input', alEscribir, true)
+  }, [])
+
   function revisarMayus(e) {
     if (typeof e.getModifierState === 'function') {
       setMayusActivo(e.getModifierState('CapsLock'))
@@ -58,6 +85,7 @@ export default function App({ Component, pageProps }) {
             <div style={{position:'relative'}}>
               <input
                 type={verPass ? 'text' : 'password'}
+                data-no-upper
                 value={pass}
                 onChange={e => setPass(e.target.value)}
                 onKeyDown={revisarMayus}

@@ -1,2 +1,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: #0F1117; }
+
+/* Mayúscula automática en toda la app (ver también el listener global en _app.js,
+   que además guarda el valor en mayúscula, no solo lo muestra así). */
+input:not([type="password"]):not([type="email"]):not([type="date"]):not([type="datetime-local"]):not([type="time"]):not([type="month"]):not([type="week"]):not([type="number"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]):not([type="url"]),
+textarea,
+select {
+  text-transform: uppercase;
+}
