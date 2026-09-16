@@ -1,48 +1,48 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:wght@800&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap');
 
-.app { display: flex; height: 100vh; background: #FFFFFF; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0A0A0A; }
+.app { display: flex; height: 100vh; background: transparent; font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #EEF1F7; }
 
-.sidebar { width: 240px; background: #0B0D12; border-right: 1px solid #0B0D12; padding: 1.5rem 1.2rem; display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar { width: 240px; background: #12151D; border-right: 1px solid #262B38; padding: 1.5rem 1.2rem; display: flex; flex-direction: column; flex-shrink: 0; }
 
-.logoArea { padding-bottom: 1.2rem; margin-bottom: 1.2rem; border-bottom: 1px solid #1E2330; }
-.logoMain { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: 2px; font-style: italic; }
-.logoI { color: #2563EB; }
-.logoLine { height: 2px; background: #2563EB; margin: 6px 0; opacity: 0.6; }
-.logoSub { font-size: 10px; color: #7C879C; letter-spacing: 4px; text-transform: uppercase; }
+.logoArea { padding-bottom: 1.2rem; margin-bottom: 1.2rem; border-bottom: 1px solid #262B38; }
+.logoMain { font-family: 'Saira Extra Condensed', Impact, sans-serif; font-size: 26px; font-weight: 800; color: #fff; letter-spacing: 1px; text-transform: uppercase; }
+.logoI { color: #2FA8FF; font-style: italic; }
+.logoLine { height: 2px; background: linear-gradient(90deg,#1B4CFF,#2FA8FF); margin: 6px 0; opacity: 0.9; }
+.logoSub { font-family: 'Barlow Condensed', sans-serif; font-size: 10px; font-weight: 600; color: #6B7488; letter-spacing: 4px; text-transform: uppercase; }
 
-.navItem { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #9AA4B8; margin-bottom: 3px; transition: all .15s; border: none; background: transparent; width: 100%; text-align: left; font-weight: 500; }
-.navItem:hover { color: #fff; background: #1E2330; }
-.navActive { color: #fff !important; background: #2563EB !important; font-weight: 600; }
+.navItem { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #9AA3B8; margin-bottom: 3px; transition: all .15s; border: none; background: transparent; width: 100%; text-align: left; }
+.navItem:hover { color: #fff; background: #1C2130; }
+.navActive { color: #fff !important; background: linear-gradient(135deg,#1B4CFF,#0A2A9C) !important; font-weight: 700; }
 
-.navBottom { margin-top: auto; border-top: 1px solid #1E2330; padding-top: 12px; }
+.navBottom { margin-top: auto; border-top: 1px solid #262B38; padding-top: 12px; }
 
-.main { flex: 1; overflow-y: auto; padding: 2rem; background: #FFFFFF; }
+.main { flex: 1; overflow-y: auto; padding: 2rem; background: transparent; }
 
 .topBar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 8px; }
-.pageTitle { font-size: 18px; font-weight: 700; color: #0A0A0A; letter-spacing: -0.01em; }
-.divider { height: 1px; background: #E5E7EB; margin-bottom: 1.5rem; }
+.pageTitle { font-family: 'Saira Extra Condensed', Impact, sans-serif; font-size: 30px; font-weight: 800; text-transform: uppercase; color: #EEF1F7; letter-spacing: .01em; line-height: 1; }
+.divider { height: 1px; background: #262B38; margin-bottom: 1.5rem; }
 
-.btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid #D1D5DB; background: #fff; color: #1F2430; transition: all .15s; font-family: inherit; font-weight: 500; }
-.btn:hover { background: #F5F6F8; border-color: #0A0A0A; }
-.btnPrimary { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; background: #2563EB; color: #fff; border: 1px solid #2563EB; transition: all .15s; font-family: inherit; font-weight: 600; }
-.btnPrimary:hover { background: #1D4ED8; border-color: #1D4ED8; }
-.btnDangerSolid { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; background: #DC2626; color: #fff; border: none; font-weight: 600; font-family: inherit; transition: all .15s; }
-.btnDangerSolid:hover { background: #B91C1C; }
-.btnDanger { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; transition: all .15s; font-family: inherit; font-weight: 500; }
-.btnDanger:hover { background: #DC2626; color: #fff; border-color: #DC2626; }
-.btnEdit { padding: 4px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; background: #fff; border: 1px solid #D1D5DB; color: #1F2430; font-family: inherit; }
-.btnEdit:hover { background: #F5F6F8; border-color: #0A0A0A; }
-.btnDelete { padding: 4px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; font-family: inherit; }
-.btnDelete:hover { background: #DC2626; color: #fff; }
-.btnSuccess { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; background: #16A34A; color: #fff; border: none; font-weight: 600; font-family: inherit; transition: all .15s; }
-.btnSuccess:hover { background: #15803D; }
-.btnRepuesto { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; font-family: inherit; font-weight: 500; transition: all .15s; }
-.btnRepuesto:hover { background: #D97706; color: #fff; border-color: #D97706; }
+.btn { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; border: 1px solid #343B4B; background: #171B25; color: #EEF1F7; transition: all .15s; }
+.btn:hover { background: #1C2130; border-color: #2FA8FF; }
+.btnPrimary { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: #1B4CFF; color: #fff; border: 1px solid #1B4CFF; transition: all .15s; }
+.btnPrimary:hover { background: #2FA8FF; border-color: #2FA8FF; }
+.btnDangerSolid { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: #FF4D4F; color: #fff; border: 1px solid #FF4D4F; transition: all .15s; }
+.btnDangerSolid:hover { background: #E0393B; border-color: #E0393B; }
+.btnDanger { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: rgba(255,77,79,.1); color: #FF4D4F; border: 1px solid rgba(255,77,79,.4); transition: all .15s; }
+.btnDanger:hover { background: #FF4D4F; color: #fff; border-color: #FF4D4F; }
+.btnEdit { padding: 5px 9px; border-radius: 6px; font-size: 13px; cursor: pointer; background: #171B25; border: 1px solid #343B4B; color: #EEF1F7; }
+.btnEdit:hover { background: #1C2130; border-color: #2FA8FF; }
+.btnDelete { padding: 5px 9px; border-radius: 6px; font-size: 13px; cursor: pointer; background: rgba(255,77,79,.1); border: 1px solid rgba(255,77,79,.4); color: #FF4D4F; }
+.btnDelete:hover { background: #FF4D4F; color: #fff; }
+.btnSuccess { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: #2ECC71; color: #0B0D12; border: 1px solid #2ECC71; transition: all .15s; }
+.btnSuccess:hover { background: #29B765; }
+.btnRepuesto { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: rgba(245,183,0,.12); color: #F5B700; border: 1px solid rgba(245,183,0,.4); transition: all .15s; }
+.btnRepuesto:hover { background: #F5B700; color: #0B0D12; border-color: #F5B700; }
 
 .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 1.5rem; }
-.stat { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 16px; }
-.statN { font-size: 28px; font-weight: 600; color: #0A0A0A; font-family: 'SF Mono', 'Consolas', monospace; }
-.statL { font-size: 11px; color: #6B7280; margin-top: 6px; text-transform: uppercase; letter-spacing: .06em; font-weight: 500; }
+.stat { background: linear-gradient(155deg,#1B4CFF,#0A2A9C); border: 2px solid #0D1018; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+.statN { background: #F7F8FB; color: #0E1118; border: 3px solid #0D1018; border-radius: 8px; padding: 10px 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; text-align: center; line-height: 1; }
+.statL { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px; margin-top: 0; text-transform: uppercase; letter-spacing: .06em; color: #EEF1F7; text-align: center; }
 
 .tblWrap { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; overflow: hidden; overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
@@ -110,15 +110,15 @@
 .histItem:last-child { border: none; }
 .histIcon { font-size: 16px; margin-top: 1px; }
 
-.tallerCard { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 1.25rem; cursor: pointer; transition: all .15s; border-left: 3px solid #2563EB; }
-.tallerCard:hover { border-color: #2563EB; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
-.tallerNombre { font-size: 14px; font-weight: 700; color: #0A0A0A; margin-bottom: 4px; }
-.tallerN { font-size: 32px; font-weight: 600; color: #2563EB; font-family: 'SF Mono', 'Consolas', monospace; }
-.tallerN span { font-size: 13px; color: #6B7280; font-weight: 400; font-family: inherit; }
-.tallerBtn { margin-top: 12px; font-size: 12px; color: #2563EB; font-weight: 600; }
+.tallerCard { background: linear-gradient(155deg,#171B25,#0D1018); border: 2px solid #262B38; border-radius: 14px; padding: 1.25rem; cursor: pointer; transition: all .15s; }
+.tallerCard:hover { border-color: #2FA8FF; box-shadow: 0 8px 22px rgba(47,168,255,.18); transform: translateY(-2px); }
+.tallerNombre { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #9AA3B8; margin-bottom: 8px; }
+.tallerN { font-family: 'Saira Extra Condensed', Impact, sans-serif; font-size: 38px; font-weight: 800; color: #fff; line-height: 1; }
+.tallerN span { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; color: #6B7488; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.tallerBtn { margin-top: 12px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #2FA8FF; }
 
 /* HAMBURGER MENU - MOBILE */
-.menuBtn { display: none; background: #0B0D12; border: none; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 18px; position: fixed; top: 12px; left: 12px; z-index: 200; }
+.menuBtn { display: none; background: #12151D; border: 1px solid #262B38; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 18px; position: fixed; top: 12px; left: 12px; z-index: 200; }
 
 /* RESPONSIVE */
 @media (max-width: 768px) {

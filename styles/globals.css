@@ -1,5 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:wght@800&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap');
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; background: #0F1117; }
+html, body {
+  height: 100%;
+  background: #0b0d12;
+  background-image: radial-gradient(circle at 1px 1px, #1c2130 1px, transparent 0);
+  background-size: 22px 22px;
+  color: #eef1f7;
+}
 
 /* Mayúscula automática en toda la app (ver también el listener global en _app.js,
    que además guarda el valor en mayúscula, no solo lo muestra así). */
