@@ -30,11 +30,11 @@
 .btnPrimary:hover { background: #2FA8FF; border-color: #2FA8FF; }
 .btnDangerSolid { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: #FF4D4F; color: #fff; border: 1px solid #FF4D4F; transition: all .15s; }
 .btnDangerSolid:hover { background: #E0393B; border-color: #E0393B; }
-.btnDanger { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: rgba(255,77,79,.1); color: #FF4D4F; border: 1px solid rgba(255,77,79,.4); transition: all .15s; }
+.btnDanger { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: rgba(255,77,79,.1); color: #FF4D4F; border: 1px solid rgba(255,77,79,.4); transition: all .15s; }
 .btnDanger:hover { background: #FF4D4F; color: #fff; border-color: #FF4D4F; }
-.btnEdit { padding: 5px 9px; border-radius: 6px; font-size: 13px; cursor: pointer; background: #171B25; border: 1px solid #343B4B; color: #EEF1F7; }
+.btnEdit { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 9px; border-radius: 6px; font-size: 13px; cursor: pointer; background: #171B25; border: 1px solid #343B4B; color: #EEF1F7; transition: all .15s; }
 .btnEdit:hover { background: #1C2130; border-color: #2FA8FF; }
-.btnDelete { padding: 5px 9px; border-radius: 6px; font-size: 13px; cursor: pointer; background: rgba(255,77,79,.1); border: 1px solid rgba(255,77,79,.4); color: #FF4D4F; }
+.btnDelete { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 9px; border-radius: 6px; font-size: 13px; cursor: pointer; background: rgba(255,77,79,.1); border: 1px solid rgba(255,77,79,.4); color: #FF4D4F; transition: all .15s; }
 .btnDelete:hover { background: #FF4D4F; color: #fff; }
 .btnSuccess { padding: 9px 16px; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; background: #2ECC71; color: #0B0D12; border: 1px solid #2ECC71; transition: all .15s; }
 .btnSuccess:hover { background: #29B765; }
