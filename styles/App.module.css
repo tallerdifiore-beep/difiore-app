@@ -14,7 +14,7 @@
 .navItem:hover { color: #fff; background: #1C2130; }
 .navActive { color: #fff !important; background: linear-gradient(135deg,#1B4CFF,#0A2A9C) !important; font-weight: 700; }
 
-.navDivider { flex-shrink: 0; height: 3px; min-height: 3px; background: #2FA8FF; margin: 9px 4px; border-radius: 2px; box-shadow: 0 0 6px 0 rgba(47,168,255,.7); }
+.navDivider { flex-shrink: 0; height: 1px; min-height: 1px; background: #2FA8FF; margin: 8px 4px; border-radius: 1px; box-shadow: 0 0 4px 0 rgba(47,168,255,.6); }
 
 .navBottom { margin-top: auto; border-top: 1px solid #262B38; padding-top: 12px; }
 
@@ -117,7 +117,7 @@
 .tallerCard { background: linear-gradient(155deg,#171B25,#0D1018); border: 2px solid #262B38; border-radius: 14px; padding: 1.25rem; cursor: pointer; transition: all .15s; }
 .tallerCard:hover { border-color: #2FA8FF; box-shadow: 0 8px 22px rgba(47,168,255,.18); transform: translateY(-2px); }
 .tallerNombre { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #9AA3B8; margin-bottom: 8px; }
-.tallerN { font-family: 'Saira Extra Condensed', Impact, sans-serif; font-size: 38px; font-weight: 800; color: #fff; line-height: 1; }
+.tallerN { font-family: 'Saira Extra Condensed', Impact, sans-serif; font-size: 24px; font-weight: 800; color: #fff; line-height: 1; }
 .tallerN span { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; color: #6B7488; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .tallerBtn { margin-top: 12px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #2FA8FF; }
 
@@ -164,7 +164,7 @@
   .fotoGrid { grid-template-columns: repeat(2,1fr); }
 
   .tallerCard { padding: 1rem; }
-  .tallerN { font-size: 26px; }
+  .tallerN { font-size: 18px; }
 
   .table { min-width: 500px; font-size: 12px; }
   .table td, .table thead th { padding: 8px 10px; }
