@@ -9,6 +9,16 @@ const LOGO = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/
 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('es-AR'))
 const norm = s => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 const pretty = p => (p.length === 7 ? `${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5)}` : p.length === 6 ? `${p.slice(0, 3)} ${p.slice(3)}` : p)
+// Si el usuario borra justo el espacio que puso el formateo automático, sin esto se repone
+// solo y hay que apretar borrar dos veces para sacar la letra de al lado.
+function formatPatente(val, valorAnterior, cursorPos) {
+  let base = val
+  if (valorAnterior !== undefined && cursorPos !== undefined && val.length === valorAnterior.length - 1) {
+    const borrado = valorAnterior[cursorPos]
+    if (borrado && !/[A-Z0-9]/i.test(borrado)) base = valorAnterior.slice(0, cursorPos - 1) + valorAnterior.slice(cursorPos + 1)
+  }
+  return pretty(norm(base).slice(0, 7))
+}
 const fecha = f => (f ? new Date(f + 'T12:00:00').toLocaleDateString('es-AR') : '—')
 
 export default function Service() {
@@ -83,7 +93,7 @@ export default function Service() {
           <form onSubmit={e => { e.preventDefault(); buscar() }} autoComplete="off">
             <div className="plate">
               <div className="band"><span>República Argentina</span><span>Patente</span></div>
-              <input id="patente" value={patente} onChange={e => setPatente(pretty(norm(e.target.value)).slice(0, 9))}
+              <input id="patente" value={patente} onChange={e => setPatente(formatPatente(e.target.value, patente, e.target.selectionStart))}
                 maxLength={9} placeholder="AB 123 CD" aria-label="Patente del vehículo" spellCheck={false} inputMode="text" />
             </div>
             <div className="row">

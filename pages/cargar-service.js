@@ -1,13 +1,24 @@
 // Pantalla para cargar un service nuevo (queda protegida por el login normal de la app).
 // Misma estética visual que /service (la pública que ve el cliente).
 // Ruta: /cargar-service
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Head from 'next/head'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 
 const LOGO = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/assets/logo-difiore.png'
 const norm = s => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 const pretty = p => (p.length === 7 ? `${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5)}` : p.length === 6 ? `${p.slice(0, 3)} ${p.slice(3)}` : p)
+// Si el usuario borra justo el espacio que puso el formateo automático, sin esto se repone
+// solo y hay que apretar borrar dos veces para sacar la letra de al lado.
+function formatPatente(val, valorAnterior, cursorPos) {
+  let base = val
+  if (valorAnterior !== undefined && cursorPos !== undefined && val.length === valorAnterior.length - 1) {
+    const borrado = valorAnterior[cursorPos]
+    if (borrado && !/[A-Z0-9]/i.test(borrado)) base = valorAnterior.slice(0, cursorPos - 1) + valorAnterior.slice(cursorPos + 1)
+  }
+  return pretty(norm(base).slice(0, 7))
+}
 
 const vacio = {
   patente: '', fecha: new Date().toISOString().slice(0, 10), km: '',
@@ -20,8 +31,19 @@ export default function CargarService() {
   const [form, setForm] = useState(vacio)
   const [guardando, setGuardando] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [origin, setOrigin] = useState('')
+  const [copiado, setCopiado] = useState(false)
+
+  useEffect(() => { setOrigin(window.location.origin) }, [])
 
   function set(campo, valor) { setForm(f => ({ ...f, [campo]: valor })) }
+
+  const patenteQR = norm(form.patente)
+  const qrUrl = origin && patenteQR.length >= 6 ? `${origin}/service?p=${patenteQR}` : ''
+
+  async function copiarLink() {
+    try { await navigator.clipboard.writeText(qrUrl); setCopiado(true); setTimeout(() => setCopiado(false), 1500) } catch {}
+  }
 
   async function guardar(e) {
     e.preventDefault()
@@ -77,11 +99,28 @@ export default function CargarService() {
           <p>Completá los datos del vehículo. Va a quedar disponible al instante para que el cliente lo consulte con su patente.</p>
         </section>
 
+        {qrUrl && (
+          <section className="qrbox">
+            <div className="qrhead">
+              <div>
+                <div className="qrlabel">Código QR del vehículo</div>
+                <div className="qrplate">{pretty(patenteQR)}</div>
+              </div>
+              <div className="qracts">
+                <button type="button" onClick={copiarLink}>{copiado ? 'Copiado ✓' : 'Copiar link'}</button>
+                <a href={qrUrl} target="_blank" rel="noreferrer">Abrir ↗</a>
+              </div>
+            </div>
+            <div className="qrimg"><QRCodeSVG value={qrUrl} size={140} bgColor="#ffffff" fgColor="#0e1118" level="M" /></div>
+            <div className="qrurl">{qrUrl.replace(/^https?:\/\//, '')}</div>
+          </section>
+        )}
+
         <form onSubmit={guardar}>
           <div className="sticker">
             <div className="head">
               <span className="headLabel">Patente</span>
-              <input className="plateInput" value={form.patente} onChange={e => set('patente', pretty(norm(e.target.value)).slice(0, 9))} placeholder="AB 123 CD" maxLength={9} spellCheck={false} />
+              <input className="plateInput" value={form.patente} onChange={e => set('patente', formatPatente(e.target.value, form.patente, e.target.selectionStart))} placeholder="AB 123 CD" maxLength={9} spellCheck={false} />
               <input className="dateInput" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
             </div>
 
@@ -143,12 +182,21 @@ export default function CargarService() {
         .hero h1{font-family:"Saira Extra Condensed",Impact,sans-serif;font-weight:800;font-size:40px;line-height:.95;margin:0 0 10px;text-transform:uppercase}
         .hero h1 em{font-style:italic;color:var(--blue2)}
         .hero p{margin:0;color:var(--muted);font-size:15px;max-width:44ch;line-height:1.45}
+        .qrbox{margin-bottom:22px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px}
+        .qrhead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+        .qrlabel{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+        .qrplate{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;letter-spacing:.08em;margin-top:2px}
+        .qracts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+        .qracts button,.qracts a{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue2);background:transparent;border:1px solid var(--line2);border-radius:6px;padding:7px 10px;cursor:pointer;text-decoration:none;white-space:nowrap}
+        .qracts button:hover,.qracts a:hover{background:#1c2130;color:#fff}
+        .qrimg{background:#fff;padding:10px;border-radius:8px;border:2px solid #0d1018;line-height:0}
+        .qrurl{font-size:12px;color:var(--dim);word-break:break-all;text-align:center}
         .sticker{background:var(--sticker);border-radius:10px;padding:10px;color:var(--paper-ink);box-shadow:0 14px 34px rgba(0,0,0,.5)}
-        .sticker .head{background:#0d1018;border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px}
+        .sticker .head{background:#0d1018;border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
         .headLabel{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#fff;opacity:.7}
-        .plateInput{flex:1;border:0;outline:0;background:transparent;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px;letter-spacing:.1em;text-transform:uppercase}
+        .plateInput{flex:1;min-width:120px;border:0;outline:0;background:transparent;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px;letter-spacing:.1em;text-transform:uppercase}
         .plateInput::placeholder{color:#5b6478}
-        .dateInput{border:0;outline:0;background:#1b2030;color:#fff;border-radius:6px;padding:6px 8px;font-family:"Barlow Condensed",sans-serif;font-size:13px}
+        .dateInput{flex-shrink:0;max-width:100%;border:0;outline:0;background:#1b2030;color:#fff;border-radius:6px;padding:6px 8px;font-family:"Barlow Condensed",sans-serif;font-size:13px}
         .sheet{background:var(--paper);border-radius:6px;margin-top:8px;padding:12px;border:2px solid #0d1018}
         .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
         .field{margin-bottom:10px}
