@@ -48,8 +48,9 @@
 
 .tblWrap { background: #12151D; border: 2px solid #262B38; border-radius: 12px; overflow: hidden; overflow-x: auto; box-shadow: 0 10px 26px rgba(0,0,0,.3); }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
-.table thead th { text-align: left; padding: 12px 14px; font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #9AA3B8; border-bottom: 2px solid #262B38; background: #171B25; }
-.table tbody tr { border-bottom: 1px solid #262B38; transition: background .1s; }
+.table thead th { text-align: left; padding: 12px 14px; font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #9AA3B8; border-bottom: 2px solid rgba(47,168,255,.3); background: #171B25; }
+.table tbody tr { border-bottom: 1px solid rgba(47,168,255,.28); transition: background .1s; }
+.table tbody tr:nth-child(even) { background: rgba(255,255,255,.035); }
 .table tbody tr:last-child { border-bottom: none; }
 .table tbody tr:hover { background: #1C2130; }
 .table td { padding: 11px 14px; color: #EEF1F7; vertical-align: middle; cursor: pointer; }
@@ -83,7 +84,7 @@
 .detailNombre { font-family: 'Saira Extra Condensed', Impact, sans-serif; font-size: 20px; font-weight: 800; text-transform: uppercase; color: #EEF1F7; }
 .detailSub { font-size: 13px; color: #9AA3B8; margin-top: 3px; }
 .detGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.detRow { display: flex; justify-content: space-between; font-size: 13px; padding: 7px 0; border-bottom: 1px solid #262B38; gap: 8px; }
+.detRow { display: flex; justify-content: space-between; font-size: 13px; padding: 7px 0; border-bottom: 1px solid rgba(47,168,255,.28); gap: 8px; }
 .detRow:last-child { border: none; }
 .detLabel { color: #9AA3B8; font-weight: 500; flex-shrink: 0; }
 .detVal { color: #EEF1F7; font-weight: 600; text-align: right; }
@@ -108,7 +109,7 @@
 .searchBar input::placeholder { color: #6B7488; }
 .searchBar input:focus { outline: none; border-color: #2FA8FF; box-shadow: 0 0 0 3px rgba(47,168,255,0.25); }
 
-.histItem { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #262B38; align-items: flex-start; }
+.histItem { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(47,168,255,.28); align-items: flex-start; }
 .histItem:last-child { border: none; }
 .histIcon { font-size: 16px; margin-top: 1px; }
 
