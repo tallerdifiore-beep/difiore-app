@@ -1726,11 +1726,11 @@ return (
         <div className={styles.navDivider}/>
         <a href="/cargar-service" className={styles.navItem} style={{textDecoration:'none'}}>Cargar service</a>
         <div className={styles.navBottom}>
-          <div style={{display:'flex',flexDirection:'column',gap:'4px',padding:'4px 0'}}>
-            {navLinks.map((l,i)=><a key={i} href={l.href} target="_blank" rel="noreferrer" style={{color:'#94A3B8',textDecoration:'none',fontSize:'12px',display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',borderRadius:'6px'}}><span style={{color:l.color}}>{l.icon}</span>{l.label}</a>)}
+          <div className={styles.sidebarContact}>
+            {navLinks.map((l,i)=><a key={i} href={l.href} target="_blank" rel="noreferrer" className={styles.contactItem}><span className={styles.contactIcon} style={{color:l.color,background:l.color+'1F'}}>{l.icon}</span>{l.label}</a>)}
           </div>
-          <div style={{padding:'8px 0',borderTop:'1px solid #2D3748',marginTop:'8px'}}>
-            <div style={{fontSize:'11px',color:'#9AA3B8',marginBottom:'8px',padding:'0 8px'}}>{admin?'Admin':'Empleado'}</div>
+          <div style={{padding:'10px 0 0',borderTop:'1px solid #262B38',marginTop:'10px'}}>
+            <div className={styles.sidebarRole}>{admin?'Admin':'Empleado'}</div>
             <button onClick={cerrarSesion} className={styles.btnDangerSolid} style={{width:'100%'}}>Cerrar sesión</button>
           </div>
         </div>
