@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import '../styles/globals.css'
+import styles from '../styles/App.module.css'
 const LOGO_URL = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/assets/ChatGPT%20Image%2017%20jul%202026,%2015_11_05.png'
 
 export default function App({ Component, pageProps }) {
@@ -73,15 +74,16 @@ export default function App({ Component, pageProps }) {
   if (Component.publica) return <Component {...pageProps} />
 
   if (!autenticado) return (
-    <div style={{minHeight:'100vh',background:'#0F1117',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
-      <div style={{background:'#1A1A2E',borderRadius:'16px',padding:'2.5rem',width:'100%',maxWidth:'380px',border:'1px solid #2D3748',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
-        <div style={{textAlign:'center',marginBottom:'2rem'}}>
-          <img src={LOGO_URL} alt="DiFiore" style={{width:'200px',marginBottom:'1rem'}}/>
-          <div style={{fontSize:'12px',color:'#64748B',letterSpacing:'3px',textTransform:'uppercase'}}>Sistema de gestión</div>
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:'1rem'}}>
+      <div style={{background:'#12151D',borderRadius:'16px',padding:'2.5rem',width:'100%',maxWidth:'380px',border:'2px solid #262B38',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+        <div style={{textAlign:'center',marginBottom:'1.75rem'}}>
+          <img src={LOGO_URL} alt="DiFiore" style={{width:'200px',marginBottom:'12px'}}/>
+          <div style={{height:'2px',background:'linear-gradient(90deg,#1B4CFF,#2FA8FF)',opacity:.9,margin:'0 auto 12px',maxWidth:'140px'}}/>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:'12px',fontWeight:'600',color:'#6B7488',letterSpacing:'.25em',textTransform:'uppercase'}}>Sistema de gestión</div>
         </div>
         <form onSubmit={login}>
-          <div style={{marginBottom:'1rem'}}>
-            <label style={{fontSize:'11px',color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.5px',fontWeight:'600',display:'block',marginBottom:'6px'}}>Contraseña</label>
+          <div style={{marginBottom:'1.1rem'}}>
+            <label style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:'11px',color:'#9AA3B8',textTransform:'uppercase',letterSpacing:'.04em',fontWeight:'700',display:'block',marginBottom:'6px'}}>Contraseña</label>
             <div style={{position:'relative'}}>
               <input
                 type={verPass ? 'text' : 'password'}
@@ -92,21 +94,21 @@ export default function App({ Component, pageProps }) {
                 onKeyUp={revisarMayus}
                 placeholder="Ingresá tu contraseña"
                 autoFocus
-                style={{width:'100%',padding:'10px 42px 10px 14px',borderRadius:'8px',border:'1px solid #2D3748',background:'#0F1117',color:'#F1F5F9',fontSize:'14px',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
+                style={{width:'100%',padding:'11px 70px 11px 14px',borderRadius:'8px',border:'1.5px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'14px',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
               />
               <button
                 type="button"
                 onClick={() => setVerPass(v => !v)}
-                style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#64748B',padding:'4px',lineHeight:1}}
+                style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontSize:'11px',fontWeight:'700',letterSpacing:'.03em',textTransform:'uppercase',color:'#2FA8FF',padding:'4px'}}
                 tabIndex={-1}
               >
-                {verPass ? '🙈' : '👁️'}
+                {verPass ? 'Ocultar' : 'Mostrar'}
               </button>
             </div>
           </div>
-          {mayusActivo && <div style={{color:'#FBBF24',fontSize:'12px',marginBottom:'12px',textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>⚠️ Bloq Mayús activado</div>}
-          {error && <div style={{color:'#F87171',fontSize:'13px',marginBottom:'12px',textAlign:'center'}}>{error}</div>}
-          <button type="submit" style={{width:'100%',padding:'11px',borderRadius:'8px',background:'#2563EB',color:'#fff',border:'none',fontSize:'14px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit'}}>
+          {mayusActivo && <div style={{color:'#F5B700',fontSize:'12px',marginBottom:'12px',textAlign:'center'}}>Bloq Mayús activado</div>}
+          {error && <div style={{color:'#FF4D4F',fontSize:'13px',marginBottom:'12px',textAlign:'center'}}>{error}</div>}
+          <button type="submit" className={styles.btnPrimary} style={{width:'100%',padding:'12px'}}>
             Ingresar
           </button>
         </form>

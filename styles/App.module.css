@@ -14,7 +14,7 @@
 .navItem:hover { color: #fff; background: #1C2130; }
 .navActive { color: #fff !important; background: linear-gradient(135deg,#1B4CFF,#0A2A9C) !important; font-weight: 700; }
 
-.navDivider { height: 2px; background: rgba(47,168,255,.75); margin: 8px 4px; border-radius: 2px; box-shadow: 0 0 8px rgba(47,168,255,.7), 0 0 2px rgba(47,168,255,.9); }
+.navDivider { flex-shrink: 0; height: 3px; min-height: 3px; background: #2FA8FF; margin: 9px 4px; border-radius: 2px; box-shadow: 0 0 6px 0 rgba(47,168,255,.7); }
 
 .navBottom { margin-top: auto; border-top: 1px solid #262B38; padding-top: 12px; }
 
