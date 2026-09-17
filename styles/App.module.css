@@ -117,7 +117,7 @@
 .tallerCard { background: linear-gradient(155deg,#171B25,#0D1018); border: 2px solid #262B38; border-radius: 14px; padding: 1.25rem; cursor: pointer; transition: all .15s; }
 .tallerCard:hover { border-color: #2FA8FF; box-shadow: 0 8px 22px rgba(47,168,255,.18); transform: translateY(-2px); }
 .tallerNombre { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #9AA3B8; margin-bottom: 8px; }
-.tallerN { font-family: 'Saira Extra Condensed', Impact, sans-serif; font-size: 16px; font-weight: 800; color: #fff; line-height: 1; }
+.tallerN { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; color: #fff; line-height: 1; }
 .tallerN span { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; color: #6B7488; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .tallerBtn { margin-top: 12px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #2FA8FF; }
 
