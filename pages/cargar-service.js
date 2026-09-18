@@ -38,8 +38,9 @@ export default function CargarService() {
 
   function set(campo, valor) { setForm(f => ({ ...f, [campo]: valor })) }
 
-  const patenteQR = norm(form.patente)
-  const qrUrl = origin && patenteQR.length >= 6 ? `${origin}/service?p=${patenteQR}` : ''
+  // QR único y fijo: manda siempre a /service, donde cualquier cliente escribe su propia
+  // patente. No es un QR distinto por vehículo.
+  const qrUrl = origin ? `${origin}/service` : ''
 
   async function copiarLink() {
     try { await navigator.clipboard.writeText(qrUrl); setCopiado(true); setTimeout(() => setCopiado(false), 1500) } catch {}
@@ -103,8 +104,8 @@ export default function CargarService() {
           <section className="qrbox">
             <div className="qrhead">
               <div>
-                <div className="qrlabel">Código QR del vehículo</div>
-                <div className="qrplate">{pretty(patenteQR)}</div>
+                <div className="qrlabel">Código QR para los clientes</div>
+                <div className="qrplate">Consultá tu service</div>
               </div>
               <div className="qracts">
                 <button type="button" onClick={copiarLink}>{copiado ? 'Copiado ✓' : 'Copiar link'}</button>
