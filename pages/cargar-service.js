@@ -33,6 +33,7 @@ export default function CargarService() {
   const [msg, setMsg] = useState(null)
   const [origin, setOrigin] = useState('')
   const [copiado, setCopiado] = useState(false)
+  const [mostrarQR, setMostrarQR] = useState(false)
 
   useEffect(() => { setOrigin(window.location.origin) }, [])
 
@@ -101,20 +102,27 @@ export default function CargarService() {
         </section>
 
         {qrUrl && (
-          <section className="qrbox">
-            <div className="qrhead">
-              <div>
-                <div className="qrlabel">Código QR para los clientes</div>
-                <div className="qrplate">Consultá tu service</div>
-              </div>
-              <div className="qracts">
-                <button type="button" onClick={copiarLink}>{copiado ? 'Copiado ✓' : 'Copiar link'}</button>
-                <a href={qrUrl} target="_blank" rel="noreferrer">Abrir ↗</a>
-              </div>
-            </div>
-            <div className="qrimg"><QRCodeSVG value={qrUrl} size={140} bgColor="#ffffff" fgColor="#0e1118" level="M" /></div>
-            <div className="qrurl">{qrUrl.replace(/^https?:\/\//, '')}</div>
-          </section>
+          <div className="qrArea">
+            <button type="button" className="qrToggle" onClick={() => setMostrarQR(v => !v)}>
+              {mostrarQR ? 'Ocultar código QR' : 'Ver código QR'}
+            </button>
+            {mostrarQR && (
+              <section className="qrbox">
+                <div className="qrhead">
+                  <div>
+                    <div className="qrlabel">Código QR para los clientes</div>
+                    <div className="qrplate">Consultá tu service</div>
+                  </div>
+                  <div className="qracts">
+                    <button type="button" onClick={copiarLink}>{copiado ? 'Copiado ✓' : 'Copiar link'}</button>
+                    <a href={qrUrl} target="_blank" rel="noreferrer">Abrir ↗</a>
+                  </div>
+                </div>
+                <div className="qrimg"><QRCodeSVG value={qrUrl} size={92} bgColor="#ffffff" fgColor="#0e1118" level="M" /></div>
+                <div className="qrurl">{qrUrl.replace(/^https?:\/\//, '')}</div>
+              </section>
+            )}
+          </div>
         )}
 
         <form onSubmit={guardar}>
@@ -183,15 +191,18 @@ export default function CargarService() {
         .hero h1{font-family:"Saira Extra Condensed",Impact,sans-serif;font-weight:800;font-size:40px;line-height:.95;margin:0 0 10px;text-transform:uppercase}
         .hero h1 em{font-style:italic;color:var(--blue2)}
         .hero p{margin:0;color:var(--muted);font-size:15px;max-width:44ch;line-height:1.45}
-        .qrbox{margin-bottom:22px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px}
-        .qrhead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-        .qrlabel{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-        .qrplate{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;letter-spacing:.08em;margin-top:2px}
-        .qracts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-        .qracts button,.qracts a{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue2);background:transparent;border:1px solid var(--line2);border-radius:6px;padding:7px 10px;cursor:pointer;text-decoration:none;white-space:nowrap}
+        .qrArea{margin-bottom:22px}
+        .qrToggle{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue2);background:transparent;border:1px solid var(--line2);border-radius:8px;padding:8px 14px;cursor:pointer}
+        .qrToggle:hover{background:#1c2130;color:#fff}
+        .qrbox{margin-top:10px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;max-width:220px}
+        .qrhead{width:100%;display:flex;flex-direction:column;gap:6px}
+        .qrlabel{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+        .qrplate{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14px;letter-spacing:.06em;margin-top:1px}
+        .qracts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+        .qracts button,.qracts a{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--blue2);background:transparent;border:1px solid var(--line2);border-radius:6px;padding:5px 8px;cursor:pointer;text-decoration:none;white-space:nowrap}
         .qracts button:hover,.qracts a:hover{background:#1c2130;color:#fff}
-        .qrimg{background:#fff;padding:10px;border-radius:8px;border:2px solid #0d1018;line-height:0}
-        .qrurl{font-size:12px;color:var(--dim);word-break:break-all;text-align:center}
+        .qrimg{background:#fff;padding:8px;border-radius:8px;border:2px solid #0d1018;line-height:0}
+        .qrurl{font-size:10.5px;color:var(--dim);word-break:break-all;text-align:center}
         .sticker{background:var(--sticker);border-radius:10px;padding:10px;color:var(--paper-ink);box-shadow:0 14px 34px rgba(0,0,0,.5)}
         .sticker .head{background:#0d1018;border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
         .headLabel{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#fff;opacity:.7}
