@@ -1725,13 +1725,9 @@ return (
           ...(admin?[{id:'recibo',label:'Recibo'}]:[]),
           {id:'checklist',label:'Checklist entrega'},
           ...(admin?[{id:'informe',label:'Informe mensual'},{id:'empleados',label:'Empleados'}]:[])
-        ].map((item,i)=>(
-          <Fragment key={item.id}>
-            {i>0&&<div className={styles.navDivider}/>}
-            <button className={`${styles.navItem} ${seccion===item.id?styles.navActive:''}`} onClick={()=>{setSeccion(item.id);setTallerVista(null);setVistaStats(null);setVistaMarca(null);setVerEntregados(false);setVerPapelera(false);setSidebarOpen(false)}}>{item.label}</button>
-          </Fragment>
+        ].map(item=>(
+          <button key={item.id} className={`${styles.navItem} ${seccion===item.id?styles.navActive:''}`} onClick={()=>{setSeccion(item.id);setTallerVista(null);setVistaStats(null);setVistaMarca(null);setVerEntregados(false);setVerPapelera(false);setSidebarOpen(false)}}>{item.label}</button>
         ))}
-        <div className={styles.navDivider}/>
         <a href="/cargar-service" className={styles.navItem} style={{textDecoration:'none'}}>Cargar service</a>
         <div className={styles.navBottom}>
           <div className={styles.sidebarContact}>

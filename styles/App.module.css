@@ -14,8 +14,6 @@
 .navItem:hover { color: #fff; background: #1C2130; }
 .navActive { color: #fff !important; background: linear-gradient(135deg,#1B4CFF,#0A2A9C) !important; font-weight: 700; }
 
-.navDivider { flex-shrink: 0; height: 1px; min-height: 1px; background: #2FA8FF; margin: 6px 14px; border-radius: 1px; opacity: .55; box-shadow: 0 0 2px 0 rgba(47,168,255,.5); }
-
 .navBottom { margin-top: auto; border-top: 1px solid #262B38; padding-top: 12px; }
 .sidebarContact { display: flex; flex-direction: column; gap: 2px; padding: 2px 0; }
 .contactItem { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; color: #9AA3B8; text-decoration: none; font-family: 'Barlow', sans-serif; font-size: 12px; font-weight: 500; transition: all .15s; }
