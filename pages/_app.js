@@ -19,6 +19,13 @@ export default function App({ Component, pageProps }) {
   // Mayúscula automática en toda la app: se reescribe el valor del campo antes de que
   // React procese el evento, así se guarda en mayúscula sin tocar cada onChange.
   useEffect(() => {
+    // Setter nativo del input/textarea (sin el "value tracker" que React le agrega a cada
+    // elemento). Si reescribimos el valor con el setter normal, React no se entera del
+    // cambio y en el próximo render pisa el campo con su estado viejo — eso es lo que
+    // borraba o dejaba incompletos los nombres al escribir rápido.
+    const setterInput = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+    const setterTextarea = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set
+
     function esCampoDeTexto(el) {
       if (!el || el.dataset?.noUpper !== undefined) return false
       const tag = el.tagName
@@ -29,18 +36,39 @@ export default function App({ Component, pageProps }) {
       }
       return false
     }
-    function alEscribir(e) {
-      const el = e.target
-      if (!esCampoDeTexto(el)) return
+    function aplicarMayuscula(el) {
       const mayus = el.value.toUpperCase()
       if (mayus === el.value) return
       const inicio = el.selectionStart
       const fin = el.selectionEnd
-      el.value = mayus
+      const setter = el.tagName === 'TEXTAREA' ? setterTextarea : setterInput
+      if (setter) setter.call(el, mayus); else el.value = mayus
       if (inicio !== null && fin !== null) { try { el.setSelectionRange(inicio, fin) } catch {} }
+      // Avisamos a React del cambio disparando un input event nuevo: como usamos el setter
+      // nativo, React lo toma como un cambio real y actualiza su estado con el valor final.
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    function alEscribir(e) {
+      const el = e.target
+      if (!esCampoDeTexto(el)) return
+      // Mientras el navegador está componiendo un caracter (tildes con teclado compuesto,
+      // teclados de celular con autocorrección, IME) no tocamos el valor: reescribirlo a
+      // mitad de la composición hace que el navegador pierda esa letra y el texto quede
+      // incompleto o se borre. Se aplica la mayúscula recién cuando termina de componer.
+      if (e.isComposing) return
+      aplicarMayuscula(el)
+    }
+    function alTerminarComposicion(e) {
+      const el = e.target
+      if (!esCampoDeTexto(el)) return
+      aplicarMayuscula(el)
     }
     document.addEventListener('input', alEscribir, true)
-    return () => document.removeEventListener('input', alEscribir, true)
+    document.addEventListener('compositionend', alTerminarComposicion, true)
+    return () => {
+      document.removeEventListener('input', alEscribir, true)
+      document.removeEventListener('compositionend', alTerminarComposicion, true)
+    }
   }, [])
 
   function revisarMayus(e) {
