@@ -19,6 +19,15 @@ function formatPatente(val, valorAnterior, cursorPos) {
   }
   return pretty(norm(base).slice(0, 7))
 }
+// Mientras el navegador está componiendo un caracter (teclados de celular con
+// autocorrección/predictivo, IME) dejamos pasar el valor tal cual, sin reformatear — hacerlo
+// a mitad de la composición mezclaba las letras. El formato final se aplica al terminar.
+function patenteHandlers(valorAnterior, setter) {
+  return {
+    onChange: e => { if (e.nativeEvent.isComposing) { setter(e.target.value); return } setter(formatPatente(e.target.value, valorAnterior, e.target.selectionStart)) },
+    onCompositionEnd: e => setter(formatPatente(e.target.value, valorAnterior, e.target.selectionStart))
+  }
+}
 const fecha = f => (f ? new Date(f + 'T12:00:00').toLocaleDateString('es-AR') : '—')
 
 export default function Service() {
@@ -102,9 +111,10 @@ export default function Service() {
           <form onSubmit={e => { e.preventDefault(); buscar() }} autoComplete="off">
             <div className="plate">
               <div className="band"><span>República Argentina</span><span>Patente</span></div>
-              <input id="patente" value={patente} onChange={e => setPatente(formatPatente(e.target.value, patente, e.target.selectionStart))}
+              <input id="patente" value={patente} {...patenteHandlers(patente, setPatente)}
                 maxLength={9} placeholder="AB 123 CD" aria-label="Patente del vehículo" spellCheck={false} inputMode="text" />
             </div>
+            <div className="hint">No hace falta poner el espacio, se agrega solo</div>
             <div className="row">
               <button className="btn" type="submit" disabled={cargando}>{cargando ? 'Buscando…' : 'Ver mi service'}</button>
             </div>
@@ -218,6 +228,7 @@ export default function Service() {
         .plate input{border:0;outline:0;background:transparent;width:100%;padding:12px 14px 10px;text-align:center;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:48px;letter-spacing:.14em;text-transform:uppercase;color:var(--paper-ink)}
         .plate input::placeholder{color:#b8c0cf}
         .plate input:focus-visible{box-shadow:inset 0 0 0 3px var(--blue2)}
+        .hint{font-size:12px;color:var(--dim);margin-top:8px;padding:0 4px;text-align:center}
         .row{display:flex;gap:10px;margin-top:12px}
         .btn{flex:1;border:0;border-radius:8px;padding:14px 18px;cursor:pointer;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;letter-spacing:.08em;text-transform:uppercase;background:var(--blue);color:#fff}
         .btn:hover{filter:brightness(1.12)}.btn:disabled{opacity:.6;cursor:wait}

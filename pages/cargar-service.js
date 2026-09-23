@@ -19,6 +19,15 @@ function formatPatente(val, valorAnterior, cursorPos) {
   }
   return pretty(norm(base).slice(0, 7))
 }
+// Mientras el navegador está componiendo un caracter (teclados de celular con
+// autocorrección/predictivo, IME) dejamos pasar el valor tal cual, sin reformatear — hacerlo
+// a mitad de la composición mezclaba las letras. El formato final se aplica al terminar.
+function patenteHandlers(valorAnterior, setter) {
+  return {
+    onChange: e => { if (e.nativeEvent.isComposing) { setter(e.target.value); return } setter(formatPatente(e.target.value, valorAnterior, e.target.selectionStart)) },
+    onCompositionEnd: e => setter(formatPatente(e.target.value, valorAnterior, e.target.selectionStart))
+  }
+}
 const formatNum = v => { const n = (v || '').toString().replace(/\D/g, ''); return n.replace(/\B(?=(\d{3})+(?!\d))/g, '.') }
 const parseNum = v => (v || '').toString().replace(/\./g, '')
 const fechaAR = f => (f ? new Date(f + 'T12:00:00').toLocaleDateString('es-AR') : '—')
@@ -213,9 +222,10 @@ export default function CargarService() {
             <div className="sticker">
               <div className="head">
                 <span className="headLabel">Patente</span>
-                <input className="plateInput" value={form.patente} onChange={e => set('patente', formatPatente(e.target.value, form.patente, e.target.selectionStart))} placeholder="AB 123 CD" maxLength={9} spellCheck={false} />
+                <input className="plateInput" value={form.patente} {...patenteHandlers(form.patente, v => set('patente', v))} placeholder="AB 123 CD" maxLength={9} spellCheck={false} />
                 <input className="dateInput" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
               </div>
+              <div className="hint">No hace falta poner el espacio, se agrega solo</div>
 
               <div className="sheet">
                 <div className="row2">
@@ -308,6 +318,7 @@ export default function CargarService() {
         .plateInput{flex:1;min-width:120px;border:0;outline:0;background:transparent;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px;letter-spacing:.1em;text-transform:uppercase}
         .plateInput::placeholder{color:#5b6478}
         .dateInput{flex-shrink:0;max-width:100%;border:0;outline:0;background:#1b2030;color:#fff;border-radius:6px;padding:6px 8px;font-family:"Barlow Condensed",sans-serif;font-size:13px}
+        .hint{font-size:11px;color:rgba(13,16,24,.6);margin-top:6px;padding:0 2px;font-weight:600}
         .sheet{background:var(--paper);border-radius:6px;margin-top:8px;padding:12px;border:2px solid #0d1018}
         .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
         .field{margin-bottom:10px}
