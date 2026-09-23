@@ -38,7 +38,7 @@ export default function App({ Component, pageProps }) {
     }
     function aplicarMayuscula(el) {
       const mayus = el.value.toUpperCase()
-      if (mayus === el.value) return
+      if (mayus === el.value) return false
       const inicio = el.selectionStart
       const fin = el.selectionEnd
       const setter = el.tagName === 'TEXTAREA' ? setterTextarea : setterInput
@@ -47,6 +47,7 @@ export default function App({ Component, pageProps }) {
       // Avisamos a React del cambio disparando un input event nuevo: como usamos el setter
       // nativo, React lo toma como un cambio real y actualiza su estado con el valor final.
       el.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
     }
     function alEscribir(e) {
       const el = e.target
@@ -56,7 +57,11 @@ export default function App({ Component, pageProps }) {
       // mitad de la composición hace que el navegador pierda esa letra y el texto quede
       // incompleto o se borre. Se aplica la mayúscula recién cuando termina de componer.
       if (e.isComposing) return
-      aplicarMayuscula(el)
+      // Si reescribimos el valor, este mismo evento (el original, todavía en minúscula)
+      // seguiría su curso y React también lo procesaría — cada tecla se terminaba
+      // aplicando dos veces y la app quedaba lenta para escribir. Lo cortamos acá: el
+      // evento nuevo que disparamos en aplicarMayuscula es el que React termina viendo.
+      if (aplicarMayuscula(el)) e.stopPropagation()
     }
     function alTerminarComposicion(e) {
       const el = e.target
