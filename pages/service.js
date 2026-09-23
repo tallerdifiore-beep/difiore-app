@@ -9,6 +9,16 @@ const LOGO = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/
 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('es-AR'))
 const norm = s => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 const pretty = p => (p.length === 7 ? `${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5)}` : p.length === 6 ? `${p.slice(0, 3)} ${p.slice(3)}` : p)
+// Si el usuario borra justo el espacio que puso el formateo automático, sin esto se repone
+// solo y hay que apretar borrar dos veces para sacar la letra de al lado.
+function formatPatente(val, valorAnterior, cursorPos) {
+  let base = val
+  if (valorAnterior !== undefined && cursorPos !== undefined && val.length === valorAnterior.length - 1) {
+    const borrado = valorAnterior[cursorPos]
+    if (borrado && !/[A-Z0-9]/i.test(borrado)) base = valorAnterior.slice(0, cursorPos - 1) + valorAnterior.slice(cursorPos + 1)
+  }
+  return pretty(norm(base).slice(0, 7))
+}
 const fecha = f => (f ? new Date(f + 'T12:00:00').toLocaleDateString('es-AR') : '—')
 
 export default function Service() {
@@ -18,6 +28,7 @@ export default function Service() {
   const [srv, setSrv] = useState(null)
   const [veh, setVeh] = useState(null)
   const [kmHoy, setKmHoy] = useState('')
+  const [cantServices, setCantServices] = useState(0)
   const resRef = useRef(null)
 
   // Si el QR viene con ?p=PATENTE la busca sola
@@ -28,7 +39,7 @@ export default function Service() {
 
   async function buscar(pRaw) {
     const p = norm(pRaw ?? patente)
-    setMsg(''); setSrv(null); setVeh(null); setKmHoy('')
+    setMsg(''); setSrv(null); setVeh(null); setKmHoy(''); setCantServices(0)
     if (p.length < 6) { setMsg('Escribí la patente completa (por ejemplo AB 123 CD o ABC 123).'); return }
     setCargando(true)
     const { data: rows, error } = await supabase.from('services').select('*').eq('patente_norm', p).order('fecha', { ascending: false }).order('created_at', { ascending: false }).limit(1)
@@ -39,6 +50,9 @@ export default function Service() {
     setSrv(s)
     const { data: vs } = await supabase.from('vehiculos').select('marca_modelo, patente').eq('patente_norm', p).limit(1)
     setVeh((vs || [])[0] || null)
+    // Sistema de fidelidad: cada 5 services de esta patente, el 5° tiene 50% off.
+    const { count } = await supabase.from('services').select('id', { count: 'exact', head: true }).eq('patente_norm', p)
+    setCantServices(count || 0)
     setTimeout(() => resRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
 
@@ -56,6 +70,11 @@ export default function Service() {
   })
   const peor = calc.some(c => c.cls === 'bad') ? 'bad' : calc.some(c => c.cls === 'warn') ? 'warn' : 'ok'
   const estadoTxt = !hoy ? (srv ? 'Último service ' + fecha(srv.fecha) : '') : peor === 'bad' ? 'Service vencido' : peor === 'warn' ? 'Service próximo' : 'Al día'
+
+  // Fidelidad: cada 5 services de la patente, el 5° (10°, 15°...) tiene 50% off.
+  const enCiclo = cantServices % 5
+  const ultimoConDescuento = cantServices > 0 && enCiclo === 0
+  const faltanParaDescuento = enCiclo === 0 ? 5 : 5 - enCiclo
   const hayCorrea = srv && srv.correa_km != null
   const waHref = `https://wa.me/${WA}?text=${encodeURIComponent(`Hola! Quiero pedir turno para el service de mi ${veh?.marca_modelo || 'auto'} (${pretty(norm(patente))}).`)}`
 
@@ -83,7 +102,7 @@ export default function Service() {
           <form onSubmit={e => { e.preventDefault(); buscar() }} autoComplete="off">
             <div className="plate">
               <div className="band"><span>República Argentina</span><span>Patente</span></div>
-              <input id="patente" value={patente} onChange={e => setPatente(pretty(norm(e.target.value)).slice(0, 9))}
+              <input id="patente" value={patente} onChange={e => setPatente(formatPatente(e.target.value, patente, e.target.selectionStart))}
                 maxLength={9} placeholder="AB 123 CD" aria-label="Patente del vehículo" spellCheck={false} inputMode="text" />
             </div>
             <div className="row">
@@ -99,6 +118,22 @@ export default function Service() {
               <h2><small>{pretty(norm(srv.patente))}</small><span>{veh?.marca_modelo || 'Tu vehículo'}</span></h2>
               <span className={'status ' + (hoy ? peor : 'ok')}><i />{estadoTxt}</span>
             </div>
+
+            {cantServices > 0 && (
+              <div className={'loyalty' + (ultimoConDescuento ? ' win' : '')}>
+                {ultimoConDescuento ? (
+                  <>
+                    <div className="loyaltyBadge">-50%</div>
+                    <div className="loyaltyText"><b>¡Felicitaciones!</b> Este service (N°{cantServices}) tiene 50% de descuento por fidelidad a esta patente.</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="loyaltyDots">{Array.from({ length: 5 }).map((_, i) => <span key={i} className={'dot' + (i < enCiclo ? ' on' : '')} />)}</div>
+                    <div className="loyaltyText">Llevás <b>{cantServices}</b> {cantServices === 1 ? 'service' : 'services'} con nosotros. Te faltan <b>{faltanParaDescuento}</b> para tu 50% de descuento.</div>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="sticker">
               <div className="head">
@@ -196,6 +231,14 @@ export default function Service() {
         .status.ok{color:var(--ok);border-color:rgba(46,204,113,.45);background:rgba(46,204,113,.1)}
         .status.warn{color:var(--warn);border-color:rgba(245,183,0,.45);background:rgba(245,183,0,.1)}
         .status.bad{color:var(--bad);border-color:rgba(255,77,79,.45);background:rgba(255,77,79,.1)}
+        .loyalty{display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:12px 14px;border-radius:10px;background:rgba(47,168,255,.08);border:1px solid rgba(47,168,255,.35)}
+        .loyalty.win{background:rgba(46,204,113,.12);border-color:rgba(46,204,113,.45)}
+        .loyaltyBadge{flex-shrink:0;width:46px;height:46px;border-radius:50%;background:var(--ok);color:#06210f;display:flex;align-items:center;justify-content:center;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px;letter-spacing:.02em}
+        .loyaltyDots{display:flex;gap:5px;flex-shrink:0}
+        .loyaltyDots .dot{width:10px;height:10px;border-radius:50%;background:var(--line2);border:1px solid var(--line2)}
+        .loyaltyDots .dot.on{background:var(--blue2);border-color:var(--blue2)}
+        .loyaltyText{font-family:Barlow,sans-serif;font-size:13.5px;color:var(--muted);line-height:1.4}
+        .loyaltyText b{color:var(--text)}
         .sticker{background:var(--sticker);border-radius:10px;padding:10px;color:var(--paper-ink);box-shadow:0 14px 34px rgba(0,0,0,.5)}
         .sticker .head{background:#0d1018;border-radius:6px;padding:10px 14px 9px;display:flex;justify-content:space-between;align-items:center}
         .sticker .head .date{font-family:"Barlow Condensed",sans-serif;color:#fff;font-size:13px;letter-spacing:.14em;text-transform:uppercase;text-align:right;line-height:1.2}

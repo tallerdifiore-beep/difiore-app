@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import '../styles/globals.css'
-const LOGO_URL = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/assets/ChatGPT%20Image%2017%20jul%202026,%2015_11_05.png'
+import styles from '../styles/App.module.css'
+const LOGO_URL = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/logo-difiore/logo-difiore.png'
 
 export default function App({ Component, pageProps }) {
   const [autenticado, setAutenticado] = useState(false)
@@ -18,6 +19,13 @@ export default function App({ Component, pageProps }) {
   // Mayúscula automática en toda la app: se reescribe el valor del campo antes de que
   // React procese el evento, así se guarda en mayúscula sin tocar cada onChange.
   useEffect(() => {
+    // Setter nativo del input/textarea (sin el "value tracker" que React le agrega a cada
+    // elemento). Si reescribimos el valor con el setter normal, React no se entera del
+    // cambio y en el próximo render pisa el campo con su estado viejo — eso es lo que
+    // borraba o dejaba incompletos los nombres al escribir rápido.
+    const setterInput = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+    const setterTextarea = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set
+
     function esCampoDeTexto(el) {
       if (!el || el.dataset?.noUpper !== undefined) return false
       const tag = el.tagName
@@ -28,18 +36,44 @@ export default function App({ Component, pageProps }) {
       }
       return false
     }
+    function aplicarMayuscula(el) {
+      const mayus = el.value.toUpperCase()
+      if (mayus === el.value) return false
+      const inicio = el.selectionStart
+      const fin = el.selectionEnd
+      const setter = el.tagName === 'TEXTAREA' ? setterTextarea : setterInput
+      if (setter) setter.call(el, mayus); else el.value = mayus
+      if (inicio !== null && fin !== null) { try { el.setSelectionRange(inicio, fin) } catch {} }
+      // Avisamos a React del cambio disparando un input event nuevo: como usamos el setter
+      // nativo, React lo toma como un cambio real y actualiza su estado con el valor final.
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    }
     function alEscribir(e) {
       const el = e.target
       if (!esCampoDeTexto(el)) return
-      const mayus = el.value.toUpperCase()
-      if (mayus === el.value) return
-      const inicio = el.selectionStart
-      const fin = el.selectionEnd
-      el.value = mayus
-      if (inicio !== null && fin !== null) { try { el.setSelectionRange(inicio, fin) } catch {} }
+      // Mientras el navegador está componiendo un caracter (tildes con teclado compuesto,
+      // teclados de celular con autocorrección, IME) no tocamos el valor: reescribirlo a
+      // mitad de la composición hace que el navegador pierda esa letra y el texto quede
+      // incompleto o se borre. Se aplica la mayúscula recién cuando termina de componer.
+      if (e.isComposing) return
+      // Si reescribimos el valor, este mismo evento (el original, todavía en minúscula)
+      // seguiría su curso y React también lo procesaría — cada tecla se terminaba
+      // aplicando dos veces y la app quedaba lenta para escribir. Lo cortamos acá: el
+      // evento nuevo que disparamos en aplicarMayuscula es el que React termina viendo.
+      if (aplicarMayuscula(el)) e.stopPropagation()
+    }
+    function alTerminarComposicion(e) {
+      const el = e.target
+      if (!esCampoDeTexto(el)) return
+      aplicarMayuscula(el)
     }
     document.addEventListener('input', alEscribir, true)
-    return () => document.removeEventListener('input', alEscribir, true)
+    document.addEventListener('compositionend', alTerminarComposicion, true)
+    return () => {
+      document.removeEventListener('input', alEscribir, true)
+      document.removeEventListener('compositionend', alTerminarComposicion, true)
+    }
   }, [])
 
   function revisarMayus(e) {
@@ -73,15 +107,16 @@ export default function App({ Component, pageProps }) {
   if (Component.publica) return <Component {...pageProps} />
 
   if (!autenticado) return (
-    <div style={{minHeight:'100vh',background:'#0F1117',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
-      <div style={{background:'#1A1A2E',borderRadius:'16px',padding:'2.5rem',width:'100%',maxWidth:'380px',border:'1px solid #2D3748',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
-        <div style={{textAlign:'center',marginBottom:'2rem'}}>
-          <img src={LOGO_URL} alt="DiFiore" style={{width:'200px',marginBottom:'1rem'}}/>
-          <div style={{fontSize:'12px',color:'#64748B',letterSpacing:'3px',textTransform:'uppercase'}}>Sistema de gestión</div>
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:'1rem'}}>
+      <div style={{background:'#12151D',borderRadius:'16px',padding:'2.5rem',width:'100%',maxWidth:'380px',border:'2px solid #262B38',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+        <div style={{textAlign:'center',marginBottom:'1.75rem'}}>
+          <img src={LOGO_URL} alt="DiFiore" style={{width:'200px',marginBottom:'12px'}}/>
+          <div style={{height:'2px',background:'linear-gradient(90deg,#1B4CFF,#2FA8FF)',opacity:.9,margin:'0 auto 12px',maxWidth:'140px'}}/>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:'12px',fontWeight:'600',color:'#6B7488',letterSpacing:'.25em',textTransform:'uppercase'}}>Sistema de gestión</div>
         </div>
         <form onSubmit={login}>
-          <div style={{marginBottom:'1rem'}}>
-            <label style={{fontSize:'11px',color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.5px',fontWeight:'600',display:'block',marginBottom:'6px'}}>Contraseña</label>
+          <div style={{marginBottom:'1.1rem'}}>
+            <label style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:'11px',color:'#9AA3B8',textTransform:'uppercase',letterSpacing:'.04em',fontWeight:'700',display:'block',marginBottom:'6px'}}>Contraseña</label>
             <div style={{position:'relative'}}>
               <input
                 type={verPass ? 'text' : 'password'}
@@ -92,21 +127,21 @@ export default function App({ Component, pageProps }) {
                 onKeyUp={revisarMayus}
                 placeholder="Ingresá tu contraseña"
                 autoFocus
-                style={{width:'100%',padding:'10px 42px 10px 14px',borderRadius:'8px',border:'1px solid #2D3748',background:'#0F1117',color:'#F1F5F9',fontSize:'14px',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
+                style={{width:'100%',padding:'11px 70px 11px 14px',borderRadius:'8px',border:'1.5px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'14px',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
               />
               <button
                 type="button"
                 onClick={() => setVerPass(v => !v)}
-                style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#64748B',padding:'4px',lineHeight:1}}
+                style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontSize:'11px',fontWeight:'700',letterSpacing:'.03em',textTransform:'uppercase',color:'#2FA8FF',padding:'4px'}}
                 tabIndex={-1}
               >
-                {verPass ? '🙈' : '👁️'}
+                {verPass ? 'Ocultar' : 'Mostrar'}
               </button>
             </div>
           </div>
-          {mayusActivo && <div style={{color:'#FBBF24',fontSize:'12px',marginBottom:'12px',textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>⚠️ Bloq Mayús activado</div>}
-          {error && <div style={{color:'#F87171',fontSize:'13px',marginBottom:'12px',textAlign:'center'}}>{error}</div>}
-          <button type="submit" style={{width:'100%',padding:'11px',borderRadius:'8px',background:'#2563EB',color:'#fff',border:'none',fontSize:'14px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit'}}>
+          {mayusActivo && <div style={{color:'#F5B700',fontSize:'12px',marginBottom:'12px',textAlign:'center'}}>Bloq Mayús activado</div>}
+          {error && <div style={{color:'#FF4D4F',fontSize:'13px',marginBottom:'12px',textAlign:'center'}}>{error}</div>}
+          <button type="submit" className={styles.btnPrimary} style={{width:'100%',padding:'12px'}}>
             Ingresar
           </button>
         </form>
