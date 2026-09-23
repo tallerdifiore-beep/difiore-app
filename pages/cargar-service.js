@@ -19,6 +19,15 @@ function formatPatente(val, valorAnterior, cursorPos) {
   }
   return pretty(norm(base).slice(0, 7))
 }
+// Mientras el navegador está componiendo un caracter (teclados de celular con
+// autocorrección/predictivo, IME) dejamos pasar el valor tal cual, sin reformatear — hacerlo
+// a mitad de la composición mezclaba las letras. El formato final se aplica al terminar.
+function patenteHandlers(valorAnterior, setter) {
+  return {
+    onChange: e => { if (e.nativeEvent.isComposing) { setter(e.target.value); return } setter(formatPatente(e.target.value, valorAnterior, e.target.selectionStart)) },
+    onCompositionEnd: e => setter(formatPatente(e.target.value, valorAnterior, e.target.selectionStart))
+  }
+}
 const formatNum = v => { const n = (v || '').toString().replace(/\D/g, ''); return n.replace(/\B(?=(\d{3})+(?!\d))/g, '.') }
 const parseNum = v => (v || '').toString().replace(/\./g, '')
 const fechaAR = f => (f ? new Date(f + 'T12:00:00').toLocaleDateString('es-AR') : '—')
@@ -213,7 +222,7 @@ export default function CargarService() {
             <div className="sticker">
               <div className="head">
                 <span className="headLabel">Patente</span>
-                <input className="plateInput" value={form.patente} onChange={e => set('patente', formatPatente(e.target.value, form.patente, e.target.selectionStart))} placeholder="AB 123 CD" maxLength={9} spellCheck={false} />
+                <input className="plateInput" value={form.patente} {...patenteHandlers(form.patente, v => set('patente', v))} placeholder="AB 123 CD" maxLength={9} spellCheck={false} />
                 <input className="dateInput" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
               </div>
 

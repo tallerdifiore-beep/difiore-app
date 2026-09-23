@@ -19,6 +19,15 @@ function formatPatente(val, valorAnterior, cursorPos) {
   }
   return pretty(norm(base).slice(0, 7))
 }
+// Mientras el navegador está componiendo un caracter (teclados de celular con
+// autocorrección/predictivo, IME) dejamos pasar el valor tal cual, sin reformatear — hacerlo
+// a mitad de la composición mezclaba las letras. El formato final se aplica al terminar.
+function patenteHandlers(valorAnterior, setter) {
+  return {
+    onChange: e => { if (e.nativeEvent.isComposing) { setter(e.target.value); return } setter(formatPatente(e.target.value, valorAnterior, e.target.selectionStart)) },
+    onCompositionEnd: e => setter(formatPatente(e.target.value, valorAnterior, e.target.selectionStart))
+  }
+}
 const fecha = f => (f ? new Date(f + 'T12:00:00').toLocaleDateString('es-AR') : '—')
 
 export default function Service() {
@@ -102,7 +111,7 @@ export default function Service() {
           <form onSubmit={e => { e.preventDefault(); buscar() }} autoComplete="off">
             <div className="plate">
               <div className="band"><span>República Argentina</span><span>Patente</span></div>
-              <input id="patente" value={patente} onChange={e => setPatente(formatPatente(e.target.value, patente, e.target.selectionStart))}
+              <input id="patente" value={patente} {...patenteHandlers(patente, setPatente)}
                 maxLength={9} placeholder="AB 123 CD" aria-label="Patente del vehículo" spellCheck={false} inputMode="text" />
             </div>
             <div className="row">
