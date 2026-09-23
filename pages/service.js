@@ -114,6 +114,7 @@ export default function Service() {
               <input id="patente" value={patente} {...patenteHandlers(patente, setPatente)}
                 maxLength={9} placeholder="AB 123 CD" aria-label="Patente del vehículo" spellCheck={false} inputMode="text" />
             </div>
+            <div className="hint">No hace falta poner el espacio, se agrega solo</div>
             <div className="row">
               <button className="btn" type="submit" disabled={cargando}>{cargando ? 'Buscando…' : 'Ver mi service'}</button>
             </div>
@@ -227,6 +228,7 @@ export default function Service() {
         .plate input{border:0;outline:0;background:transparent;width:100%;padding:12px 14px 10px;text-align:center;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:48px;letter-spacing:.14em;text-transform:uppercase;color:var(--paper-ink)}
         .plate input::placeholder{color:#b8c0cf}
         .plate input:focus-visible{box-shadow:inset 0 0 0 3px var(--blue2)}
+        .hint{font-size:12px;color:var(--dim);margin-top:8px;padding:0 4px;text-align:center}
         .row{display:flex;gap:10px;margin-top:12px}
         .btn{flex:1;border:0;border-radius:8px;padding:14px 18px;cursor:pointer;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;letter-spacing:.08em;text-transform:uppercase;background:var(--blue);color:#fff}
         .btn:hover{filter:brightness(1.12)}.btn:disabled{opacity:.6;cursor:wait}
