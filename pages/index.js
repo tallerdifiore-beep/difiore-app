@@ -375,8 +375,9 @@ const tcHTML = `
     <div class="tc-item"><b>6. Seguro vigente</b>El cliente declara entregar el vehículo con la póliza de seguro al día. Di Fiore no se responsabiliza por siniestros en caso de que el seguro no se encuentre vigente.</div>
     <div class="tc-item"><b>7. Pertenencias</b>El cliente deberá retirar todas las pertenencias personales. Di Fiore no se responsabiliza por objetos personales en el interior del vehículo.</div>
     <div class="tc-item"><b>8. Plazos de pago</b>El plazo máximo para abonar el total del trabajo es el día del retiro del vehículo.</div>
-    <div class="tc-item"><b>9. Garantía (30 días desde la entrega)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. NO TRABAJAMOS DE OTRA MANERA.</div>
+    <div class="tc-item"><b>9. Garantía (30 días o 15.000 km desde la entrega, lo que ocurra primero)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. NO TRABAJAMOS DE OTRA MANERA.</div>
     <div class="tc-item"><b>10. Entrega</b>El cliente podrá retirar su vehículo hasta las 17hs con previa coordinación.</div>
+    <div class="tc-item"><b>11. Repuestos propios</b>Si el cliente opta por reparar el vehículo aportando sus propios repuestos, el trabajo realizado no cuenta con garantía.</div>
   </div>
   <div style="display:flex;gap:30px;margin-top:8px;font-size:9px;">
     <div>Fecha: ___________________</div>
