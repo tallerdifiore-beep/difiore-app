@@ -197,7 +197,16 @@ export default function CargarService() {
             </div>
 
             {cargando && <div className="msg" style={{ color: 'var(--muted)' }}>Cargando…</div>}
-            {!cargando && serviciosFiltrados.length === 0 && <div className="msg">No hay services cargados todavía.</div>}
+            {!cargando && serviciosFiltrados.length === 0 && (
+              <div className="msg">{busqueda.trim() ? 'No encontramos services para esa búsqueda.' : 'No hay services cargados todavía.'}</div>
+            )}
+            {!cargando && serviciosFiltrados.length > 0 && (
+              <div className="resumen">
+                {busqueda.trim()
+                  ? `${serviciosFiltrados.length} service${serviciosFiltrados.length === 1 ? '' : 's'} encontrado${serviciosFiltrados.length === 1 ? '' : 's'}`
+                  : `${serviciosFiltrados.length} service${serviciosFiltrados.length === 1 ? '' : 's'} en total`}
+              </div>
+            )}
 
             <div className="lista">
               {serviciosFiltrados.map(s => (
@@ -303,6 +312,7 @@ export default function CargarService() {
         .row{display:flex;gap:10px}
         .search{flex:1;border:1px solid var(--line2);border-radius:8px;background:var(--panel);color:var(--text);padding:10px 12px;font-family:Barlow,sans-serif;font-size:14px;text-transform:uppercase;outline:none}
         .search:focus{border-color:var(--blue2)}
+        .resumen{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--blue2);margin-bottom:10px}
         .lista{display:flex;flex-direction:column;gap:8px}
         .itemLista{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:12px 14px;cursor:pointer}
         .itemLista:hover{border-color:var(--blue2)}
