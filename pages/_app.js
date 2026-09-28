@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import '../styles/globals.css'
 import styles from '../styles/App.module.css'
-const LOGO_URL = 'https://gepusjdevpaxxkrgzyeb.supabase.co/storage/v1/object/public/logo-difiore/logo-difiore.png'
+const LOGO_URL = '/logo-difiore.png'
 
 export default function App({ Component, pageProps }) {
   const [autenticado, setAutenticado] = useState(false)
