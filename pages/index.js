@@ -684,6 +684,7 @@ export default function Home({ rol, cerrarSesion }) {
   async function cargarTrabajos() {
     const{data}=await supabase.from('trabajos').select('*, vehiculos(*, clientes(*))').order('fecha_ingreso',{ascending:true})
     setTrabajos(data||[])
+    return data||[]
   }
 
   // numeración automática de presupuestos y recibos, guardada en la tabla numeracion
@@ -1323,8 +1324,12 @@ export default function Home({ rol, cerrarSesion }) {
     }
     if(ant!==nvo)await agregarHistorial(formEditar.trabajo_id,'movimiento',`Movido de ${ant} a ${nvo}`)
     setModalEditar(null)
-    await cargarTrabajos()
-    if(clienteDetalle)cargarHistorial(formEditar.vehiculo_id)
+    const trabajosActualizados=await cargarTrabajos()
+    if(clienteDetalle){
+      cargarHistorial(formEditar.vehiculo_id)
+      const actualizado=trabajosActualizados.find(t=>t.id===formEditar.trabajo_id)
+      if(actualizado)setClienteDetalle(actualizado)
+    }
     setGuardandoEdicion(false)
   }
 
