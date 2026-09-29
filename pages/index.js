@@ -1238,6 +1238,7 @@ export default function Home({ rol, cerrarSesion }) {
     const nuevoNumFicha=await incrementarNumeracion('cliente')
     const{data:cliente,error:errC}=await supabase.from('clientes').insert({nombre:form.nombre,telefono:form.telefono,email:form.email,numero_ficha:formatNumeroFicha(nuevoNumFicha)}).select().single()
     if(errC){setMensaje('Error al guardar cliente');setGuardandoCliente(false);return}
+    setClientes(prev=>[cliente,...prev])
     const{data:vehiculo,error:errV}=await supabase.from('vehiculos').insert({cliente_id:cliente.id,marca_modelo:form.marca_modelo,patente:form.patente,anio:form.anio,kilometraje:form.kilometraje,color:form.color}).select().single()
     if(errV){setMensaje('Error al guardar vehículo');setGuardandoCliente(false);return}
     const fechaIngreso=form.fecha_ingreso_manual?datetimeLocalAFechaISO(form.fecha_ingreso_manual):new Date().toISOString()
@@ -1302,6 +1303,7 @@ export default function Home({ rol, cerrarSesion }) {
       await supabase.from('trabajos').delete().eq('id',trabajo.id)
       await supabase.from('vehiculos').delete().eq('id',trabajo.vehiculos?.id)
       await supabase.from('clientes').delete().eq('id',trabajo.vehiculos?.clientes?.id)
+      setClientes(prev=>prev.filter(c=>c.id!==trabajo.vehiculos?.clientes?.id))
       await cargarTrabajos()
       avisar('Borrado definitivamente','exito')
     })
@@ -2092,7 +2094,7 @@ return (
 
         {seccion==='turnos'&&admin&&(
           <div>
-            <div className={styles.topBar}><h1 className={styles.pageTitle}>Turnos</h1><div style={{display:'flex',gap:'8px'}}><button className={styles.btn} onClick={actualizarTodo}>↻ Actualizar</button><button className={`${styles.btn} ${verRecordatorios?styles.navActive:''}`} onClick={()=>setVerRecordatorios(v=>!v)}>Recordatorios de mañana {turnosManiana.length>0?`(${turnosManiana.length})`:''}</button><button className={styles.btnPrimary} onClick={()=>{setMostrarFormTurno(true);setEditandoTurno(null);setFormTurno({nombre:'',telefono:'',vehiculo:'',fecha:diaSeleccionado||'',motivo:''})}}>+ Nuevo turno</button></div></div>
+            <div className={styles.topBar}><h1 className={styles.pageTitle}>Turnos</h1><div style={{display:'flex',gap:'8px'}}><button className={styles.btn} onClick={actualizarTodo}>↻ Actualizar</button><button className={`${styles.btn} ${verRecordatorios?styles.navActive:''}`} onClick={()=>setVerRecordatorios(v=>!v)}>Recordatorios de mañana {turnosManiana.length>0?`(${turnosManiana.length})`:''}</button><button className={styles.btnPrimary} onClick={()=>{const fecha=diaSeleccionado||new Date().toISOString().split('T')[0];setDiaSeleccionado(fecha);setMostrarFormTurno(true);setEditandoTurno(null);setFormTurno({nombre:'',telefono:'',vehiculo:'',fecha,motivo:''})}}>+ Nuevo turno</button></div></div>
             {verRecordatorios&&(<div className={styles.card} style={{marginBottom:'1rem'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
                 <div className={styles.cardTitle} style={{margin:0}}>Turnos de mañana ({turnosManiana.length})</div>
