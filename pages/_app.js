@@ -3,6 +3,22 @@ import '../styles/globals.css'
 import styles from '../styles/App.module.css'
 const LOGO_URL = '/logo-difiore.png'
 
+// Prueba por tiempo limitado: solo se activa si el deploy define estas variables de
+// entorno. El deploy de DiFiore no las tiene, así que a esta app nunca le corre el
+// vencimiento — es para copias de prueba que se le dan a otros talleres.
+const TRIAL_START = process.env.NEXT_PUBLIC_TRIAL_START // 'YYYY-MM-DD'
+const TRIAL_DIAS = parseInt(process.env.NEXT_PUBLIC_TRIAL_DIAS || '10', 10)
+const TRIAL_CONTACTO = process.env.NEXT_PUBLIC_TRIAL_CONTACTO // ej: '5492235299700'
+
+function calcularPrueba() {
+  if (!TRIAL_START) return null
+  const inicio = new Date(TRIAL_START + 'T00:00:00')
+  const fin = new Date(inicio.getTime() + TRIAL_DIAS * 86400000)
+  const ahora = new Date()
+  const diasRestantes = Math.max(0, Math.ceil((fin - ahora) / 86400000))
+  return { vencido: ahora >= fin, diasRestantes }
+}
+
 export default function App({ Component, pageProps }) {
   const [autenticado, setAutenticado] = useState(false)
   const [rol, setRol] = useState(null)
@@ -10,6 +26,7 @@ export default function App({ Component, pageProps }) {
   const [error, setError] = useState('')
   const [mayusActivo, setMayusActivo] = useState(false)
   const [verPass, setVerPass] = useState(false)
+  const [prueba] = useState(calcularPrueba)
 
   useEffect(() => {
     const r = sessionStorage.getItem('rol')
@@ -103,6 +120,29 @@ export default function App({ Component, pageProps }) {
     setPass('')
   }
 
+  // Prueba vencida: corta el acceso a toda la app, incluidas las páginas públicas
+  if (prueba?.vencido) return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:'1rem'}}>
+      <div style={{background:'#12151D',borderRadius:'16px',padding:'2.5rem',width:'100%',maxWidth:'400px',border:'2px solid #262B38',boxShadow:'0 20px 60px rgba(0,0,0,0.5)',textAlign:'center'}}>
+        <img src={LOGO_URL} alt="DiFiore" style={{width:'180px',marginBottom:'18px'}}/>
+        <div style={{fontFamily:"'Saira Extra Condensed',Impact,sans-serif",fontSize:'26px',fontWeight:'800',textTransform:'uppercase',color:'#EEF1F7',marginBottom:'10px'}}>Tu prueba terminó</div>
+        <p style={{color:'#9AA3B8',fontSize:'14px',lineHeight:'1.5',marginBottom:'20px'}}>
+          Ya pasaron los {TRIAL_DIAS} días de prueba gratuita. Activá tu cuenta para seguir usando el sistema.
+        </p>
+        {TRIAL_CONTACTO && (
+          <a
+            href={`https://wa.me/${TRIAL_CONTACTO}?text=${encodeURIComponent('Hola! Quiero activar mi cuenta.')}`}
+            target="_blank" rel="noreferrer"
+            className={styles.btnPrimary}
+            style={{display:'inline-block',padding:'12px 24px',textDecoration:'none'}}
+          >
+            Activar por WhatsApp
+          </a>
+        )}
+      </div>
+    </div>
+  )
+
   // Páginas públicas (ej. /service, la del QR): no piden contraseña
   if (Component.publica) return <Component {...pageProps} />
 
@@ -148,5 +188,16 @@ export default function App({ Component, pageProps }) {
       </div>
     </div>
   )
-  return <Component {...pageProps} rol={rol} cerrarSesion={cerrarSesion} />
+  return (
+    <>
+      {prueba && (
+        <div style={{background:'linear-gradient(90deg,#1B4CFF,#2FA8FF)',color:'#fff',textAlign:'center',padding:'6px 10px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:'12.5px',fontWeight:'700',letterSpacing:'.03em',textTransform:'uppercase'}}>
+          {prueba.diasRestantes > 0
+            ? `Versión de prueba · Quedan ${prueba.diasRestantes} día${prueba.diasRestantes === 1 ? '' : 's'}`
+            : 'Versión de prueba · Último día'}
+        </div>
+      )}
+      <Component {...pageProps} rol={rol} cerrarSesion={cerrarSesion} />
+    </>
+  )
 }
