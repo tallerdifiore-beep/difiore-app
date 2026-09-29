@@ -3,6 +3,11 @@ import '../styles/globals.css'
 import styles from '../styles/App.module.css'
 const LOGO_URL = '/logo-difiore.png'
 
+// Contraseñas de acceso, configurables por deploy. Si el deploy no define estas
+// variables de entorno, se usan las de siempre (las de DiFiore).
+const PASS_ADMIN = process.env.NEXT_PUBLIC_PASS_ADMIN || 'Oficina2084'
+const PASS_EMPLEADO = process.env.NEXT_PUBLIC_PASS_EMPLEADO || 'Taller2084'
+
 // Prueba por tiempo limitado: solo se activa si el deploy define estas variables de
 // entorno. El deploy de DiFiore no las tiene, así que a esta app nunca le corre el
 // vencimiento — es para copias de prueba que se le dan a otros talleres.
@@ -101,10 +106,10 @@ export default function App({ Component, pageProps }) {
 
   function login(e) {
     e.preventDefault()
-    if (pass === 'Oficina2084') {
+    if (pass === PASS_ADMIN) {
       sessionStorage.setItem('rol', 'admin')
       setRol('admin'); setAutenticado(true); setError('')
-    } else if (pass === 'Taller2084') {
+    } else if (pass === PASS_EMPLEADO) {
       sessionStorage.setItem('rol', 'empleado')
       setRol('empleado'); setAutenticado(true); setError('')
     } else {
