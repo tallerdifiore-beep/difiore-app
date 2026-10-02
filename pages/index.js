@@ -78,180 +78,6 @@ function formatFechaAR(iso,conHora){
   return conHora?`${fecha} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`:fecha
 }
 
-const CATEGORIA_POR_TIPO = {
-  ingreso:'Diagnóstico sin iniciar',
-  diagnostico:'Diagnóstico',
-  diagnostico_fin:'Esperando aprobación del cliente',
-  cliente_aprobo:'Esperando pago de repuestos',
-  cliente_pago:'Esperando que vayan a comprar repuestos',
-  oficina_salio:'Comprando repuestos',
-  repuestos_llegaron:'Esperando inicio de reparación',
-  reparacion:'Reparación',
-  trabajo_iniciado:'Reparación',
-  service:'Service',
-  esperando_retiro:'Esperando que el cliente retire el vehículo',
-  repuesto_no_pactado:'Tiempo perdido por mal pedido de repuestos',
-  mecanico_pide_repuestos:'Esperando repuestos',
-  estado:'En proceso',
-  prueba:'En prueba',
-  motor:'Arreglo de motor',
-  movimiento:'Cambio de taller',
-  reingreso:'Reingreso',
-  terceros:'Esperando a terceros',
-  repuestos:'Esperando repuestos',
-  aprobacion:'Esperando aprobación del cliente',
-  elevador:'Esperando mecánico/elevador',
-}
-const CATEGORIAS_MUERTAS = ['Diagnóstico sin iniciar','Esperando a terceros','Esperando repuestos','Esperando aprobación del cliente','Esperando mecánico/elevador','Esperando pago de repuestos','Esperando que vayan a comprar repuestos','Esperando inicio de reparación','Tiempo perdido por mal pedido de repuestos','Esperando que el cliente retire el vehículo']
-const CATEGORIAS_CLIENTE = ['Esperando aprobación del cliente','Esperando pago de repuestos','Esperando que el cliente retire el vehículo']
-const TIPOS_ELEGIBLES_ESPERANDO_MECANICO=['ingreso','estado','elevador','repuestos_llegaron']
-// dado un evento y el que le sigue, devuelve la categoría correcta (con el override de "esperando mecánico" si corresponde)
-function categoriaDeEvento(eventos,i){
-  const siguienteEsTrabajoIniciado=(eventos[i+1]?.tipo==='trabajo_iniciado'||eventos[i+1]?.tipo==='reparacion')&&TIPOS_ELEGIBLES_ESPERANDO_MECANICO.includes(eventos[i].tipo)
-  return siguienteEsTrabajoIniciado?'Esperando mecánico/elevador':(CATEGORIA_POR_TIPO[eventos[i].tipo]||'Otro')
-}
-
-// calcula, para un trabajo, cuántas horas pasó en cada categoría, a partir del ingreso, cada actualización, y la salida (o ahora si sigue en curso)
-const HORARIO_APERTURA_HORA=8, HORARIO_APERTURA_MIN=30, HORARIO_CIERRE=18
-const MES_INICIO_CONTROL_TIEMPOS='2026-08' // no mirar hacia atrás de este mes en Histórico ni en Por marca
-const DIAS_LABORALES=[1,2,3,4,5] // lunes a viernes (0=domingo, 6=sábado)
-
-// separa las horas entre dos fechas en "laborales" (dentro del horario del taller) y "no laborales" (de noche o fin de semana)
-function horasLaboralesEntre(inicio,fin){
-  let laborales=0
-  let cursor=new Date(inicio.getTime()-3*60*60*1000) // pasamos a hora Argentina para que los límites de día caigan bien
-  const finAR=new Date(fin.getTime()-3*60*60*1000)
-  const inicioAR=new Date(inicio.getTime()-3*60*60*1000)
-  while(cursor<finAR){
-    const diaSemana=cursor.getUTCDay()
-    const inicioDiaLaboral=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth(),cursor.getUTCDate(),HORARIO_APERTURA_HORA,HORARIO_APERTURA_MIN,0))
-    const finDiaLaboral=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth(),cursor.getUTCDate(),HORARIO_CIERRE,0,0))
-    if(DIAS_LABORALES.includes(diaSemana)){
-      const inicioEfectivo=cursor>inicioDiaLaboral?cursor:inicioDiaLaboral
-      const finEfectivo=finAR<finDiaLaboral?finAR:finDiaLaboral
-      if(inicioEfectivo<finEfectivo)laborales+=(finEfectivo-inicioEfectivo)/(1000*60*60)
-    }
-    cursor=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth(),cursor.getUTCDate()+1,0,0,0))
-  }
-  const totalHoras=(finAR-inicioAR)/(1000*60*60)
-  return{laborales:Math.max(0,laborales),noLaborales:Math.max(0,totalHoras-laborales)}
-}
-
-function calcularTiemposTrabajo(trabajo, actualizacionesTrabajo){
-  const eventos=[{tipo:'ingreso',fecha:trabajo.fecha_ingreso},...actualizacionesTrabajo]
-    .filter(e=>e.fecha)
-    .sort((a,b)=>new Date(a.fecha)-new Date(b.fecha))
-  const fin=trabajo.fecha_salida?new Date(trabajo.fecha_salida):new Date()
-  const categorias={}
-  for(let i=0;i<eventos.length;i++){
-    const inicio=new Date(eventos[i].fecha)
-    const finSeg=i+1<eventos.length?new Date(eventos[i+1].fecha):fin
-    if(finSeg<=inicio)continue
-    const{laborales}=horasLaboralesEntre(inicio,finSeg)
-    const cat=categoriaDeEvento(eventos,i)
-    categorias[cat]=(categorias[cat]||0)+laborales
-    // las horas fuera de horario simplemente no se suman a ninguna categoría — no cuentan como "motivo", solo evitan que se infle otra categoría con la noche/fin de semana
-  }
-  return categorias
-}
-
-// para un tipo de evento puntual (diagnostico, reparacion) con mecánico asignado, calcula cantidad y horas promedio por mecánico
-// para cada actualización que tenga mecánico asignado (cualquier categoría), calcula cantidad y horas promedio por mecánico + categoría
-function calcularStatsMecanicoGeneral(trabajosDelMes, actualizacionesRaw){
-  const porMecanico={}
-  trabajosDelMes.forEach(t=>{
-    const eventos=[{tipo:'ingreso',fecha:t.fecha_ingreso},...actualizacionesRaw.filter(a=>a.trabajo_id===t.id)]
-      .filter(e=>e.fecha).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha))
-    const fin=t.fecha_salida?new Date(t.fecha_salida):new Date()
-    for(let i=0;i<eventos.length;i++){
-      if(!eventos[i].mecanico)continue
-      const inicio=new Date(eventos[i].fecha)
-      const finSeg=i+1<eventos.length?new Date(eventos[i+1].fecha):fin
-      if(finSeg<=inicio)continue
-      const{laborales}=horasLaboralesEntre(inicio,finSeg)
-      const cat=categoriaDeEvento(eventos,i)
-      const m=eventos[i].mecanico
-      if(!porMecanico[m])porMecanico[m]=[]
-      porMecanico[m].push({trabajo:t,categoria:cat,horas:laborales,fecha:eventos[i].fecha})
-    }
-  })
-  return Object.entries(porMecanico).map(([mecanico,items])=>({
-    mecanico,
-    cantidad:items.length,
-    horasTotal:items.reduce((a,i)=>a+i.horas,0),
-    items:items.sort((a,b)=>b.horas-a.horas)
-  })).sort((a,b)=>a.mecanico.localeCompare(b.mecanico))
-}
-
-// calcula eficiencia/motivo principal de un mes arbitrario (para el histórico), reutilizando la misma lógica de categorización
-function calcularResumenMes(trabajosVivos, actualizacionesRaw, mesStr){
-  const trabajosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesStr&&!t.excluir_tiempos)
-  const totalesPorCategoria={}
-  trabajosDelMes.forEach(t=>{
-    const eventos=actualizacionesRaw.filter(a=>a.trabajo_id===t.id)
-    const categorias=calcularTiemposTrabajo(t,eventos)
-    Object.entries(categorias).forEach(([cat,h])=>{totalesPorCategoria[cat]=(totalesPorCategoria[cat]||0)+h})
-  })
-  const horasMuertas=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)).reduce((a,[,h])=>a+h,0)
-  const horasTotales=Object.values(totalesPorCategoria).reduce((a,b)=>a+b,0)
-  const eficiencia=horasTotales>0?Math.round(((horasTotales-horasMuertas)/horasTotales)*100):0
-  const motivoGeneral=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)).sort((a,b)=>b[1]-a[1])[0]
-  return{mes:mesStr,eficiencia,motivoGeneral,horasMuertas,cantidadVehiculos:trabajosDelMes.length}
-}
-
-// calcula, por mecánico, cuántas reparaciones hizo en total y cuántas de esas terminaron en un reingreso al taller
-function calcularRetrabajoPorMecanico(trabajos, actualizacionesRaw, reingresosRaw){
-  const stats={}
-  actualizacionesRaw.forEach(a=>{
-    if((a.tipo==='reparacion'||a.tipo==='trabajo_iniciado')&&a.mecanico){
-      if(!stats[a.mecanico])stats[a.mecanico]={reparaciones:new Set(),retrabajos:new Set()}
-      stats[a.mecanico].reparaciones.add(a.trabajo_id)
-    }
-  })
-  reingresosRaw.forEach(h=>{
-    const trabajoNuevo=trabajos.find(t=>t.id===h.trabajo_id)
-    if(!trabajoNuevo?.vehiculos?.id)return
-    const anteriores=trabajos.filter(t=>t.vehiculos?.id===trabajoNuevo.vehiculos.id&&t.id!==trabajoNuevo.id&&new Date(t.fecha_ingreso)<new Date(trabajoNuevo.fecha_ingreso))
-      .sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso))
-    const anterior=anteriores[0]
-    if(!anterior)return
-    const mecanicosQueRepararon=new Set(actualizacionesRaw.filter(a=>a.trabajo_id===anterior.id&&(a.tipo==='reparacion'||a.tipo==='trabajo_iniciado')&&a.mecanico).map(a=>a.mecanico))
-    mecanicosQueRepararon.forEach(m=>{
-      if(!stats[m])stats[m]={reparaciones:new Set(),retrabajos:new Set()}
-      stats[m].retrabajos.add(anterior.id)
-    })
-  })
-  return Object.entries(stats).map(([mecanico,{reparaciones,retrabajos}])=>({mecanico,totalReparaciones:reparaciones.size,retrabajos:retrabajos.size})).sort((a,b)=>b.retrabajos-a.retrabajos)
-}
-
-// horas de reparación promedio por marca de vehículo, en base a todo el historial (no solo el mes seleccionado)
-function calcularTiempoPorMarca(trabajosVivos, actualizacionesRaw){
-  const porMarca={}
-  trabajosVivos.forEach(t=>{
-    const eventos=actualizacionesRaw.filter(a=>a.trabajo_id===t.id)
-    const categorias=calcularTiemposTrabajo(t,eventos)
-    const horasReparacion=(categorias['Reparación']||0)
-    if(horasReparacion<=0)return
-    const marca=getMarca(t.vehiculos?.marca_modelo)
-    if(!porMarca[marca])porMarca[marca]={horas:0,cantidad:0}
-    porMarca[marca].horas+=horasReparacion
-    porMarca[marca].cantidad++
-  })
-  return Object.entries(porMarca).map(([marca,{horas,cantidad}])=>({marca,promedio:horas/cantidad,cantidad})).sort((a,b)=>b.promedio-a.promedio)
-}
-
-// máxima cantidad de vehículos distintos que un mecánico tuvo "abiertos" el mismo día calendario
-function calcularCargaMaxima(items){
-  const porDia={}
-  items.forEach(it=>{
-    if(!it.fecha)return
-    const dia=new Date(it.fecha).toISOString().slice(0,10)
-    if(!porDia[dia])porDia[dia]=new Set()
-    porDia[dia].add(it.trabajo.id)
-  })
-  return Math.max(0,...Object.values(porDia).map(s=>s.size))
-}
-
 // redimensiona y comprime una foto en el navegador antes de subirla, para no llenar el storage con fotos de celular sin comprimir
 function comprimirImagen(file, maxAncho=1600, calidad=0.75) {
   return new Promise((resolve) => {
@@ -543,17 +369,9 @@ export default function Home({ rol, cerrarSesion }) {
   const [editandoTurno, setEditandoTurno] = useState(null)
   const [mostrarFormTurno, setMostrarFormTurno] = useState(false)
   const [verRecordatorios, setVerRecordatorios] = useState(false)
-  const [mesTiempos, setMesTiempos] = useState(new Date().toISOString().slice(0,7))
-  const [vistaTiempos, setVistaTiempos] = useState('motivos')
-  const [mecanicoSeleccionadoTiempos, setMecanicoSeleccionadoTiempos] = useState(null)
-  const [trabajoSeleccionadoTiempos, setTrabajoSeleccionadoTiempos] = useState(null)
-  const [costoHoraTaller, setCostoHoraTaller] = useState(0)
-  const [editandoCostoHora, setEditandoCostoHora] = useState(false)
-  const [costoHoraTemp, setCostoHoraTemp] = useState('')
   const [umbralEstancados, setUmbralEstancados] = useState(UMBRAL_ESTANCADOS_DEFAULT)
   const [editandoUmbral, setEditandoUmbral] = useState(false)
   const [mostrarExcluidosEstancados, setMostrarExcluidosEstancados] = useState(false)
-  const [mostrarExcluidosTiempos, setMostrarExcluidosTiempos] = useState(false)
   const [umbralTemp, setUmbralTemp] = useState('')
   const [diaSeleccionado, setDiaSeleccionado] = useState(null)
   const [mesCalendario, setMesCalendario] = useState(new Date())
@@ -577,6 +395,10 @@ export default function Home({ rol, cerrarSesion }) {
   const [modalFotosAnteriores, setModalFotosAnteriores] = useState(false)
   const [historial, setHistorial] = useState([])
   const [repuestos, setRepuestos] = useState([])
+  const [notasDiarias, setNotasDiarias] = useState([])
+  const [notaHoyTexto, setNotaHoyTexto] = useState('')
+  const [notaHoyMecanico, setNotaHoyMecanico] = useState('')
+  const [guardandoNota, setGuardandoNota] = useState(false)
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalEditarFecha, setModalEditarFecha] = useState(null)
   const [nuevaFechaHistorial, setNuevaFechaHistorial] = useState('')
@@ -630,13 +452,13 @@ export default function Home({ rol, cerrarSesion }) {
 
   const [verPapelera, setVerPapelera] = useState(false)
 
-  useEffect(() => { cargarDatos(); cargarNumeracion(); cargarReingresos(); cargarActualizacionesGlobal(); cargarUmbralEstancados(); cargarCostoHoraTaller() }, [])
+  useEffect(() => { cargarDatos(); cargarNumeracion(); cargarReingresos(); cargarActualizacionesGlobal(); cargarUmbralEstancados() }, [])
 
   // carga de a partes: presupuestos y plan del día recién cuando se visita esa sección, no en cada carga de la app
   const [presupuestosCargados, setPresupuestosCargados] = useState(false)
   const [planDiarioCargado, setPlanDiarioCargado] = useState(false)
   useEffect(() => {
-    if((seccion==='presupuesto'||seccion==='tiempos')&&!presupuestosCargados){ cargarPresupuestos(); setPresupuestosCargados(true) }
+    if(seccion==='presupuesto'&&!presupuestosCargados){ cargarPresupuestos(); setPresupuestosCargados(true) }
     if(seccion==='plandia'&&!planDiarioCargado){ cargarPlanDiario(fechaPlan); setPlanDiarioCargado(true) }
   }, [seccion])
 
@@ -753,21 +575,6 @@ export default function Home({ rol, cerrarSesion }) {
     avisar('Umbral actualizado','exito')
   }
 
-  async function cargarCostoHoraTaller(){
-    const{data}=await supabase.from('configuracion').select('valor').eq('clave','costo_hora_taller').single()
-    if(data?.valor)setCostoHoraTaller(parseFloat(data.valor)||0)
-  }
-
-  async function guardarCostoHoraTaller(){
-    const num=parseFloat(costoHoraTemp)
-    if(isNaN(num)||num<0){avisar('Ingresá un monto válido','error');return}
-    const{error}=await supabase.from('configuracion').upsert({clave:'costo_hora_taller',valor:String(num)})
-    if(error){avisar('No se pudo guardar: '+error.message,'error');return}
-    setCostoHoraTaller(num)
-    setEditandoCostoHora(false)
-    avisar('Costo por hora actualizado','exito')
-  }
-
   async function cargarPlanDiario(fecha){
     const{data,error}=await supabase.from('plan_diario').select('*').eq('fecha',fecha).order('created_at',{ascending:true})
     if(error){avisar('No se pudo cargar el plan: '+error.message,'error');return}
@@ -867,6 +674,7 @@ export default function Home({ rol, cerrarSesion }) {
       cargarChecklistsVehiculo(clienteDetalle.vehiculos.id)
       cargarFotos(clienteDetalle.id)
       cargarFotosAnteriores(clienteDetalle.vehiculos.id,clienteDetalle.id)
+      cargarNotasDiarias(clienteDetalle.id)
     }
   }
 
@@ -977,6 +785,32 @@ export default function Home({ rol, cerrarSesion }) {
     setHistorial(combinado.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)))
   }
   async function cargarRepuestos(id){const{data}=await supabase.from('repuestos').select('*').eq('trabajo_id',id).order('fecha',{ascending:false});setRepuestos(data||[])}
+  async function cargarNotasDiarias(trabajoId){
+    if(!trabajoId){setNotasDiarias([]);setNotaHoyTexto('');setNotaHoyMecanico('');return}
+    const{data}=await supabase.from('notas_diarias').select('*').eq('trabajo_id',trabajoId).order('fecha',{ascending:false})
+    setNotasDiarias(data||[])
+    const hoyStr=new Date().toISOString().split('T')[0]
+    const notaHoy=(data||[]).find(n=>n.fecha===hoyStr)
+    setNotaHoyTexto(notaHoy?.texto||'')
+    setNotaHoyMecanico(notaHoy?.mecanico||'')
+  }
+  async function guardarNotaDiaria(){
+    if(!clienteDetalle||guardandoNota)return
+    if(!notaHoyTexto.trim()){avisar('Escribí la nota del día','error');return}
+    setGuardandoNota(true)
+    const hoyStr=new Date().toISOString().split('T')[0]
+    const existente=notasDiarias.find(n=>n.fecha===hoyStr)
+    let error
+    if(existente){
+      ;({error}=await supabase.from('notas_diarias').update({texto:notaHoyTexto,mecanico:notaHoyMecanico||null}).eq('id',existente.id))
+    } else {
+      ;({error}=await supabase.from('notas_diarias').insert({trabajo_id:clienteDetalle.id,fecha:hoyStr,texto:notaHoyTexto,mecanico:notaHoyMecanico||null}))
+    }
+    setGuardandoNota(false)
+    if(error){avisar('No se pudo guardar: '+error.message,'error');return}
+    avisar('Nota guardada','exito')
+    await cargarNotasDiarias(clienteDetalle.id)
+  }
   async function agregarHistorial(trabajoId,tipo,descripcion,fecha){await supabase.from('historial').insert({trabajo_id:trabajoId,tipo,descripcion,...(fecha?{fecha}:{})})}
   async function subirFotoStorage(file,trabajoId){
     const comprimido=await comprimirImagen(file)
@@ -1429,7 +1263,7 @@ export default function Home({ rol, cerrarSesion }) {
   async function borrarFotoModal(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotosModal(modalFotos.vehiculos?.id)}
   async function subirFoto(e){const files=Array.from(e.target.files);if(!files.length||!clienteDetalle)return;setSubiendo(true);for(const f of files){const url=await subirFotoStorage(f,clienteDetalle.id);if(url)await supabase.from('fotos').insert({trabajo_id:clienteDetalle.id,url})}await cargarFotos(clienteDetalle.id);setSubiendo(false);e.target.value=''}
   async function borrarFoto(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotos(clienteDetalle.id)}
-  function verDetalle(t){setClienteDetalle(t);setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarFotosAnteriores(t.vehiculos?.id,t.id);cargarHistorial(t.vehiculos?.id);cargarRepuestos(t.id);cargarPresupuestosVehiculo(t.vehiculos?.id);cargarChecklistsVehiculo(t.vehiculos?.id)}
+  function verDetalle(t){setClienteDetalle(t);setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarFotosAnteriores(t.vehiculos?.id,t.id);cargarHistorial(t.vehiculos?.id);cargarRepuestos(t.id);cargarPresupuestosVehiculo(t.vehiculos?.id);cargarChecklistsVehiculo(t.vehiculos?.id);cargarNotasDiarias(t.id)}
   function abrirEditar(t){
     setFormEditar({trabajo_id:t.id,cliente_id:t.vehiculos?.clientes?.id,vehiculo_id:t.vehiculos?.id,nombre:t.vehiculos?.clientes?.nombre,telefono:t.vehiculos?.clientes?.telefono,email:t.vehiculos?.clientes?.email,marca_modelo:t.vehiculos?.marca_modelo,patente:t.vehiculos?.patente,anio:t.vehiculos?.anio,kilometraje:t.vehiculos?.kilometraje,color:t.vehiculos?.color,motivo:t.motivo,estado:t.estado,mecanico:t.mecanico,taller:t.taller,taller_anterior:t.taller,llego_en_grua:t.llego_en_grua||false,tiene_seguro:t.tiene_seguro||false,fecha_ingreso:fechaISOAInputLocal(t.fecha_ingreso)})
     setModalEditar(true)
@@ -1454,45 +1288,11 @@ export default function Home({ rol, cerrarSesion }) {
     XLSX.writeFile(libro,`informe-difiore-${nombreMes.replace(' ','-')}.xlsx`)
   }
 
-  async function toggleExcluirTiempos(trabajo){
-    const{error}=await supabase.from('trabajos').update({excluir_tiempos:!trabajo.excluir_tiempos}).eq('id',trabajo.id)
-    if(error){avisar('No se pudo actualizar: '+error.message,'error');return}
-    await cargarTrabajos()
-    avisar(trabajo.excluir_tiempos?'Vehículo vuelto a incluir':'Vehículo excluido del cálculo','exito')
-  }
-
   async function toggleExcluirEstancados(trabajo){
     const{error}=await supabase.from('trabajos').update({excluir_estancados:!trabajo.excluir_estancados}).eq('id',trabajo.id)
     if(error){avisar('No se pudo actualizar: '+error.message,'error');return}
     await cargarTrabajos()
     avisar(trabajo.excluir_estancados?'Vehículo vuelto a incluir en la alerta':'Vehículo excluido de la alerta de estancados','exito')
-  }
-
-  function exportarTiemposExcel(){
-    const todasCategorias=Object.keys(CATEGORIA_POR_TIPO).map(k=>CATEGORIA_POR_TIPO[k]).filter((v,i,arr)=>arr.indexOf(v)===i)
-    const hojaDetalle=XLSX.utils.json_to_sheet(tiemposDelMes.porTrabajo.map(({trabajo,categorias,totalHoras,motivoPrincipal})=>{
-      const fila={Vehiculo:trabajo.vehiculos?.marca_modelo||'',Cliente:trabajo.vehiculos?.clientes?.nombre||'',Patente:trabajo.vehiculos?.patente||'','Total horas':Math.round(totalHoras*10)/10,'Motivo principal':motivoPrincipal?motivoPrincipal[0]:'—'}
-      todasCategorias.forEach(cat=>{fila[cat]=Math.round((categorias[cat]||0)*10)/10})
-      return fila
-    }))
-    const hojaResumen=XLSX.utils.json_to_sheet(Object.entries(tiemposDelMes.totalesPorCategoria).sort((a,b)=>b[1]-a[1]).map(([categoria,horas])=>({Categoria:categoria,Horas:Math.round(horas*10)/10})))
-    const libro=XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(libro,hojaResumen,'Resumen')
-    XLSX.utils.book_append_sheet(libro,hojaDetalle,'Detalle por vehiculo')
-    XLSX.writeFile(libro,`tiempos-difiore-${mesTiempos}.xlsx`)
-  }
-
-  function exportarHistoricoExcel(){
-    const hoja=XLSX.utils.json_to_sheet(historicoTiempos.map(m=>({
-      Mes:new Date(m.mes+'-15').toLocaleDateString('es-AR',{month:'long',year:'numeric'}),
-      'Eficiencia %':m.eficiencia,
-      'Motivo principal':m.motivoGeneral?m.motivoGeneral[0]:'—',
-      'Horas muertas':Math.round(m.horasMuertas*10)/10,
-      'Cantidad de vehículos':m.cantidadVehiculos
-    })))
-    const libro=XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(libro,hoja,'Histórico')
-    XLSX.writeFile(libro,`historico-tiempos-difiore.xlsx`)
   }
 
   function imprimirInforme(){const{ingresados,salidos,marcaTop,marcasCount,nombreMes}=generarInforme();const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Mensual</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a56db;padding-bottom:16px;}.header-logo img{width:180px;}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}.stat-box{border:2px solid #1a56db;border-radius:10px;padding:16px;text-align:center;}.stat-box .num{font-size:36px;font-weight:900;color:#1a56db;}.stat-box .lbl{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;}.section{margin-bottom:20px;}.section-title{background:#222;color:#fff;font-weight:bold;font-size:11px;padding:6px 12px;margin-bottom:8px;letter-spacing:1px;}table{width:100%;border-collapse:collapse;}thead th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;border-bottom:2px solid #ccc;}tbody td{padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.marcas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}.marca-item{border:1px solid #e0e0e0;border-radius:6px;padding:10px;display:flex;justify-content:space-between;align-items:center;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div style="text-align:right"><h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">INFORME MENSUAL</h1><p style="font-size:14px;font-weight:700;color:#333;margin-bottom:4px">${nombreMes.toUpperCase()}</p><p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p></div></div><div class="stats"><div class="stat-box"><div class="num">${ingresados.length}</div><div class="lbl">Vehículos ingresados</div></div><div class="stat-box"><div class="num">${salidos.length}</div><div class="lbl">Vehículos entregados</div></div><div class="stat-box" style="border-color:#16A34A"><div class="num" style="color:#16A34A;font-size:24px">${marcaTop?marcaTop[0]:'—'}</div><div class="lbl">Marca más frecuente${marcaTop?` (${marcaTop[1]})`:''}</div></div></div><div class="section"><div class="section-title">VEHÍCULOS INGRESADOS (${ingresados.length})</div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>${ingresados.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>`).join('')}${ingresados.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin ingresos este mes</td></tr>':''}</tbody></table></div><div class="section"><div class="section-title">VEHÍCULOS ENTREGADOS (${salidos.length})</div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead><tbody>${salidos.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>`).join('')}${salidos.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin entregas este mes</td></tr>':''}</tbody></table></div><div class="section"><div class="section-title">MARCAS ATENDIDAS</div><div class="marcas">${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="marca-item"><span style="font-size:13px;color:#555">${m}</span><b style="font-size:18px;color:#1a56db">${n}</b></div>`).join('')}</div></div><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
@@ -1551,66 +1351,6 @@ export default function Home({ rol, cerrarSesion }) {
     })
     return Object.values(mapa).sort((a,b)=>b.cantidad-a.cantidad)
   },[seccion,reingresosRaw,trabajos])
-
-  const tiemposDelMes=useMemo(()=>{
-    if(seccion!=='tiempos')return{porTrabajo:[],totalesPorCategoria:{},eficiencia:0,tiempoMuertoProm:0,motivoGeneral:null,excluidos:[],statsPorMecanico:[],statsOficina:[],horasClientes:0,horasMuertas:0,horasMuertasSinCerrado:0,porTerceros:[],porCliente:[],costoTiempoMuerto:0}
-    const trabajosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos&&!t.excluir_tiempos)
-    const excluidosDelMes=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)===mesTiempos&&t.excluir_tiempos)
-    const porTrabajo=trabajosDelMes.map(t=>{
-      const eventos=actualizacionesRaw.filter(a=>a.trabajo_id===t.id)
-      const categorias=calcularTiemposTrabajo(t,eventos)
-      const totalHoras=Object.values(categorias).reduce((a,b)=>a+b,0)
-      const motivoPrincipal=Object.entries(categorias).sort((a,b)=>b[1]-a[1])[0]
-      return{trabajo:t,categorias,totalHoras,motivoPrincipal}
-    })
-    const totalesPorCategoria={}
-    porTrabajo.forEach(({categorias})=>{
-      Object.entries(categorias).forEach(([cat,horas])=>{totalesPorCategoria[cat]=(totalesPorCategoria[cat]||0)+horas})
-    })
-    const horasMuertas=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)).reduce((a,[,h])=>a+h,0)
-    const horasMuertasSinCerrado=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)&&cat!=='Taller cerrado').reduce((a,[,h])=>a+h,0)
-    const horasTotales=Object.values(totalesPorCategoria).reduce((a,b)=>a+b,0)
-    const eficiencia=horasTotales>0?Math.round(((horasTotales-horasMuertas)/horasTotales)*100):0
-    const tiempoMuertoProm=porTrabajo.length>0?Math.round(horasMuertas/porTrabajo.length):0
-    const motivoGeneral=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_MUERTAS.includes(cat)&&cat!=='Taller cerrado').sort((a,b)=>b[1]-a[1])[0]
-    const horasClientes=Object.entries(totalesPorCategoria).filter(([cat])=>CATEGORIAS_CLIENTE.includes(cat)).reduce((a,[,h])=>a+h,0)
-    const statsPorMecanicoTodos=calcularStatsMecanicoGeneral(trabajosDelMes,actualizacionesRaw)
-    const statsOficina=statsPorMecanicoTodos.filter(s=>s.mecanico==='Oficina')
-    const statsPorMecanico=statsPorMecanicoTodos.filter(s=>s.mecanico!=='Oficina')
-    const porTerceros=porTrabajo.filter(p=>p.categorias['Esperando a terceros']>0).map(p=>({trabajo:p.trabajo,horas:p.categorias['Esperando a terceros']})).sort((a,b)=>b.horas-a.horas)
-    const porCliente=porTrabajo.filter(p=>((p.categorias['Esperando aprobación del cliente']||0)+(p.categorias['Esperando pago de repuestos']||0))>0).map(p=>({trabajo:p.trabajo,horas:(p.categorias['Esperando aprobación del cliente']||0)+(p.categorias['Esperando pago de repuestos']||0)})).sort((a,b)=>b.horas-a.horas)
-    const costoTiempoMuerto=horasMuertasSinCerrado*costoHoraTaller
-    const retrabajoPorMecanico=calcularRetrabajoPorMecanico(trabajosVivos,actualizacionesRaw,reingresosRaw)
-    const statsConCarga=statsPorMecanico.map(s=>({...s,cargaMaxima:calcularCargaMaxima(s.items),retrabajo:retrabajoPorMecanico.find(r=>r.mecanico===s.mecanico)||{totalReparaciones:0,retrabajos:0}}))
-    return{porTrabajo:porTrabajo.sort((a,b)=>b.totalHoras-a.totalHoras),totalesPorCategoria,eficiencia,tiempoMuertoProm,motivoGeneral,excluidos:excluidosDelMes,statsPorMecanico:statsConCarga,statsOficina,horasClientes,horasMuertas,horasMuertasSinCerrado,porTerceros,porCliente,costoTiempoMuerto}
-  },[seccion,trabajosVivos,actualizacionesRaw,mesTiempos,costoHoraTaller,reingresosRaw])
-
-  const historicoTiempos=useMemo(()=>{
-    if(seccion!=='tiempos'||vistaTiempos!=='historico')return[]
-    const meses=[]
-    const base=new Date(mesTiempos+'-15')
-    for(let i=5;i>=0;i--){
-      const d=new Date(base.getFullYear(),base.getMonth()-i,1)
-      const m=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-      if(m>=MES_INICIO_CONTROL_TIEMPOS)meses.push(m)
-    }
-    return meses.map(m=>calcularResumenMes(trabajosVivos,actualizacionesRaw,m))
-  },[seccion,vistaTiempos,trabajosVivos,actualizacionesRaw,mesTiempos])
-
-  const cuelloBotellaPersistente=useMemo(()=>{
-    if(historicoTiempos.length<3)return null
-    const ultimos3=historicoTiempos.slice(-3)
-    if(ultimos3.some(m=>!m.motivoGeneral))return null
-    const motivos=ultimos3.map(m=>m.motivoGeneral[0])
-    if(motivos[0]===motivos[1]&&motivos[1]===motivos[2])return motivos[0]
-    return null
-  },[historicoTiempos])
-
-  const tiempoPorMarca=useMemo(()=>{
-    if(seccion!=='tiempos'||vistaTiempos!=='marca')return[]
-    const trabajosDesdeInicio=trabajosVivos.filter(t=>t.fecha_ingreso&&t.fecha_ingreso.slice(0,7)>=MES_INICIO_CONTROL_TIEMPOS)
-    return calcularTiempoPorMarca(trabajosDesdeInicio,actualizacionesRaw)
-  },[seccion,vistaTiempos,trabajosVivos,actualizacionesRaw])
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
   const mecanicos=empleados.filter(e=>e.rol==='mecanico')
@@ -1760,251 +1500,6 @@ return (
       </div>
 
       <div className={styles.main}>
-
-        {seccion==='tiempos'&&admin&&(
-          <div>
-            <div className={styles.topBar}>
-              <h1 className={styles.pageTitle}>Control de tiempos</h1>
-              <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-                <input type="month" value={mesTiempos} onChange={e=>setMesTiempos(e.target.value)} style={{padding:'8px 12px',borderRadius:'6px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
-                <button className={styles.btnSuccess} onClick={exportarTiemposExcel}>Exportar a Excel</button>
-              </div>
-            </div>
-            <div className={styles.divider}></div>
-
-            <div className={styles.stats} style={{marginBottom:'1rem'}}>
-              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{tiemposDelMes.eficiencia}%</div><div className={styles.statL}>Eficiencia de flujo</div></div>
-              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{tiemposDelMes.tiempoMuertoProm}h</div><div className={styles.statL}>Tiempo muerto prom.</div></div>
-              <div className={styles.stat} style={{cursor:'default'}}>
-                <div className={styles.statN} style={{fontSize:'15px'}}>{tiemposDelMes.motivoGeneral?`${tiemposDelMes.motivoGeneral[0]} ${Math.round((tiemposDelMes.motivoGeneral[1]/(tiemposDelMes.horasMuertasSinCerrado||1))*100)}%`:'—'}</div>
-                <div className={styles.statL}>Motivo principal{tiemposDelMes.motivoGeneral&&<span style={{display:'block',fontSize:'11px',color:'#6B7488',marginTop:'2px'}}>({formatHoras(tiemposDelMes.motivoGeneral[1])}hs de {formatHoras(tiemposDelMes.horasMuertasSinCerrado)}hs)</span>}</div>
-              </div>
-              <div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{color:'#FF4D4F'}}>{formatHoras(tiemposDelMes.horasClientes)}h</div><div className={styles.statL}>Perdidas por clientes</div></div>
-              <div className={styles.stat} style={{cursor:'default'}}>
-                {costoHoraTaller>0?<div className={styles.statN} style={{color:'#FF4D4F',fontSize:'15px'}}>${formatPeso(Math.round(tiemposDelMes.costoTiempoMuerto))}</div>:<div className={styles.statN} style={{fontSize:'13px',color:'#6B7488'}}>Sin configurar</div>}
-                <div className={styles.statL}>Costo t. muerto{!editandoCostoHora?<span onClick={(e)=>{e.stopPropagation();setCostoHoraTemp(String(costoHoraTaller));setEditandoCostoHora(true)}} style={{display:'block',fontSize:'11px',color:'#2FA8FF',marginTop:'2px',cursor:'pointer'}}>{costoHoraTaller>0?'Cambiar':'Configurar'} $/hora</span>:<div style={{display:'flex',gap:'4px',marginTop:'4px'}} onClick={e=>e.stopPropagation()}><input type="number" value={costoHoraTemp} onChange={e=>setCostoHoraTemp(e.target.value)} style={{width:'70px',padding:'3px 6px',fontSize:'11px',borderRadius:'4px',border:'1px solid #343B4B'}}/><button onClick={guardarCostoHoraTaller} style={{fontSize:'11px',padding:'3px 8px',borderRadius:'4px',border:'none',background:'#1B4CFF',color:'#fff',cursor:'pointer'}}>OK</button></div>}</div>
-              </div>
-            </div>
-
-            {trabajoSeleccionadoTiempos?(
-              <div className={styles.card}>
-                {(()=>{
-                  const p=tiemposDelMes.porTrabajo.find(x=>x.trabajo.id===trabajoSeleccionadoTiempos.id)
-                  const mecanicosRaw=tiemposDelMes.statsPorMecanico.concat(tiemposDelMes.statsOficina).flatMap(s=>s.items.filter(it=>it.trabajo.id===trabajoSeleccionadoTiempos.id).map(it=>({mecanico:s.mecanico,...it})))
-                  const agrupadoMecanicos={}
-                  mecanicosRaw.forEach(it=>{
-                    const clave=it.mecanico+'|'+it.categoria
-                    if(!agrupadoMecanicos[clave])agrupadoMecanicos[clave]={mecanico:it.mecanico,categoria:it.categoria,horas:0}
-                    agrupadoMecanicos[clave].horas+=it.horas
-                  })
-                  const mecanicosDeEsteTrabajo=Object.values(agrupadoMecanicos).sort((a,b)=>b.horas-a.horas)
-                  const esReingreso=reingresosRaw.some(h=>h.trabajo_id===trabajoSeleccionadoTiempos.id)
-                  const presupuestoVinculado=presupuestos.find(pr=>pr.trabajo_id===trabajoSeleccionadoTiempos.id)
-                  const horasActivas=(p?.categorias['Reparación']||0)+(p?.categorias['Diagnóstico']||0)+(p?.categorias['Service']||0)
-                  const montoManoObra=presupuestoVinculado?(presupuestoVinculado.items||[]).filter(i=>i.es_mano_obra).reduce((a,i)=>a+(parseFloat((i.total||'0').toString().replace(/\./g,''))||0),0):0
-                  return(<>
-                    <div className={styles.cardTitle}>{trabajoSeleccionadoTiempos.vehiculos?.marca_modelo}{esReingreso&&<span style={{marginLeft:'8px',fontSize:'11px',fontWeight:'700',color:'#2FA8FF',background:'rgba(47,168,255,.12)',padding:'3px 9px',borderRadius:'20px'}}>Reingreso</span>}</div>
-                    <div style={{fontSize:'13px',color:'#9AA3B8',marginBottom:'14px'}}>{trabajoSeleccionadoTiempos.vehiculos?.clientes?.nombre} · {trabajoSeleccionadoTiempos.vehiculos?.patente||'—'}</div>
-                    {montoManoObra>0&&horasActivas>0&&<div style={{background:'rgba(46,204,113,.1)',border:'1px solid #BBF7D0',borderRadius:'8px',padding:'10px 12px',marginBottom:'14px'}}>
-                      <div style={{fontSize:'11px',color:'#166534',fontWeight:'600',textTransform:'uppercase'}}>Rentabilidad real</div>
-                      <div style={{fontSize:'13px',color:'#166534',marginTop:'2px'}}>${formatPeso(montoManoObra)} de mano de obra ÷ {formatHoras(horasActivas)}h reales de trabajo = <b>${formatPeso(Math.round(montoManoObra/horasActivas))}/hora efectiva</b></div>
-                    </div>}
-                    <div style={{fontSize:'12px',fontWeight:'700',color:'#9AA3B8',textTransform:'uppercase',marginBottom:'8px'}}>Tiempo por categoría</div>
-                    {p?Object.entries(p.categorias).sort((a,b)=>b[1]-a[1]).map(([cat,horas])=>(
-                      <div key={cat} style={{display:'flex',justifyContent:'space-between',fontSize:'13px',padding:'6px 0',borderBottom:'1px solid #262B38'}}>
-                        <span style={{color:CATEGORIAS_MUERTAS.includes(cat)?'#FF4D4F':'#EEF1F7'}}>{cat}</span>
-                        <span style={{fontFamily:'monospace'}}>{formatHoras(horas)}h</span>
-                      </div>
-                    )):<div style={{color:'#6B7488',fontSize:'13px'}}>Sin datos este mes para este vehículo</div>}
-                    {mecanicosDeEsteTrabajo.length>0&&<>
-                      <div style={{fontSize:'12px',fontWeight:'700',color:'#9AA3B8',textTransform:'uppercase',marginTop:'18px',marginBottom:'8px'}}>Quién trabajó en esto</div>
-                      {mecanicosDeEsteTrabajo.map((it,i)=>(
-                        <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:'13px',padding:'6px 0',borderBottom:'1px solid #262B38'}}>
-                          <span>{it.mecanico} — {it.categoria}</span>
-                          <span style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</span>
-                        </div>
-                      ))}
-                    </>}
-                    <button className={styles.btn} style={{marginTop:'16px'}} onClick={()=>setTrabajoSeleccionadoTiempos(null)}>← Volver</button>
-                  </>)
-                })()}
-              </div>
-            ):(<>
-
-            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',borderBottom:'1px solid #343B4B',marginBottom:'1rem'}}>
-              {[['motivos','Motivos'],['vehiculo','Por vehículo'],['mecanico','Por mecánico'],['oficina','Oficina'],['terceros','Por terceros'],['cliente','Por cliente'],['historico','Histórico'],['marca','Por marca']].map(([id,label])=>(
-                <button key={id} onClick={()=>{setVistaTiempos(id);setMecanicoSeleccionadoTiempos(null)}} style={{padding:'8px 14px',fontSize:'13px',fontWeight:vistaTiempos===id?'600':'400',border:'none',background:'none',cursor:'pointer',color:vistaTiempos===id?'#EEF1F7':'#9AA3B8',borderBottom:vistaTiempos===id?'2px solid #2FA8FF':'2px solid transparent',fontFamily:'inherit'}}>{label}</button>
-              ))}
-            </div>
-
-            {vistaTiempos==='motivos'&&(
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>¿Dónde se van las horas este mes?</div>
-                {Object.keys(tiemposDelMes.totalesPorCategoria).length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin datos este mes</div>}
-                {Object.entries(tiemposDelMes.totalesPorCategoria).sort((a,b)=>b[1]-a[1]).map(([cat,horas])=>{
-                  const max=Math.max(...Object.values(tiemposDelMes.totalesPorCategoria),1)
-                  const esMuerta=CATEGORIAS_MUERTAS.includes(cat)
-                  return(
-                    <div key={cat} style={{marginBottom:'10px'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',marginBottom:'3px'}}><span>{cat}</span><span style={{fontFamily:'monospace'}}>{formatHoras(horas)}h</span></div>
-                      <div style={{height:'8px',background:'#262B38',borderRadius:'4px'}}><div style={{width:`${(horas/max)*100}%`,height:'100%',background:esMuerta?'#FF4D4F':'#1B4CFF',borderRadius:'4px'}}></div></div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {vistaTiempos==='vehiculo'&&(()=>{
-              const idsReingreso=new Set(reingresosRaw.map(h=>h.trabajo_id))
-              const normales=tiemposDelMes.porTrabajo.filter(p=>!idsReingreso.has(p.trabajo.id))
-              const reingresos=tiemposDelMes.porTrabajo.filter(p=>idsReingreso.has(p.trabajo.id))
-              const filaVehiculo=({trabajo,motivoPrincipal,totalHoras})=>(
-                <tr key={trabajo.id}><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}><b>{trabajo.vehiculos?.marca_modelo}</b></td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}>{trabajo.vehiculos?.clientes?.nombre}</td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)} style={{color:motivoPrincipal&&CATEGORIAS_MUERTAS.includes(motivoPrincipal[0])?'#FF4D4F':'#9AA3B8'}}>{motivoPrincipal?motivoPrincipal[0]:'—'}</td><td onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)} style={{fontFamily:'monospace'}}>{formatHoras(totalHoras)}h</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(trabajo)}>Excluir</button></td></tr>
-              )
-              return(<>
-                <div className={styles.card}>
-                  <div className={styles.cardTitle}>Detalle por vehículo</div>
-                  {normales.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin vehículos ingresados este mes</div>}
-                  {normales.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{normales.map(filaVehiculo)}</tbody></table>}
-                </div>
-                {reingresos.length>0&&<div className={styles.card}>
-                  <div className={styles.cardTitle}>Reingresos</div>
-                  <div style={{fontSize:'12px',color:'#6B7488',marginBottom:'10px'}}>Vehículos que volvieron al taller este mes (segunda visita o más).</div>
-                  <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Motivo principal</th><th>Horas totales</th><th></th></tr></thead><tbody>{reingresos.map(filaVehiculo)}</tbody></table>
-                </div>}
-                {tiemposDelMes.excluidos.length>0&&<div className={styles.card}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosTiempos(v=>!v)}>
-                    <div className={styles.cardTitle} style={{margin:0}}>Excluidos del cálculo este mes ({tiemposDelMes.excluidos.length})</div>
-                    <span style={{fontSize:'12px',color:'#9AA3B8'}}>{mostrarExcluidosTiempos?'▲ Ocultar':'▼ Ver'}</span>
-                  </div>
-                  {mostrarExcluidosTiempos&&<>
-                    <div style={{fontSize:'12px',color:'#6B7488',margin:'10px 0'}}>Estos vehículos no se cuentan en los promedios ni en el gráfico.</div>
-                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th></th></tr></thead><tbody>{tiemposDelMes.excluidos.map(t=>(<tr key={t.id}><td onClick={()=>setTrabajoSeleccionadoTiempos(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>setTrabajoSeleccionadoTiempos(t)}>{t.vehiculos?.clientes?.nombre}</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirTiempos(t)}>Volver a incluir</button></td></tr>))}</tbody></table>
-                  </>}
-                </div>}
-              </>)
-            })()}
-
-            {vistaTiempos==='mecanico'&&(<>
-              <div className={styles.card}>
-                {!mecanicoSeleccionadoTiempos?(<>
-                  <div className={styles.cardTitle}>Tiempo por mecánico</div>
-                  {tiemposDelMes.statsPorMecanico.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin datos este mes</div>}
-                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                    {tiemposDelMes.statsPorMecanico.map(s=>(
-                      <button key={s.mecanico} onClick={()=>setMecanicoSeleccionadoTiempos(s.mecanico)} style={{padding:'10px 16px',borderRadius:'10px',border:'1px solid #343B4B',background:'#1C2130',cursor:'pointer',fontFamily:'inherit',fontSize:'13px',fontWeight:'600',color:'#EEF1F7'}}>
-                        {s.mecanico}<span style={{opacity:.6,fontSize:'11px',marginLeft:'6px',fontWeight:'400'}}>{s.cantidad} registro{s.cantidad===1?'':'s'}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>):(()=>{
-                  const s=tiemposDelMes.statsPorMecanico.find(x=>x.mecanico===mecanicoSeleccionadoTiempos)
-                  if(!s)return null
-                  const agrupado={}
-                  s.items.forEach(it=>{
-                    if(!agrupado[it.trabajo.id])agrupado[it.trabajo.id]={trabajo:it.trabajo,horas:0,categorias:[]}
-                    agrupado[it.trabajo.id].horas+=it.horas
-                    agrupado[it.trabajo.id].categorias.push(it.categoria)
-                  })
-                  const filas=Object.values(agrupado).sort((a,b)=>b.horas-a.horas)
-                  return(<>
-                    <div className={styles.cardTitle}>{s.mecanico}</div>
-                    <div style={{fontSize:'12px',color:'#9AA3B8',marginBottom:'14px'}}>{Object.entries(s.items.reduce((acc,i)=>{acc[i.categoria]=(acc[i.categoria]||0)+i.horas;return acc},{})).map(([cat,h])=>`${formatHoras(h)}h ${cat.toLowerCase()}`).join(' · ')}</div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'14px'}}>
-                      <div style={{background:'#1C2130',borderRadius:'8px',padding:'10px'}}><div style={{fontSize:'11px',color:'#9AA3B8'}}>Retrabajo (todo el historial)</div><div style={{fontSize:'18px',fontWeight:'700',fontFamily:'monospace',color:s.retrabajo.retrabajos>0?'#FF4D4F':'#EEF1F7'}}>{s.retrabajo.retrabajos} de {s.retrabajo.totalReparaciones}</div></div>
-                      <div style={{background:'#1C2130',borderRadius:'8px',padding:'10px'}}><div style={{fontSize:'11px',color:'#9AA3B8'}}>Máx. autos el mismo día</div><div style={{fontSize:'18px',fontWeight:'700',fontFamily:'monospace'}}>{s.cargaMaxima}</div></div>
-                    </div>
-                    <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categorías</th><th>Horas totales</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>setTrabajoSeleccionadoTiempos(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{[...new Set(it.categorias)].join(', ')}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
-                    <button className={styles.btn} style={{marginTop:'14px'}} onClick={()=>setMecanicoSeleccionadoTiempos(null)}>← Volver a todos</button>
-                  </>)
-                })()}
-              </div>
-              {!mecanicoSeleccionadoTiempos&&tiemposDelMes.statsPorMecanico.length>0&&(()=>{
-                const categoriasComunes=[...new Set(tiemposDelMes.statsPorMecanico.flatMap(s=>s.items.map(i=>i.categoria)))]
-                return <div className={styles.card}>
-                  <div className={styles.cardTitle}>Ranking por especialidad</div>
-                  <div style={{fontSize:'12px',color:'#6B7488',marginBottom:'10px'}}>Horas promedio de cada mecánico en cada categoría este mes — quién es más rápido en qué.</div>
-                  <div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>Mecánico</th>{categoriasComunes.map(c=><th key={c}>{c}</th>)}</tr></thead><tbody>{tiemposDelMes.statsPorMecanico.map(s=>{
-                    const porCategoria={}
-                    s.items.forEach(i=>{if(!porCategoria[i.categoria])porCategoria[i.categoria]={horas:0,cantidad:0};porCategoria[i.categoria].horas+=i.horas;porCategoria[i.categoria].cantidad++})
-                    return <tr key={s.mecanico}><td><b>{s.mecanico}</b></td>{categoriasComunes.map(c=><td key={c} style={{fontFamily:'monospace',fontSize:'12px'}}>{porCategoria[c]?formatHoras(porCategoria[c].horas/porCategoria[c].cantidad)+'h':'—'}</td>)}</tr>
-                  })}</tbody></table></div>
-                </div>
-              })()}
-            </>)}
-
-            {vistaTiempos==='oficina'&&(
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Oficina</div>
-                <div style={{fontSize:'12px',color:'#6B7488',marginBottom:'10px'}}>Tareas asignadas a "Oficina" en vez de a un mecánico puntual (ej: comprar repuestos).</div>
-                {tiemposDelMes.statsOficina.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin datos este mes</div>}
-                {tiemposDelMes.statsOficina.length>0&&(()=>{
-                  const agrupado={}
-                  tiemposDelMes.statsOficina.flatMap(s=>s.items).forEach(it=>{
-                    if(!agrupado[it.trabajo.id])agrupado[it.trabajo.id]={trabajo:it.trabajo,horas:0,categorias:[]}
-                    agrupado[it.trabajo.id].horas+=it.horas
-                    agrupado[it.trabajo.id].categorias.push(it.categoria)
-                  })
-                  const filas=Object.values(agrupado).sort((a,b)=>b.horas-a.horas)
-                  return <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Categorías</th><th>Horas totales</th></tr></thead><tbody>{filas.map((it,i)=><tr key={i} onClick={()=>setTrabajoSeleccionadoTiempos(it.trabajo)}><td><b>{it.trabajo.vehiculos?.marca_modelo}</b></td><td>{it.trabajo.vehiculos?.clientes?.nombre}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{[...new Set(it.categorias)].join(', ')}</td><td style={{fontFamily:'monospace'}}>{formatHoras(it.horas)}h</td></tr>)}</tbody></table>
-                })()}
-              </div>
-            )}
-
-            {vistaTiempos==='terceros'&&(
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Horas perdidas por terceros</div>
-                <div style={{fontSize:'12px',color:'#6B7488',marginBottom:'10px'}}>Vehículos con horas en "Esperando a terceros" este mes, de mayor a menor.</div>
-                {tiemposDelMes.porTerceros.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin horas perdidas por terceros este mes</div>}
-                {tiemposDelMes.porTerceros.length>0&&<table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.porTerceros.map(({trabajo,horas})=>(<tr key={trabajo.id} onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}><td><b>{trabajo.vehiculos?.marca_modelo}</b></td><td>{trabajo.vehiculos?.clientes?.nombre}</td><td style={{fontFamily:'monospace',color:'#FF4D4F'}}>{formatHoras(horas)}h</td></tr>))}</tbody></table>}
-              </div>
-            )}
-
-            {vistaTiempos==='cliente'&&(
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Horas perdidas por cliente</div>
-                <div style={{fontSize:'12px',color:'#6B7488',marginBottom:'10px'}}>Suma de "esperando aprobación" + "esperando pago de repuestos" por cliente, de mayor a menor.</div>
-                {tiemposDelMes.porCliente.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin horas perdidas por clientes este mes</div>}
-                {tiemposDelMes.porCliente.length>0&&<table className={styles.table}><thead><tr><th>Cliente</th><th>Vehículo</th><th>Horas</th></tr></thead><tbody>{tiemposDelMes.porCliente.map(({trabajo,horas})=>(<tr key={trabajo.id} onClick={()=>setTrabajoSeleccionadoTiempos(trabajo)}><td><b>{trabajo.vehiculos?.clientes?.nombre}</b></td><td>{trabajo.vehiculos?.marca_modelo}</td><td style={{fontFamily:'monospace',color:'#FF4D4F'}}>{formatHoras(horas)}h</td></tr>))}</tbody></table>}
-              </div>
-            )}
-
-            {vistaTiempos==='historico'&&(<>
-              {cuelloBotellaPersistente&&<div className={styles.card} style={{background:'rgba(255,77,79,.08)',border:'2px solid rgba(255,77,79,.4)'}}>
-                <div style={{fontSize:'13px',color:'#FF4D4F',fontWeight:'600'}}>"{cuelloBotellaPersistente}" es el motivo principal hace 3 meses seguidos — parece un problema estructural, no un mes suelto.</div>
-              </div>}
-              <div className={styles.card}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
-                  <div className={styles.cardTitle} style={{margin:0}}>Eficiencia — últimos 6 meses</div>
-                  <button className={styles.btnSuccess} style={{fontSize:'12px',padding:'6px 12px'}} onClick={exportarHistoricoExcel}>Exportar histórico completo</button>
-                </div>
-                <div style={{display:'flex',alignItems:'flex-end',gap:'10px',height:'120px'}}>
-                  {historicoTiempos.map(m=>(
-                    <div key={m.mes} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'4px'}}>
-                      <div style={{fontSize:'11px',fontFamily:'monospace',color:'#9AA3B8'}}>{m.eficiencia}%</div>
-                      <div style={{width:'100%',height:`${Math.max(4,m.eficiencia)}px`,background:m.mes===mesTiempos?'#1B4CFF':'#343B4B',borderRadius:'4px 4px 0 0'}}></div>
-                      <span style={{fontSize:'10px',color:m.mes===mesTiempos?'#EEF1F7':'#6B7488',fontWeight:m.mes===mesTiempos?'700':'400'}}>{new Date(m.mes+'-15').toLocaleDateString('es-AR',{month:'short'})}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Motivo principal por mes</div>
-                <table className={styles.table}><thead><tr><th>Mes</th><th>Motivo principal</th><th>Vehículos</th></tr></thead><tbody>{historicoTiempos.map(m=>(<tr key={m.mes}><td style={{textTransform:'capitalize'}}>{new Date(m.mes+'-15').toLocaleDateString('es-AR',{month:'long',year:'numeric'})}</td><td style={{color:'#FF4D4F'}}>{m.motivoGeneral?m.motivoGeneral[0]:'—'}</td><td style={{fontFamily:'monospace'}}>{m.cantidadVehiculos}</td></tr>))}</tbody></table>
-              </div>
-            </>)}
-
-            {vistaTiempos==='marca'&&(
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Tiempo de reparación promedio por marca</div>
-                <div style={{fontSize:'12px',color:'#6B7488',marginBottom:'10px'}}>Desde agosto 2026 (no solo el mes seleccionado). Útil para presupuestar mejor a futuro.</div>
-                {tiempoPorMarca.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin datos todavía</div>}
-                {tiempoPorMarca.length>0&&<table className={styles.table}><thead><tr><th>Marca</th><th>Horas promedio</th><th>Vehículos</th></tr></thead><tbody>{tiempoPorMarca.map(m=>(<tr key={m.marca}><td><b>{m.marca}</b></td><td style={{fontFamily:'monospace'}}>{formatHoras(m.promedio)}h</td><td style={{fontFamily:'monospace',color:'#9AA3B8'}}>{m.cantidad}</td></tr>))}</tbody></table>}
-              </div>
-            )}
-            </>)}
-          </div>
-        )}
 
         {seccion==='plandia'&&(
           <div>
@@ -2375,6 +1870,35 @@ return (
             <div className={styles.detGrid}>
               <div className={styles.card}><div className={styles.cardTitle}>Vehículo</div>{[['Modelo',clienteDetalle.vehiculos?.marca_modelo],['Patente',clienteDetalle.vehiculos?.patente],['Color',clienteDetalle.vehiculos?.color],['Año',clienteDetalle.vehiculos?.anio],['Km',clienteDetalle.vehiculos?.kilometraje],['Mecánico',clienteDetalle.mecanico],['Taller',clienteDetalle.taller],['Seguro',clienteDetalle.tiene_seguro?'Sí':'No']].map(([k,v])=><div key={k} className={styles.detRow}><span className={styles.detLabel}>{k}</span><span className={styles.detVal}>{v||'—'}</span></div>)}</div>
               <div className={styles.card}><div className={styles.cardTitle}>Trabajo</div><p className={styles.detText}>{clienteDetalle.motivo||'Sin descripción'}</p><div className={styles.detFecha}>Ingresó: {formatFechaAR(clienteDetalle.fecha_ingreso,true)}</div>{clienteDetalle.fecha_salida&&<div className={styles.detFecha}>Salió: {formatFechaAR(clienteDetalle.fecha_salida,true)}</div>}{clienteDetalle.observacion_final&&<div className={styles.detText} style={{marginTop:'8px'}}><b>Obs. final:</b> {clienteDetalle.observacion_final}</div>}</div>
+            </div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Informe diario del vehículo</div>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup} style={{gridColumn:'1/-1'}}>
+                  <label>Nota de hoy — {new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}</label>
+                  <textarea value={notaHoyTexto} onChange={e=>setNotaHoyTexto(e.target.value)} placeholder="Escribí acá la novedad del día para este vehículo..."/>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Mecánico (opcional)</label>
+                  <select value={notaHoyMecanico} onChange={e=>setNotaHoyMecanico(e.target.value)}>
+                    <option value="">— Sin asignar —</option>
+                    {mecanicos.map(m=><option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{display:'flex',justifyContent:'flex-end',marginTop:'10px'}}>
+                <button className={styles.btnPrimary} onClick={guardarNotaDiaria} disabled={guardandoNota}>{guardandoNota?'Guardando...':'Guardar nota'}</button>
+              </div>
+              {notasDiarias.filter(n=>n.fecha!==new Date().toISOString().split('T')[0]).length>0&&<>
+                <div className={styles.divider} style={{margin:'16px 0'}}></div>
+                {notasDiarias.filter(n=>n.fecha!==new Date().toISOString().split('T')[0]).map(n=>(
+                  <div key={n.id} style={{borderLeft:'3px solid #2FA8FF',padding:'8px 0 8px 14px',marginBottom:'12px'}}>
+                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:'11.5px',fontWeight:'700',letterSpacing:'.03em',textTransform:'uppercase',color:'#2FA8FF',marginBottom:'3px'}}>{new Date(n.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}</div>
+                    <div style={{fontSize:'13.5px',color:'#EEF1F7',lineHeight:'1.5',whiteSpace:'pre-wrap'}}>{n.texto}</div>
+                    <div style={{fontSize:'11px',color:'#6B7488',marginTop:'4px'}}>{n.mecanico||'—'}</div>
+                  </div>
+                ))}
+              </>}
             </div>
             <div className={styles.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}><div className={styles.cardTitle} style={{margin:0}}>Repuestos</div>{admin&&repuestos.length>0&&<button className={styles.btn} style={{fontSize:'12px',padding:'4px 10px'}} onClick={()=>imprimirRepuestos(clienteDetalle,repuestos)}>Imprimir</button>}</div>{repuestos.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin repuestos registrados</div>}{repuestos.length>0&&<table className={styles.table}><thead><tr><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th>{admin&&<th></th>}</tr></thead><tbody>{repuestos.map(r=>(<tr key={r.id}><td>{r.nombre}</td><td>${formatPeso(r.valor)}</td><td>{r.lugar||'—'}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{new Date(r.fecha).toLocaleDateString('es-AR')}</td>{admin&&<td style={{display:'flex',gap:'4px',cursor:'default'}}><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{setFormEditarRepuesto({id:r.id,nombre:r.nombre,valor:formatNum(r.valor.toString()),lugar:r.lugar||'',fecha:r.fecha});setModalEditarRepuesto(true)}}>Editar</button><button className={styles.btnDelete} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>borrarRepuesto(r)}><TrashIcon/></button></td>}</tr>))}<tr><td style={{fontWeight:'700',color:'#EEF1F7'}}>Total</td><td style={{fontWeight:'700',color:'#2ECC71'}}>${formatPeso(repuestos.reduce((a,r)=>a+Number(r.valor),0))}</td><td colSpan={admin?3:2}></td></tr></tbody></table>}</div>
             {admin&&<div className={styles.card}><div className={styles.cardTitle}>Presupuestos</div>{presupuestosDetalle.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin presupuestos guardados para este vehículo</div>}{presupuestosDetalle.length>0&&<table className={styles.table}><thead><tr><th>N°</th><th>Fecha</th><th>Total aprox.</th><th></th></tr></thead><tbody>{presupuestosDetalle.map(p=>(<tr key={p.id}><td style={{fontFamily:'monospace',fontSize:'12px'}}>{p.numero}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{p.fecha?new Date(p.fecha+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td><td>${formatPeso(totalAproxPresupuesto(p))}</td><td><button className={styles.btnEdit} style={{fontSize:'11px',padding:'3px 7px'}} onClick={()=>{abrirPresupuesto(p);setSeccion('presupuesto')}}>Ver / Editar</button></td></tr>))}</tbody></table>}</div>}
