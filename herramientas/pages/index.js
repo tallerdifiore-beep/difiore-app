@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
-import { pesos, fechaAR, hoyAR, calcularSaldos } from '../lib/formato'
+import Link from 'next/link'
+import { pesos, fechaAR, hoyAR, calcularSaldos, estadoVenta, diasEntre } from '../lib/formato'
 import { ClienteModal } from '../components/Modales'
 
 export default function Inicio() {
@@ -18,8 +19,8 @@ export default function Inicio() {
   async function cargar() {
     const [c, v, p] = await Promise.all([
       supabase.from('herr_clientes').select('*').order('nombre'),
-      supabase.from('herr_ventas').select('cliente_id, fecha, total'),
-      supabase.from('herr_pagos').select('cliente_id, fecha, monto'),
+      supabase.from('herr_ventas').select('*'),
+      supabase.from('herr_pagos').select('cliente_id, venta_id, fecha, monto'),
     ])
     const err = c.error || v.error || p.error
     if (err) setError('No se pudieron cargar los datos: ' + err.message)
@@ -29,11 +30,18 @@ export default function Inicio() {
   useEffect(() => { cargar() }, [])
 
   const saldos = useMemo(() => calcularSaldos(ventas, pagos), [ventas, pagos])
-  const mes = hoyAR().slice(0, 7)
+  const hoy = hoyAR()
+  const mes = hoy.slice(0, 7)
+  const nombre = Object.fromEntries(clientes.map(c => [c.id, c.nombre]))
+  const estados = useMemo(() => ventas.map(v => ({ venta: v, ...estadoVenta(v, pagos.filter(p => p.venta_id === v.id), hoy) })), [ventas, pagos, hoy])
   const totalDeuda = Object.values(saldos).reduce((t, s) => t + Math.max(0, s.saldo), 0)
-  const deudores = Object.values(saldos).filter(s => s.saldo > 0).length
-  const vendidoMes = ventas.filter(v => v.fecha.startsWith(mes)).reduce((t, v) => t + Number(v.total), 0)
   const cobradoMes = pagos.filter(p => p.fecha.startsWith(mes)).reduce((t, p) => t + Number(p.monto), 0)
+  const paraEntregar = estados.filter(e => e.estado === 'PARA ENTREGAR')
+  const vencidas = estados.filter(e => e.plan?.atrasada).sort((a, b) => b.plan.diasAtraso - a.plan.diasAtraso)
+  // Cuotas que vencen de hoy a 7 días (sin contar las ya vencidas)
+  const proximas = estados
+    .filter(e => e.plan?.proxima && !e.plan.atrasada && diasEntre(hoy, e.plan.proxima.fecha) <= 7)
+    .sort((a, b) => a.plan.proxima.fecha.localeCompare(b.plan.proxima.fecha))
 
   const lista = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
@@ -48,10 +56,36 @@ export default function Inicio() {
     <>
       <div className="kpis">
         <div className="kpi"><div className="lbl">Te deben en total</div><div className="val debe">{pesos(totalDeuda)}</div></div>
-        <div className="kpi"><div className="lbl">Clientes con deuda</div><div className="val">{deudores}</div></div>
-        <div className="kpi"><div className="lbl">Vendido este mes</div><div className="val">{pesos(vendidoMes)}</div></div>
         <div className="kpi"><div className="lbl">Cobrado este mes</div><div className="val ok">{pesos(cobradoMes)}</div></div>
+        <div className="kpi"><div className="lbl">Para entregar</div><div className="val">{paraEntregar.length}</div></div>
+        <div className="kpi"><div className="lbl">Cuotas vencidas</div><div className={'val ' + (vencidas.length ? 'debe' : '')}>{vencidas.length}</div></div>
       </div>
+
+      {(vencidas.length > 0 || paraEntregar.length > 0 || proximas.length > 0) && (
+        <div className="card lista-avisos">
+          {vencidas.length > 0 && <div className="titulo debe">Cuotas vencidas</div>}
+          {vencidas.map(e => (
+            <Link key={e.venta.id} href={`/cliente/${e.venta.cliente_id}`}>
+              <span><b>{nombre[e.venta.cliente_id]}</b> <span className="tenue">· cuota {e.plan.proxima.numero}/{e.plan.cuotas}, venció el {fechaAR(e.plan.proxima.fecha)}</span></span>
+              <span className="debe" style={{ whiteSpace: 'nowrap' }}>{e.plan.diasAtraso} día{e.plan.diasAtraso > 1 ? 's' : ''}</span>
+            </Link>
+          ))}
+          {proximas.length > 0 && <div className="titulo" style={{ marginTop: vencidas.length ? 16 : 0 }}>Vencen esta semana</div>}
+          {proximas.map(e => (
+            <Link key={e.venta.id} href={`/cliente/${e.venta.cliente_id}`}>
+              <span><b>{nombre[e.venta.cliente_id]}</b> <span className="tenue">· cuota {e.plan.proxima.numero}/{e.plan.cuotas} de {pesos(e.venta.monto_cuota)}</span></span>
+              <span style={{ whiteSpace: 'nowrap' }}>{e.plan.proxima.fecha === hoy ? 'Hoy' : fechaAR(e.plan.proxima.fecha)}</span>
+            </Link>
+          ))}
+          {paraEntregar.length > 0 && <div className="titulo ok" style={{ marginTop: vencidas.length || proximas.length ? 16 : 0 }}>Pagado completo · para entregar</div>}
+          {paraEntregar.map(e => (
+            <Link key={e.venta.id} href={`/cliente/${e.venta.cliente_id}`}>
+              <span><b>{nombre[e.venta.cliente_id]}</b> <span className="tenue">· {(e.venta.items || []).map(i => i.detalle).join(', ')}</span></span>
+              <span className="ok" style={{ whiteSpace: 'nowrap' }}>{pesos(e.total)}</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       <div className="card">
         <div className="acciones" style={{ marginBottom: 12 }}>

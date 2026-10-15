@@ -24,7 +24,45 @@ export function fechaAR(yyyymmdd) {
   return `${d}/${m}/${a}`
 }
 
-export const MEDIOS_PAGO = ['EFECTIVO', 'TRANSFERENCIA', 'MERCADO PAGO', 'TARJETA', 'CHEQUE']
+// Cómo se vende: define si se cobra todo en el momento o en cuotas.
+export const FORMAS_PAGO = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA EN CUOTAS', 'PLAN PERSONAL']
+// Con qué entra cada pago (un plan personal se va pagando en efectivo o transferencia).
+export const MEDIOS_PAGO = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA']
+export const FRECUENCIAS = ['SEMANAL', 'QUINCENAL', 'MENSUAL']
+
+// Fecha de la cuota número n (0 = la primera) de un plan personal.
+export function fechaCuota(primera, frecuencia, n) {
+  const [a, m, d] = primera.slice(0, 10).split('-').map(Number)
+  const f = frecuencia === 'MENSUAL'
+    ? new Date(Date.UTC(a, m - 1 + n, Math.min(d, diasDelMes(a, m - 1 + n))))
+    : new Date(Date.UTC(a, m - 1, d + n * (frecuencia === 'QUINCENAL' ? 15 : 7)))
+  return f.toISOString().slice(0, 10)
+}
+function diasDelMes(a, mes0) { return new Date(Date.UTC(a, mes0 + 1, 0)).getUTCDate() }
+
+export function diasEntre(desde, hasta) {
+  return Math.round((new Date(hasta + 'T00:00:00Z') - new Date(desde + 'T00:00:00Z')) / 86400000)
+}
+
+// Estado de una venta según lo que lleva pagado. La mercadería se entrega recién cuando
+// está todo pagado: hasta entonces la venta queda "PAGANDO".
+export function estadoVenta(venta, pagosDeVenta, hoy = hoyAR()) {
+  const total = Number(venta.total)
+  const pagado = pagosDeVenta.reduce((t, p) => t + Number(p.monto), 0)
+  const saldo = total - pagado
+  const estado = venta.entregado_el ? 'ENTREGADO' : saldo <= 0 ? 'PARA ENTREGAR' : 'PAGANDO'
+  let plan = null
+  if (venta.forma_pago === 'PLAN PERSONAL' && venta.cuotas && venta.monto_cuota && venta.primera_cuota) {
+    const n = venta.cuotas
+    const anticipo = Number(venta.anticipo) || 0
+    // Cuotas cubiertas por lo pagado (descontando el anticipo). Se deja $1 de tolerancia por redondeo.
+    const pagadas = saldo <= 0 ? n : Math.max(0, Math.min(n, Math.floor((pagado - anticipo + 1) / Number(venta.monto_cuota))))
+    const proxima = pagadas < n ? { numero: pagadas + 1, fecha: fechaCuota(venta.primera_cuota, venta.frecuencia, pagadas) } : null
+    const diasAtraso = proxima && saldo > 0 ? diasEntre(proxima.fecha, hoy) : 0
+    plan = { cuotas: n, pagadas, proxima, atrasada: diasAtraso > 0, diasAtraso }
+  }
+  return { total, pagado, saldo, estado, plan }
+}
 
 // Saldo de cada cliente = total vendido - total pagado. Positivo = el cliente debe.
 export function calcularSaldos(ventas, pagos) {

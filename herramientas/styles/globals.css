@@ -123,3 +123,39 @@ input:focus, select:focus, textarea:focus { border-color: var(--acento2); box-sh
   .saldo-cliente { text-align: left; }
   .logo { height: 40px; }
 }
+
+/* Botones de opción (forma de pago, medio, frecuencia) */
+.opciones { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.opciones button {
+  flex: 1 1 auto; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .03em;
+  padding: 9px 10px; border-radius: 8px; border: 1.5px solid var(--borde2); background: var(--card2); color: var(--texto2); cursor: pointer;
+}
+.opciones button.activa { border-color: var(--acento2); color: #fff; background: rgba(31, 107, 255, .22); box-shadow: 0 0 10px rgba(31, 107, 255, .35); }
+
+.total-venta { text-align: right; font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+.aviso { background: rgba(31, 107, 255, .1); border: 1px solid rgba(63, 178, 255, .3); border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; line-height: 1.45; }
+.aviso.ok-fondo { background: rgba(60, 207, 122, .1); border-color: rgba(60, 207, 122, .35); }
+.aviso.debe-fondo { background: rgba(255, 91, 91, .08); border-color: rgba(255, 91, 91, .3); }
+
+.miniatura { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1.5px solid var(--borde2); display: block; }
+
+/* Ventas en la ficha del cliente */
+.venta { border: 1.5px solid var(--borde); border-radius: 12px; padding: 14px; margin-bottom: 12px; background: var(--card2); }
+.venta.entregada { opacity: .75; }
+.venta-cab { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 8px; }
+.barra { height: 8px; border-radius: 6px; background: #0a0d13; border: 1px solid var(--borde); overflow: hidden; margin: 10px 0 6px; }
+.barra > div { height: 100%; background: linear-gradient(90deg, var(--acento), var(--acento2)); box-shadow: 0 0 8px rgba(63, 178, 255, .6); }
+.barra.completa > div { background: var(--ok); box-shadow: none; }
+.cifras { display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; }
+.pagos-venta { margin-top: 10px; border-top: 1px solid var(--borde); }
+.pago-fila { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--borde); font-size: 14px; }
+.pago-fila .crece { flex: 1; min-width: 0; }
+
+.tag.forma { background: #1a2233; color: var(--texto2); }
+.tag.e-pagando { background: #3a1616; color: #ff8b8b; }
+.tag.e-para-entregar { background: #0f3020; color: var(--ok); }
+.tag.e-entregado { background: #1a2233; color: var(--texto3); }
+.tag.atraso { background: var(--debe); color: #fff; }
+
+.lista-avisos a { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--borde); }
+.lista-avisos a:last-child { border-bottom: none; }

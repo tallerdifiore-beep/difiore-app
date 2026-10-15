@@ -38,16 +38,16 @@ export default function Movimientos() {
   })).filter(x => x.total > 0)
 
   const detalle = m => m.tipo === 'venta'
-    ? (m.items || []).map(it => (it.cantidad !== 1 ? `${it.cantidad} x ` : '') + it.detalle).join(', ')
+    ? (m.forma_pago ? m.forma_pago + ': ' : '') + (m.items || []).map(it => (it.cantidad !== 1 ? `${it.cantidad} x ` : '') + it.detalle).join(', ')
     : m.medio
 
   function exportar() {
     const filas = visibles.map(m => ({
       Fecha: fechaAR(m.fecha), Tipo: m.tipo === 'venta' ? 'VENTA' : 'PAGO', Cliente: m.herr_clientes?.nombre || '',
-      Detalle: detalle(m), Notas: m.notas || '', Importe: m.importe,
+      Detalle: detalle(m), Notas: m.notas || '', Importe: m.importe, Comprobante: m.comprobante_url || '',
     }))
     const hoja = XLSX.utils.json_to_sheet(filas)
-    hoja['!cols'] = [{ wch: 11 }, { wch: 7 }, { wch: 28 }, { wch: 45 }, { wch: 25 }, { wch: 12 }]
+    hoja['!cols'] = [{ wch: 11 }, { wch: 7 }, { wch: 28 }, { wch: 45 }, { wch: 25 }, { wch: 12 }, { wch: 40 }]
     const libro = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(libro, hoja, 'Movimientos')
     XLSX.writeFile(libro, `movimientos_${desde}_a_${hasta}.xlsx`)
@@ -85,7 +85,8 @@ export default function Movimientos() {
                   <tr key={m.tipo + m.id}>
                     <td style={{ whiteSpace: 'nowrap' }}>{fechaAR(m.fecha)}</td>
                     <td><Link href={`/cliente/${m.cliente_id}`}><b>{m.herr_clientes?.nombre}</b></Link></td>
-                    <td><span className={'tag ' + m.tipo}>{m.tipo === 'venta' ? 'Venta' : 'Pago'}</span> {detalle(m)}{m.notas && <span className="tenue"> · {m.notas}</span>}</td>
+                    <td><span className={'tag ' + m.tipo}>{m.tipo === 'venta' ? 'Venta' : 'Pago'}</span> {detalle(m)}{m.notas && <span className="tenue"> · {m.notas}</span>}
+                      {m.comprobante_url && <> · <a href={m.comprobante_url} target="_blank" rel="noreferrer" style={{ color: 'var(--acento2)' }}>Ver comprobante</a></>}</td>
                     <td className={'num ' + (m.tipo === 'pago' ? 'ok' : '')}>{pesos(m.importe)}</td>
                   </tr>
                 ))}
