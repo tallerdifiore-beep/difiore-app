@@ -6,7 +6,7 @@ import '../styles/globals.css'
 
 // Contraseña de acceso, configurable en Vercel (variable NEXT_PUBLIC_PASS).
 const PASS = process.env.NEXT_PUBLIC_PASS || 'Herramientas2084'
-const NOMBRE_NEGOCIO = process.env.NEXT_PUBLIC_NOMBRE_NEGOCIO || 'Herramientas'
+const NOMBRE_NEGOCIO = process.env.NEXT_PUBLIC_NOMBRE_NEGOCIO || 'Esteban Herramientas'
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
@@ -38,6 +38,9 @@ export default function App({ Component, pageProps }) {
     <Head>
       <title>{NOMBRE_NEGOCIO} · Clientes y pagos</title>
       <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="theme-color" content="#050608" />
+      <link rel="icon" href="/icono.png" />
+      <link rel="apple-touch-icon" href="/icono.png" />
     </Head>
   )
 
@@ -47,8 +50,8 @@ export default function App({ Component, pageProps }) {
     <>
       {head}
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-        <form onSubmit={login} className="card" style={{ width: '100%', maxWidth: 360, padding: 28 }}>
-          <div className="marca" style={{ textAlign: 'center', marginBottom: 20 }}>{NOMBRE_NEGOCIO}<span>.</span></div>
+        <form onSubmit={login} className="card" style={{ width: '100%', maxWidth: 420, padding: 28 }}>
+          <img src="/logo.png" alt={NOMBRE_NEGOCIO} className="logo-grande" />
           <label className="lbl">Contraseña</label>
           <input type="password" value={pass} onChange={e => setPass(e.target.value)} autoFocus placeholder="Ingresá tu contraseña" />
           {error && <div className="error">{error}</div>}
@@ -64,7 +67,7 @@ export default function App({ Component, pageProps }) {
       {head}
       <div className="wrap">
         <div className="top">
-          <Link href="/" className="marca">{NOMBRE_NEGOCIO}<span>.</span></Link>
+          <Link href="/"><img src="/logo.png" alt={NOMBRE_NEGOCIO} className="logo" /></Link>
           <div className="nav">
             <Link href="/" className={ruta === '/' || ruta.startsWith('/cliente') ? 'activo' : ''}>Clientes</Link>
             <Link href="/movimientos" className={ruta === '/movimientos' ? 'activo' : ''}>Movimientos</Link>

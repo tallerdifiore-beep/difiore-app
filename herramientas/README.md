@@ -1,4 +1,4 @@
-# Gestión de herramientas — clientes y pagos
+# Esteban Herramientas — clientes y pagos
 
 Web aparte (no tiene nada que ver con la app del taller) para llevar la cuenta corriente
 de los clientes de la venta de herramientas:
@@ -12,6 +12,9 @@ de los clientes de la venta de herramientas:
 - **Movimientos**: todas las ventas y pagos entre dos fechas, lo cobrado por medio de pago,
   y botón para bajarlo a Excel.
 - Botón para **mandarle el saldo por WhatsApp** al cliente.
+
+El diseño sigue el logo (`public/logo.png`): fondo negro, azul eléctrico y plateado cromado.
+El ícono de la app (`public/icono.png`) es la "E" del logo.
 
 ## Cómo ponerla en marcha
 
@@ -28,7 +31,7 @@ de los clientes de la venta de herramientas:
    | `NEXT_PUBLIC_SUPABASE_URL` | La URL del proyecto de Supabase (Settings → API) |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | La clave `anon public` (Settings → API) |
    | `NEXT_PUBLIC_PASS` | La contraseña para entrar (si no se pone: `Herramientas2084`) |
-   | `NEXT_PUBLIC_NOMBRE_NEGOCIO` | El nombre que aparece arriba (si no se pone: `Herramientas`) |
+   | `NEXT_PUBLIC_NOMBRE_NEGOCIO` | El nombre en la pestaña del navegador (si no se pone: `Esteban Herramientas`) |
 
 4. Deploy. Desde el celular se puede "Agregar a pantalla de inicio" para usarla como app.
 

@@ -60,7 +60,7 @@ export default function FichaCliente() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div className="marca" style={{ fontSize: 30 }}>{cliente.nombre}</div>
+            <div className="marca cromo" style={{ fontSize: 32 }}>{cliente.nombre}</div>
             <div className="tenue" style={{ marginTop: 4, lineHeight: 1.6 }}>
               {[cliente.telefono, cliente.documento, cliente.direccion].filter(Boolean).join(' · ') || 'Sin datos de contacto'}
               {cliente.notas && <div>{cliente.notas}</div>}
@@ -70,7 +70,7 @@ export default function FichaCliente() {
             <div className="lbl" style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--texto3)', textTransform: 'uppercase' }}>
               {saldo > 0 ? 'Debe' : saldo < 0 ? 'Saldo a favor' : 'Saldo'}
             </div>
-            <div className={'marca ' + (saldo > 0 ? 'debe' : 'ok')} style={{ fontSize: 38 }}>{saldo === 0 ? 'Al día' : pesos(Math.abs(saldo))}</div>
+            <div className={'marca ' + (saldo > 0 ? 'debe' : 'ok')} style={{ fontSize: 38, fontStyle: 'italic' }}>{saldo === 0 ? 'Al día' : pesos(Math.abs(saldo))}</div>
             <div className="tenue" style={{ fontSize: 13 }}>Compró {pesos(vendido)} · Pagó {pesos(pagado)}</div>
           </div>
         </div>
