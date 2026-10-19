@@ -204,6 +204,7 @@ const tcHTML = `
     <div class="tc-item"><b>9. Garantía (30 días o 15.000 km desde la entrega, lo que ocurra primero)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. NO TRABAJAMOS DE OTRA MANERA.</div>
     <div class="tc-item"><b>10. Entrega</b>El cliente podrá retirar su vehículo hasta las 17hs con previa coordinación.</div>
     <div class="tc-item"><b>11. Repuestos propios</b>Si el cliente opta por reparar el vehículo aportando sus propios repuestos, el trabajo realizado no cuenta con garantía.</div>
+    <div class="tc-item"><b>12. Combustible</b>Si durante el diagnóstico, la reparación o las pruebas de manejo fue necesario cargarle combustible al vehículo, el cliente deberá abonar ese importe al momento del retiro.</div>
   </div>
   <div style="display:flex;gap:30px;margin-top:8px;font-size:9px;">
     <div>Fecha: ___________________</div>
