@@ -349,6 +349,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [formTareaSuelta, setFormTareaSuelta] = useState({descripcion:'',mecanico:''})
   const [guardandoTareaPlan, setGuardandoTareaPlan] = useState(false)
   const [mesInforme, setMesInforme] = useState(new Date().toISOString().slice(0,7))
+  const [notasInformeTaller, setNotasInformeTaller] = useState({})
   const [empleados, setEmpleados] = useState([])
   const [checklists, setChecklists] = useState([])
   const [checklistActivo, setChecklistActivo] = useState(null)
@@ -1300,7 +1301,7 @@ export default function Home({ rol, cerrarSesion }) {
       Ingreso:t.fecha_ingreso?new Date(t.fecha_ingreso).toLocaleDateString('es-AR'):'',
       'Dias en el taller':t.fecha_ingreso?Math.floor((hoy-new Date(t.fecha_ingreso))/86400000):'',
       'Llego en grua':t.llego_en_grua?'Sí':'No','Tiene seguro':t.tiene_seguro?'Sí':'No',
-      Observaciones:'',Prioridad:''
+      Observaciones:notasInformeTaller[t.id]?.obs||'',Prioridad:notasInformeTaller[t.id]?.prioridad||''
     })))
     hoja['!cols']=[{wch:18},{wch:12},{wch:12},{wch:8},{wch:10},{wch:20},{wch:14},{wch:14},{wch:18},{wch:14},{wch:30},{wch:12},{wch:14},{wch:12},{wch:12},{wch:30},{wch:12}]
     const libro=XLSX.utils.book_new()
@@ -1308,7 +1309,7 @@ export default function Home({ rol, cerrarSesion }) {
     XLSX.writeFile(libro,`vehiculos-en-el-taller-${new Date().toISOString().slice(0,10)}.xlsx`)
   }
   function imprimirInformeTaller(){
-    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Vehículos en el taller</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a56db;padding-bottom:16px;}.header-logo img{width:180px;}table{width:100%;border-collapse:collapse;}thead th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;border-bottom:2px solid #ccc;}tbody td{padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div style="text-align:right"><h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">VEHÍCULOS EN EL TALLER</h1><p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p></div></div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th></tr></thead><tbody>${trabajosActivos.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.estado||'—'}</td><td>${t.taller||'—'}</td></tr>`).join('')}${trabajosActivos.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">No hay vehículos en el taller</td></tr>':''}</tbody></table><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Vehículos en el taller</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a56db;padding-bottom:16px;}.header-logo img{width:180px;}table{width:100%;border-collapse:collapse;}thead th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;border-bottom:2px solid #ccc;}tbody td{padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div style="text-align:right"><h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">VEHÍCULOS EN EL TALLER</h1><p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p></div></div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Observaciones</th><th>Prioridad</th></tr></thead><tbody>${trabajosActivos.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.estado||'—'}</td><td>${t.taller||'—'}</td><td>${notasInformeTaller[t.id]?.obs||''}</td><td>${notasInformeTaller[t.id]?.prioridad||''}</td></tr>`).join('')}${trabajosActivos.length===0?'<tr><td colspan="8" style="text-align:center;color:#999;padding:16px">No hay vehículos en el taller</td></tr>':''}</tbody></table><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
   }
 
@@ -1892,9 +1893,19 @@ return (
             <div className={styles.divider}></div>
             <div className={styles.card}>
               <div className={styles.cardTitle}>En el taller ahora ({trabajosActivos.length})</div>
+              <div style={{color:'#6B7488',fontSize:'12px',marginBottom:'10px'}}>Las columnas Observaciones y Prioridad se pueden completar acá mismo — se imprimen y se exportan tal cual queden.</div>
               {trabajosActivos.length===0?<div style={{color:'#6B7488',fontSize:'13px'}}>No hay vehículos en el taller.</div>:
-              <table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th></tr></thead><tbody>
-                {trabajosActivos.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td><span className={badgeClass(t.estado)}>{t.estado}</span></td><td>{t.taller}</td></tr>)}
+              <table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Observaciones</th><th>Prioridad</th></tr></thead><tbody>
+                {trabajosActivos.map((t,i)=><tr key={t.id}>
+                  <td style={{color:'#6B7488',cursor:'pointer'}} onClick={()=>verDetalle(t)}>{i+1}</td>
+                  <td style={{cursor:'pointer'}} onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td>
+                  <td style={{cursor:'pointer'}} onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td>
+                  <td style={{cursor:'pointer'}} onClick={()=>verDetalle(t)}>{t.vehiculos?.patente}</td>
+                  <td style={{cursor:'pointer'}} onClick={()=>verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td>
+                  <td style={{cursor:'pointer'}} onClick={()=>verDetalle(t)}>{t.taller}</td>
+                  <td onClick={e=>e.stopPropagation()}><input value={notasInformeTaller[t.id]?.obs||''} onChange={e=>setNotasInformeTaller(n=>({...n,[t.id]:{...n[t.id],obs:e.target.value}}))} placeholder="—" style={{width:'160px',padding:'6px 8px',borderRadius:'6px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/></td>
+                  <td onClick={e=>e.stopPropagation()}><input value={notasInformeTaller[t.id]?.prioridad||''} onChange={e=>setNotasInformeTaller(n=>({...n,[t.id]:{...n[t.id],prioridad:e.target.value}}))} placeholder="—" style={{width:'100px',padding:'6px 8px',borderRadius:'6px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/></td>
+                </tr>)}
               </tbody></table>}
             </div>
           </div>
