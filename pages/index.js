@@ -1290,10 +1290,19 @@ export default function Home({ rol, cerrarSesion }) {
   }
 
   function exportarInformeTallerExcel(){
+    const hoy=new Date()
     const hoja=XLSX.utils.json_to_sheet(trabajosActivos.map(t=>({
-      Vehiculo:t.vehiculos?.marca_modelo||'',Cliente:t.vehiculos?.clientes?.nombre||'',Patente:t.vehiculos?.patente||'',
-      Estado:t.estado||'',Taller:t.taller||''
+      Vehiculo:t.vehiculos?.marca_modelo||'',Patente:t.vehiculos?.patente||'',Color:t.vehiculos?.color||'',
+      Anio:t.vehiculos?.anio||'',Km:t.vehiculos?.kilometraje||'',
+      Cliente:t.vehiculos?.clientes?.nombre||'',Telefono:t.vehiculos?.clientes?.telefono||'',
+      Estado:t.estado||'',Taller:t.taller||'',Mecanico:t.mecanico||'',
+      Motivo:t.motivo||'',
+      Ingreso:t.fecha_ingreso?new Date(t.fecha_ingreso).toLocaleDateString('es-AR'):'',
+      'Dias en el taller':t.fecha_ingreso?Math.floor((hoy-new Date(t.fecha_ingreso))/86400000):'',
+      'Llego en grua':t.llego_en_grua?'Sí':'No','Tiene seguro':t.tiene_seguro?'Sí':'No',
+      Observaciones:'',Prioridad:''
     })))
+    hoja['!cols']=[{wch:18},{wch:12},{wch:12},{wch:8},{wch:10},{wch:20},{wch:14},{wch:14},{wch:18},{wch:14},{wch:30},{wch:12},{wch:14},{wch:12},{wch:12},{wch:30},{wch:12}]
     const libro=XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(libro,hoja,'En el taller')
     XLSX.writeFile(libro,`vehiculos-en-el-taller-${new Date().toISOString().slice(0,10)}.xlsx`)
