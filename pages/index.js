@@ -1289,6 +1289,20 @@ export default function Home({ rol, cerrarSesion }) {
     XLSX.writeFile(libro,`informe-difiore-${nombreMes.replace(' ','-')}.xlsx`)
   }
 
+  function exportarInformeTallerExcel(){
+    const hoja=XLSX.utils.json_to_sheet(trabajosActivos.map(t=>({
+      Vehiculo:t.vehiculos?.marca_modelo||'',Cliente:t.vehiculos?.clientes?.nombre||'',Patente:t.vehiculos?.patente||'',
+      Estado:t.estado||'',Taller:t.taller||''
+    })))
+    const libro=XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(libro,hoja,'En el taller')
+    XLSX.writeFile(libro,`vehiculos-en-el-taller-${new Date().toISOString().slice(0,10)}.xlsx`)
+  }
+  function imprimirInformeTaller(){
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Vehículos en el taller</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a56db;padding-bottom:16px;}.header-logo img{width:180px;}table{width:100%;border-collapse:collapse;}thead th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;border-bottom:2px solid #ccc;}tbody td{padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div style="text-align:right"><h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">VEHÍCULOS EN EL TALLER</h1><p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p></div></div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th></tr></thead><tbody>${trabajosActivos.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.estado||'—'}</td><td>${t.taller||'—'}</td></tr>`).join('')}${trabajosActivos.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">No hay vehículos en el taller</td></tr>':''}</tbody></table><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
+    abrirVentana(html)
+  }
+
   async function toggleExcluirEstancados(trabajo){
     const{error}=await supabase.from('trabajos').update({excluir_estancados:!trabajo.excluir_estancados}).eq('id',trabajo.id)
     if(error){avisar('No se pudo actualizar: '+error.message,'error');return}
@@ -1484,7 +1498,7 @@ return (
           ...(admin?[{id:'presupuesto',label:'Presupuesto'}]:[]),
           ...(admin?[{id:'recibo',label:'Recibo'}]:[]),
           {id:'checklist',label:'Checklist entrega'},
-          ...(admin?[{id:'informe',label:'Informe mensual'},{id:'empleados',label:'Empleados'}]:[])
+          ...(admin?[{id:'informe',label:'Informe mensual'},{id:'informe-taller',label:'Vehículos en el taller'},{id:'empleados',label:'Empleados'}]:[])
         ].map(item=>(
           <button key={item.id} className={`${styles.navItem} ${seccion===item.id?styles.navActive:''}`} onClick={()=>{setSeccion(item.id);setTallerVista(null);setVistaStats(null);setVistaMarca(null);setVerEntregados(false);setVerPapelera(false);setSidebarOpen(false)}}>{item.label}</button>
         ))}
@@ -1860,6 +1874,20 @@ return (
             <div className={styles.topBar}><h1 className={styles.pageTitle}>Informe mensual</h1><div style={{display:'flex',gap:'8px',alignItems:'center'}}><button className={styles.btn} onClick={actualizarTodo}>↻ Actualizar</button><input type="month" value={mesInforme} onChange={e=>setMesInforme(e.target.value)} style={{padding:'8px 12px',borderRadius:'6px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/><button className={styles.btnSuccess} onClick={exportarInformeExcel}>Exportar a Excel</button><button className={styles.btnPrimary} onClick={imprimirInforme}>Imprimir informe</button></div></div>
             <div className={styles.divider}></div>
             {(()=>{const{ingresados,salidos,marcaTop,marcasCount,nombreMes}=generarInforme();return<div><div style={{marginBottom:'12px',fontSize:'14px',fontWeight:'600',color:'#9AA3B8',textTransform:'capitalize'}}>{nombreMes}</div><div className={styles.stats} style={{marginBottom:'1.5rem'}}><div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{ingresados.length}</div><div className={styles.statL}>Ingresados</div></div><div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{salidos.length}</div><div className={styles.statL}>Entregados</div></div><div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{fontSize:'18px',color:'#2ECC71'}}>{marcaTop?marcaTop[0]:'—'}</div><div className={styles.statL}>Marca frecuente{marcaTop?` (${marcaTop[1]})`:''}</div></div><div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN} style={{fontSize:'16px'}}>{Object.keys(marcasCount).length}</div><div className={styles.statL}>Marcas distintas</div></div></div><div className={styles.card}><div className={styles.cardTitle}>Vehículos ingresados ({ingresados.length})</div>{ingresados.length===0?<div style={{color:'#6B7488',fontSize:'13px'}}>Sin ingresos este mes</div>:<table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>{ingresados.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>)}</tbody></table>}</div><div className={styles.card}><div className={styles.cardTitle}>Vehículos entregados ({salidos.length})</div>{salidos.length===0?<div style={{color:'#6B7488',fontSize:'13px'}}>Sin entregas este mes</div>:<table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead><tbody>{salidos.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>)}</tbody></table>}</div><div className={styles.card}><div className={styles.cardTitle}>Marcas atendidas</div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'8px'}}>{Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([marca,n])=><div key={marca} style={{background:'#1C2130',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',border:'1px solid #343B4B'}}><span style={{fontSize:'13px',color:'#9AA3B8',fontWeight:'500'}}>{marca}</span><span style={{fontSize:'20px',fontWeight:'700',color:'#2FA8FF'}}>{n}</span></div>)}{Object.keys(marcasCount).length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin datos este mes</div>}</div></div></div>})()}
+          </div>
+        )}
+
+        {seccion==='informe-taller'&&admin&&(
+          <div>
+            <div className={styles.topBar}><h1 className={styles.pageTitle}>Vehículos en el taller</h1><div style={{display:'flex',gap:'8px',alignItems:'center'}}><button className={styles.btn} onClick={actualizarTodo}>↻ Actualizar</button><button className={styles.btnSuccess} onClick={exportarInformeTallerExcel}>Exportar a Excel</button><button className={styles.btnPrimary} onClick={imprimirInformeTaller}>Imprimir</button></div></div>
+            <div className={styles.divider}></div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>En el taller ahora ({trabajosActivos.length})</div>
+              {trabajosActivos.length===0?<div style={{color:'#6B7488',fontSize:'13px'}}>No hay vehículos en el taller.</div>:
+              <table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th></tr></thead><tbody>
+                {trabajosActivos.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td><span className={badgeClass(t.estado)}>{t.estado}</span></td><td>{t.taller}</td></tr>)}
+              </tbody></table>}
+            </div>
           </div>
         )}
 
