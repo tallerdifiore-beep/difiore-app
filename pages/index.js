@@ -194,17 +194,15 @@ const tcHTML = `
   <div class="tc-title">TÉRMINOS Y CONDICIONES</div>
   <div class="tc-grid">
     <div class="tc-item"><b>1. Ingreso al taller</b>Al ingresar el vehículo, el cliente deberá abonar $150.000 correspondientes al diagnóstico inicial (*). En caso de aceptar el trabajo, el valor del diagnóstico se descuenta de la mano de obra.</div>
-    <div class="tc-item"><b>2. Diagnóstico</b>El diagnóstico es para que los profesionales tengan un panorama del problema. El taller no está obligado a enviar reportes periódicos; al final se entregará un informe detallado del trabajo realizado.</div>
-    <div class="tc-item"><b>3. Presupuesto y aceptación</b>Una vez realizado el diagnóstico se enviará el detalle de repuestos y mano de obra. Si el cliente acepta, contará con 48hs hábiles para entregar el importe y dar inicio a la reparación.</div>
-    <div class="tc-item"><b>4. Vencimiento / Cochera</b>Si pasadas las 48hs hábiles no se realizó el pago, se cobrará cochera a $8.000/día. Las mismas condiciones aplican una vez notificada la finalización del trabajo.</div>
-    <div class="tc-item"><b>5. Prueba de manejo</b>El cliente presta su consentimiento para que el vehículo sea probado en calle entre 10 y 100 km, a fin de realizar las pruebas correspondientes al diagnóstico o reparación.</div>
-    <div class="tc-item"><b>6. Seguro vigente</b>El cliente declara entregar el vehículo con la póliza de seguro al día. Di Fiore no se responsabiliza por siniestros en caso de que el seguro no se encuentre vigente.</div>
-    <div class="tc-item"><b>7. Pertenencias</b>El cliente deberá retirar todas las pertenencias personales. Di Fiore no se responsabiliza por objetos personales en el interior del vehículo.</div>
-    <div class="tc-item"><b>8. Plazos de pago</b>El plazo máximo para abonar el total del trabajo es el día del retiro del vehículo.</div>
-    <div class="tc-item"><b>9. Garantía (30 días o 15.000 km desde la entrega, lo que ocurra primero)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. NO TRABAJAMOS DE OTRA MANERA.</div>
-    <div class="tc-item"><b>10. Entrega</b>El cliente podrá retirar su vehículo hasta las 17hs con previa coordinación.</div>
-    <div class="tc-item"><b>11. Repuestos propios</b>Si el cliente opta por reparar el vehículo aportando sus propios repuestos, el trabajo realizado no cuenta con garantía.</div>
-    <div class="tc-item"><b>12. Combustible</b>Si durante el diagnóstico, la reparación o las pruebas de manejo fue necesario cargarle combustible al vehículo, el cliente deberá abonar ese importe al momento del retiro.</div>
+    <div class="tc-item"><b>2. Seguro vigente</b>El cliente declara entregar el vehículo con la póliza de seguro al día. Di Fiore no se responsabiliza por siniestros en caso de que el seguro no se encuentre vigente.</div>
+    <div class="tc-item"><b>3. Pertenencias</b>El cliente deberá retirar todas las pertenencias personales. Di Fiore no se responsabiliza por objetos personales en el interior del vehículo.</div>
+    <div class="tc-item"><b>4. Diagnóstico</b>El diagnóstico es para que los profesionales tengan un panorama del problema. El taller no está obligado a enviar reportes periódicos; al final se entregará un informe detallado del trabajo realizado.</div>
+    <div class="tc-item"><b>5. Presupuesto y aceptación</b>Una vez realizado el diagnóstico se enviará el detalle de repuestos y mano de obra. Si el cliente acepta, contará con 48hs hábiles para entregar el importe y dar inicio a la reparación.</div>
+    <div class="tc-item"><b>6. Vencimiento / Cochera</b>Si pasadas las 48hs hábiles no se realizó el pago, se cobrará cochera a $8.000/día. Las mismas condiciones aplican una vez notificada la finalización del trabajo.</div>
+    <div class="tc-item"><b>7. Prueba de manejo</b>El cliente presta su consentimiento para que el vehículo sea probado en calle entre 10 y 100 km, a fin de realizar las pruebas correspondientes al diagnóstico o reparación.</div>
+    <div class="tc-item"><b>8. Combustible</b>Si durante el diagnóstico, la reparación o las pruebas de manejo fue necesario cargarle combustible al vehículo, el cliente deberá abonar ese importe al momento del retiro.</div>
+    <div class="tc-item"><b>9. Repuestos propios</b>Si el cliente opta por reparar el vehículo aportando sus propios repuestos, el trabajo realizado no cuenta con garantía.</div>
+    <div class="tc-item"><b>10. Garantía (30 días o 15.000 km desde la entrega, lo que ocurra primero)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. NO TRABAJAMOS DE OTRA MANERA.</div>
   </div>
   <div style="display:flex;gap:30px;margin-top:8px;font-size:9px;">
     <div>Fecha: ___________________</div>
