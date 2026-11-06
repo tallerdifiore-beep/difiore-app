@@ -46,9 +46,6 @@ function patenteHandlers(valorAnterior, setter) {
 // formatea el próximo número de documento a partir del último usado en la tabla numeracion
 function formatNumeroDoc(ultimoUsado) { return '001-' + String((ultimoUsado||0)+1).padStart(5,'0') }
 function formatNumeroFicha(ultimoUsado) { return 'C-' + String((ultimoUsado||0)+1).padStart(5,'0') }
-
-const UMBRAL_ESTANCADOS_DEFAULT = 2
-function diasDesde(fecha){ return Math.floor((new Date() - new Date(fecha)) / (1000*60*60*24)) }
 // redondea a la media hora más cercana (0, 0.5, 1, 1.5...) y muestra sin decimales de más
 function formatHoras(h){
   const redondeado=Math.ceil((h||0)*2)/2
@@ -373,10 +370,6 @@ export default function Home({ rol, cerrarSesion }) {
   const [editandoTurno, setEditandoTurno] = useState(null)
   const [mostrarFormTurno, setMostrarFormTurno] = useState(false)
   const [verRecordatorios, setVerRecordatorios] = useState(false)
-  const [umbralEstancados, setUmbralEstancados] = useState(UMBRAL_ESTANCADOS_DEFAULT)
-  const [editandoUmbral, setEditandoUmbral] = useState(false)
-  const [mostrarExcluidosEstancados, setMostrarExcluidosEstancados] = useState(false)
-  const [umbralTemp, setUmbralTemp] = useState('')
   const [diaSeleccionado, setDiaSeleccionado] = useState(null)
   const [mesCalendario, setMesCalendario] = useState(new Date())
   const [form, setForm] = useState({
@@ -456,7 +449,7 @@ export default function Home({ rol, cerrarSesion }) {
 
   const [verPapelera, setVerPapelera] = useState(false)
 
-  useEffect(() => { cargarDatos(); cargarNumeracion(); cargarReingresos(); cargarActualizacionesGlobal(); cargarUmbralEstancados() }, [])
+  useEffect(() => { cargarDatos(); cargarNumeracion(); cargarReingresos(); cargarActualizacionesGlobal() }, [])
 
   // carga de a partes: presupuestos y plan del día recién cuando se visita esa sección, no en cada carga de la app
   const [presupuestosCargados, setPresupuestosCargados] = useState(false)
@@ -562,21 +555,6 @@ export default function Home({ rol, cerrarSesion }) {
   async function cargarActualizacionesGlobal(){
     const{data}=await supabase.from('actualizaciones').select('trabajo_id, fecha, tipo, mecanico')
     setActualizacionesRaw(data||[])
-  }
-
-  async function cargarUmbralEstancados(){
-    const{data}=await supabase.from('configuracion').select('valor').eq('clave','umbral_estancados').single()
-    if(data?.valor)setUmbralEstancados(parseInt(data.valor)||UMBRAL_ESTANCADOS_DEFAULT)
-  }
-
-  async function guardarUmbralEstancados(){
-    const num=parseInt(umbralTemp)
-    if(!num||num<1){avisar('Ingresá un número de días válido','error');return}
-    const{error}=await supabase.from('configuracion').upsert({clave:'umbral_estancados',valor:String(num)})
-    if(error){avisar('No se pudo guardar: '+error.message,'error');return}
-    setUmbralEstancados(num)
-    setEditandoUmbral(false)
-    avisar('Umbral actualizado','exito')
   }
 
   async function cargarPlanDiario(fecha){
@@ -1315,13 +1293,6 @@ export default function Home({ rol, cerrarSesion }) {
     abrirVentana(html)
   }
 
-  async function toggleExcluirEstancados(trabajo){
-    const{error}=await supabase.from('trabajos').update({excluir_estancados:!trabajo.excluir_estancados}).eq('id',trabajo.id)
-    if(error){avisar('No se pudo actualizar: '+error.message,'error');return}
-    await cargarTrabajos()
-    avisar(trabajo.excluir_estancados?'Vehículo vuelto a incluir en la alerta':'Vehículo excluido de la alerta de estancados','exito')
-  }
-
   function imprimirInforme(){const{ingresados,salidos,marcaTop,marcasCount,nombreMes}=generarInforme();const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Mensual</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a56db;padding-bottom:16px;}.header-logo img{width:180px;}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}.stat-box{border:2px solid #1a56db;border-radius:10px;padding:16px;text-align:center;}.stat-box .num{font-size:36px;font-weight:900;color:#1a56db;}.stat-box .lbl{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;}.section{margin-bottom:20px;}.section-title{background:#222;color:#fff;font-weight:bold;font-size:11px;padding:6px 12px;margin-bottom:8px;letter-spacing:1px;}table{width:100%;border-collapse:collapse;}thead th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;border-bottom:2px solid #ccc;}tbody td{padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.marcas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}.marca-item{border:1px solid #e0e0e0;border-radius:6px;padding:10px;display:flex;justify-content:space-between;align-items:center;}.bottom{margin-top:24px;border-top:2px solid #1a56db;padding-top:10px;text-align:center;font-size:10px;color:#1a56db;font-weight:600;}@media print{body{padding:15px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div style="text-align:right"><h1 style="font-size:22px;font-weight:900;color:#1a56db;margin-bottom:4px">INFORME MENSUAL</h1><p style="font-size:14px;font-weight:700;color:#333;margin-bottom:4px">${nombreMes.toUpperCase()}</p><p style="font-size:11px;color:#555">Generado: ${new Date().toLocaleDateString('es-AR')}</p></div></div><div class="stats"><div class="stat-box"><div class="num">${ingresados.length}</div><div class="lbl">Vehículos ingresados</div></div><div class="stat-box"><div class="num">${salidos.length}</div><div class="lbl">Vehículos entregados</div></div><div class="stat-box" style="border-color:#16A34A"><div class="num" style="color:#16A34A;font-size:24px">${marcaTop?marcaTop[0]:'—'}</div><div class="lbl">Marca más frecuente${marcaTop?` (${marcaTop[1]})`:''}</div></div></div><div class="section"><div class="section-title">VEHÍCULOS INGRESADOS (${ingresados.length})</div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>${ingresados.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>`).join('')}${ingresados.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin ingresos este mes</td></tr>':''}</tbody></table></div><div class="section"><div class="section-title">VEHÍCULOS ENTREGADOS (${salidos.length})</div><table><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entrega</th></tr></thead><tbody>${salidos.map((t,i)=>`<tr><td>${i+1}</td><td>${t.vehiculos?.marca_modelo||'—'}</td><td>${t.vehiculos?.clientes?.nombre||'—'}</td><td>${t.vehiculos?.patente||'—'}</td><td>${t.taller||'—'}</td><td>${new Date(t.fecha_salida).toLocaleDateString('es-AR')}</td></tr>`).join('')}${salidos.length===0?'<tr><td colspan="6" style="text-align:center;color:#999;padding:16px">Sin entregas este mes</td></tr>':''}</tbody></table></div><div class="section"><div class="section-title">MARCAS ATENDIDAS</div><div class="marcas">${Object.entries(marcasCount).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="marca-item"><span style="font-size:13px;color:#555">${m}</span><b style="font-size:18px;color:#1a56db">${n}</b></div>`).join('')}</div></div><div class="bottom">Di Fiore Performance — Malvinas 2084, Mar del Plata 7600</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
 
   const trabajosVivos=useMemo(()=>trabajos.filter(t=>!t.borrado),[trabajos])
@@ -1338,16 +1309,6 @@ export default function Home({ rol, cerrarSesion }) {
   const tipoHistorial={ingreso:'🟢',salida:'🔴',movimiento:'🔵',reingreso:'🟡',estado:'⚪',prueba:'🟠',motor:'🔧',terceros:'⏳',repuestos:'📦',aprobacion:'✍️',elevador:'🅿️',diagnostico:'🔍',reparacion:'🛠️',diagnostico_fin:'✅',cliente_aprobo:'👍',cliente_pago:'💵',oficina_salio:'🚗',repuestos_llegaron:'📦',repuesto_no_pactado:'⚠️',mecanico_pide_repuestos:'🔧',trabajo_iniciado:'▶️',service:'🛢️',esperando_retiro:'🔑'}
   const trabajosTaller=tallerVista?trabajosVivos.filter(t=>t.taller===tallerVista&&t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)):[]
   const trabajosDeMarca=vistaMarca?trabajosActivos.filter(t=>getMarca(t.vehiculos?.marca_modelo)===vistaMarca).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)):[]
-  const ultimaActualizacionPorTrabajo=useMemo(()=>{
-    const mapa={}
-    actualizacionesRaw.forEach(a=>{
-      if(!mapa[a.trabajo_id]||new Date(a.fecha)>new Date(mapa[a.trabajo_id]))mapa[a.trabajo_id]=a.fecha
-    })
-    return mapa
-  },[actualizacionesRaw])
-  function fechaReferenciaEstancado(t){ return ultimaActualizacionPorTrabajo[t.id]||t.fecha_ingreso }
-  const trabajosEstancados=useMemo(()=>trabajosActivos.filter(t=>diasDesde(fechaReferenciaEstancado(t))>=umbralEstancados&&!t.excluir_estancados).sort((a,b)=>diasDesde(fechaReferenciaEstancado(b))-diasDesde(fechaReferenciaEstancado(a))),[trabajosActivos,ultimaActualizacionPorTrabajo,umbralEstancados])
-  const estancadosExcluidos=useMemo(()=>trabajosActivos.filter(t=>diasDesde(fechaReferenciaEstancado(t))>=umbralEstancados&&t.excluir_estancados).sort((a,b)=>diasDesde(fechaReferenciaEstancado(b))-diasDesde(fechaReferenciaEstancado(a))),[trabajosActivos,ultimaActualizacionPorTrabajo,umbralEstancados])
   const resultadosGlobales=useMemo(()=>{
     const q=busquedaGlobal.trim().toLowerCase()
     if(q.length<2)return{clientes:[],presupuestos:[],checklists:[]}
@@ -1581,7 +1542,7 @@ return (
           <div>
             <div className={styles.topBar}><h1 className={styles.pageTitle}>Dashboard</h1><div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}><button className={styles.btnPrimary} onClick={actualizarTodo}>↻ Actualizar</button></div></div>
             <div className={styles.divider}></div>
-            <div className={styles.stats}><div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{stats.total}</div><div className={styles.statL}>Clientes totales</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('enTaller')}><div className={styles.statN}>{stats.enTaller}</div><div className={styles.statL}>En taller →</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('listos')}><div className={styles.statN}>{stats.listos}</div><div className={styles.statL}>Listos →</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('salidos')}><div className={styles.statN}>{stats.salidos}</div><div className={styles.statL}>Entregados →</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('reingresos')}><div className={styles.statN}>{reingresosRaw.length}</div><div className={styles.statL}>Reingresos →</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('estancados')}><div className={styles.statN} style={{color:trabajosEstancados.length>0?'#FF4D4F':undefined}}>{trabajosEstancados.length}</div><div className={styles.statL}>Estancados →</div></div></div>
+            <div className={styles.stats}><div className={styles.stat} style={{cursor:'default'}}><div className={styles.statN}>{stats.total}</div><div className={styles.statL}>Clientes totales</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('enTaller')}><div className={styles.statN}>{stats.enTaller}</div><div className={styles.statL}>En taller →</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('listos')}><div className={styles.statN}>{stats.listos}</div><div className={styles.statL}>Listos →</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('salidos')}><div className={styles.statN}>{stats.salidos}</div><div className={styles.statL}>Entregados →</div></div><div className={styles.stat} style={{cursor:'pointer'}} onClick={()=>setVistaStats('reingresos')}><div className={styles.statN}>{reingresosRaw.length}</div><div className={styles.statL}>Reingresos →</div></div></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1rem'}}>{['Malvinas 2084','Malvinas 3906'].map(taller=>{const t=trabajos.filter(x=>x.taller===taller&&x.estado!=='Salio');return<div key={taller} className={styles.tallerCard} onClick={()=>setTallerVista(taller)}><div className={styles.tallerNombre}>{taller}</div><div className={styles.tallerN}>{t.length} <span>autos</span></div><div style={{marginTop:'10px'}}>{['Diagnóstico','En proceso','En espera','Desarmando','Listo'].map(estado=>{const n=t.filter(x=>x.estado===estado).length;return n>0?<div key={estado} style={{display:'flex',justifyContent:'space-between',fontSize:'12px',padding:'4px 0',borderBottom:'1px solid #262B38'}}><span style={{color:'#9AA3B8'}}>{estado}</span><span style={{color:'#EEF1F7',fontWeight:'600'}}>{n}</span></div>:null})}</div><div className={styles.tallerBtn}>Ver detalle →</div></div>})}</div>
             <div className={styles.card}><div className={styles.cardTitle}>Marcas en taller</div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'8px'}}>{Object.entries(conteoMarcas).sort((a,b)=>b[1]-a[1]).map(([marca,n])=>(<div key={marca} onClick={()=>setVistaMarca(marca)} style={{background:'#1C2130',borderRadius:'8px',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',border:'1px solid #343B4B',cursor:'pointer'}} onMouseOver={e=>{e.currentTarget.style.borderColor='#2FA8FF';e.currentTarget.style.background='#20263A'}} onMouseOut={e=>{e.currentTarget.style.borderColor='#343B4B';e.currentTarget.style.background='#1C2130'}}><span style={{fontSize:'13px',color:'#9AA3B8',fontWeight:'500'}}>{marca}</span><span style={{fontSize:'20px',fontWeight:'700',color:'#2FA8FF'}}>{n}</span></div>))}{Object.keys(conteoMarcas).length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin autos en taller</div>}</div></div>
           </div>
@@ -1589,20 +1550,7 @@ return (
 
         {seccion==='dashboard'&&!tallerVista&&!vistaStats&&vistaMarca&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVistaMarca(null)}>← Volver</button><h1 className={styles.pageTitle}>{vistaMarca} en taller</h1></div><div className={styles.divider}></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>{trabajosDeMarca.map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td><span className={badgeClass(t.estado)}>{t.estado}</span></td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>)}{trabajosDeMarca.length===0&&<tr><td colSpan="7" style={{textAlign:'center',color:'#6B7488',padding:'2rem'}}>Sin resultados</td></tr>}</tbody></table></div></div>)}
 
-        {seccion==='dashboard'&&!tallerVista&&vistaStats&&vistaStats!=='reingresos'&&vistaStats!=='estancados'&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVistaStats(null)}>← Volver</button><h1 className={styles.pageTitle}>{titulosVistaStats[vistaStats]}</h1></div><div className={styles.divider}></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>{listaVistaStats[vistaStats].map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td><span className={badgeClass(t.estado)}>{t.estado}</span></td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>)}{listaVistaStats[vistaStats].length===0&&<tr><td colSpan="7" style={{textAlign:'center',color:'#6B7488',padding:'2rem'}}>Sin resultados</td></tr>}</tbody></table></div></div>)}
-
-        {seccion==='dashboard'&&!tallerVista&&vistaStats==='estancados'&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVistaStats(null)}>← Volver</button><h1 className={styles.pageTitle}>Vehículos estancados (+{umbralEstancados} días sin cambiar de estado)</h1>{!editandoUmbral?<button className={styles.btn} onClick={()=>{setUmbralTemp(String(umbralEstancados));setEditandoUmbral(true)}}>Cambiar umbral</button>:<div style={{display:'flex',gap:'6px',alignItems:'center'}}><input type="number" min="1" value={umbralTemp} onChange={e=>setUmbralTemp(e.target.value)} style={{width:'60px',padding:'6px 8px',borderRadius:'6px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/><span style={{fontSize:'12px',color:'#9AA3B8'}}>días</span><button className={styles.btnPrimary} style={{fontSize:'12px',padding:'6px 12px'}} onClick={guardarUmbralEstancados}>Guardar</button><button className={styles.btn} style={{fontSize:'12px',padding:'6px 12px'}} onClick={()=>setEditandoUmbral(false)}>Cancelar</button></div>}</div><div className={styles.divider}></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Días</th><th></th></tr></thead><tbody>{trabajosEstancados.map((t,i)=><tr key={t.id}><td style={{color:'#6B7488'}}>{i+1}</td><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.patente}</td><td onClick={()=>verDetalle(t)}><span className={badgeClass(t.estado)}>{t.estado}</span></td><td onClick={()=>verDetalle(t)} style={{fontWeight:'700',color:'#FF4D4F'}}>{diasDesde(fechaReferenciaEstancado(t))} días</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirEstancados(t)}>Excluir</button></td></tr>)}{trabajosEstancados.length===0&&<tr><td colSpan="7" style={{textAlign:'center',color:'#6B7488',padding:'2rem'}}>Ningún vehículo estancado</td></tr>}</tbody></table></div>
-        {estancadosExcluidos.length>0&&<div className={styles.card} style={{marginTop:'1rem'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setMostrarExcluidosEstancados(v=>!v)}>
-            <div className={styles.cardTitle} style={{margin:0}}>Excluidos de la alerta ({estancadosExcluidos.length})</div>
-            <span style={{fontSize:'12px',color:'#9AA3B8'}}>{mostrarExcluidosEstancados?'▲ Ocultar':'▼ Ver'}</span>
-          </div>
-          {mostrarExcluidosEstancados&&<>
-            <div style={{fontSize:'12px',color:'#6B7488',margin:'10px 0'}}>Estos vehículos llevan más de {umbralEstancados} días sin cambiar de estado, pero elegiste no contarlos.</div>
-            <table className={styles.table}><thead><tr><th>Vehículo</th><th>Cliente</th><th>Días</th><th></th></tr></thead><tbody>{estancadosExcluidos.map(t=>(<tr key={t.id}><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(t)} style={{color:'#9AA3B8'}}>{diasDesde(fechaReferenciaEstancado(t))} días</td><td style={{cursor:'default'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>toggleExcluirEstancados(t)}>Volver a incluir</button></td></tr>))}</tbody></table>
-          </>}
-        </div>}
-        </div>)}
+        {seccion==='dashboard'&&!tallerVista&&vistaStats&&vistaStats!=='reingresos'&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVistaStats(null)}>← Volver</button><h1 className={styles.pageTitle}>{titulosVistaStats[vistaStats]}</h1></div><div className={styles.divider}></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Estado</th><th>Taller</th><th>Ingreso</th></tr></thead><tbody>{listaVistaStats[vistaStats].map((t,i)=><tr key={t.id} onClick={()=>verDetalle(t)}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td><span className={badgeClass(t.estado)}>{t.estado}</span></td><td>{t.taller}</td><td style={{fontSize:'12px',color:'#9AA3B8'}}>{new Date(t.fecha_ingreso).toLocaleDateString('es-AR')}</td></tr>)}{listaVistaStats[vistaStats].length===0&&<tr><td colSpan="7" style={{textAlign:'center',color:'#6B7488',padding:'2rem'}}>Sin resultados</td></tr>}</tbody></table></div></div>)}
 
         {seccion==='dashboard'&&!tallerVista&&vistaStats==='reingresos'&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVistaStats(null)}>← Volver</button><h1 className={styles.pageTitle}>Reingresos</h1></div><div className={styles.divider}></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Veces que reingresó</th></tr></thead><tbody>{reingresosPorVehiculo.map((r,i)=><tr key={r.vehiculo?.id||i} onClick={()=>{const t=trabajos.find(tr=>tr.vehiculos?.id===r.vehiculo?.id);if(t)verDetalle(t)}}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{r.vehiculo?.marca_modelo}</b></td><td>{r.vehiculo?.clientes?.nombre}</td><td>{r.vehiculo?.patente}</td><td style={{fontWeight:'700',color:'#2FA8FF'}}>{r.cantidad} {r.cantidad===1?'vez':'veces'}</td></tr>)}{reingresosPorVehiculo.length===0&&<tr><td colSpan="5" style={{textAlign:'center',color:'#6B7488',padding:'2rem'}}>Sin reingresos registrados</td></tr>}</tbody></table></div></div>)}
 
