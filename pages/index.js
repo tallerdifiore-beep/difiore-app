@@ -1108,7 +1108,33 @@ export default function Home({ rol, cerrarSesion }) {
     const montoNum=parseFloat(parseNum(recibo.monto.toString()))||0
     const numeroFicha=trabajos.find(t=>t.id===recibo.trabajo_id)?.vehiculos?.clientes?.numero_ficha||'—'
     const fechaFmt=new Date(recibo.fecha+'T12:00:00').toLocaleDateString('es-AR')
-    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibo</title>${comprobanteFonts}<style>${comprobanteCSS}</style></head><body>${buildDocHeader('Recibo','N° Recibo',recibo.numero,`Ficha ${numeroFicha} · ${fechaFmt}`)}<div class="fields"><div class="field"><label>Cliente</label><span>${recibo.cliente||'—'}</span></div><div class="field"><label>Vehículo</label><span>${recibo.vehiculo||'—'}</span></div><div class="field"><label>Patente</label><span>${recibo.patente||'—'}</span></div><div class="field"><label>Forma de pago</label><span>${recibo.forma_pago}</span></div></div><div class="totals" style="margin-top:22px"><div class="total-card"><span class="lbl">Monto recibido</span><span class="amt num">${esUSD?'USS':'$'} ${montoNum?formatPeso(montoNum):'0'}</span></div></div><div class="content-box"><label>Concepto</label><p>${recibo.concepto||'—'}</p></div>${recibo.observaciones?`<div class="content-box"><label>Observaciones</label><p>${recibo.observaciones}</p></div>`:''}<div class="signoff"><div class="signline">Firma del cliente</div><div class="signline">Di Fiore Performance</div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
+    const reciboExtraCSS=`
+.recibo-wm{position:fixed;inset:0;z-index:-1;background:url('${LOGO_URL}') no-repeat center 55%/440px auto;opacity:.05;pointer-events:none}
+body{max-width:860px;padding:60px 56px}
+.brandblock img{height:66px}
+.brandtext .title{font-size:40px}
+.brandtext .line{width:150px;height:3px;margin:10px 0 6px}
+.folio{padding:16px 26px;min-width:190px}
+.folio .lbl{font-size:11px}
+.folio .numero{font-size:26px}
+.folio .fecha{font-size:11.5px}
+.fields{margin-top:34px;gap:16px}
+.field{padding:16px 18px}
+.field label{font-size:10.5px}
+.field span{font-size:17px}
+.total-card{padding:28px 32px}
+.total-card .lbl{font-size:13px}
+.total-card .amt{font-size:38px}
+.content-box{padding:22px 24px;margin-top:22px}
+.content-box label{font-size:10.5px}
+.content-box p{font-size:16px;line-height:1.7}
+.closing{margin-top:40px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#0A2A9C;font-weight:700}
+.signoff{margin-top:56px}
+.signline{width:260px;font-size:11px;padding-top:10px}
+.footer{margin-top:30px;font-size:11px;gap:20px}
+@media print{body{padding:40px 36px}}
+`
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibo</title>${comprobanteFonts}<style>${comprobanteCSS}${reciboExtraCSS}</style></head><body><div class="recibo-wm"></div>${buildDocHeader('Recibo','N° Recibo',recibo.numero,`Ficha ${numeroFicha} · ${fechaFmt}`)}<div class="fields"><div class="field"><label>Cliente</label><span>${recibo.cliente||'—'}</span></div><div class="field"><label>Vehículo</label><span>${recibo.vehiculo||'—'}</span></div><div class="field"><label>Patente</label><span>${recibo.patente||'—'}</span></div><div class="field"><label>Forma de pago</label><span>${recibo.forma_pago}</span></div></div><div class="totals" style="margin-top:34px"><div class="total-card"><span class="lbl">Monto recibido</span><span class="amt num">${esUSD?'USS':'$'} ${montoNum?formatPeso(montoNum):'0'}</span></div></div><div class="content-box"><label>Concepto</label><p>${recibo.concepto||'—'}</p></div>${recibo.observaciones?`<div class="content-box"><label>Observaciones</label><p>${recibo.observaciones}</p></div>`:''}<div class="closing">¡Gracias por confiar en nosotros!</div><div class="signoff"><div class="signline">Firma del cliente</div><div class="signline">Di Fiore Performance</div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
     const nuevo=await incrementarNumeracion('recibo')
     setRecibo(r=>({...r,numero:formatNumeroDoc(nuevo)}))
