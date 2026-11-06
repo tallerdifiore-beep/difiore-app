@@ -162,7 +162,7 @@ const footerIconsHTML = `
 // para imprimirse en papel, sin los degradés/sombras de la UI.
 const comprobanteFonts = `<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:wght@800&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">`
 const comprobanteCSS = `
-*{box-sizing:border-box;margin:0;padding:0}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 body{font-family:'Barlow',Arial,sans-serif;font-size:12.5px;color:#0E1118;background:#F7F8FB;padding:30px;max-width:800px;margin:0 auto}
 .num{font-variant-numeric:tabular-nums}
 .letterhead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;padding-bottom:18px;border-bottom:2px solid #0D1018}
