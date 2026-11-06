@@ -367,6 +367,12 @@ export default function Home({ rol, cerrarSesion }) {
     mecanico:'', observacion_general:'',
     items: itemsVacios('entrega')
   })
+  const [cargarServiceChecklist, setCargarServiceChecklist] = useState(false)
+  const [formServiceChecklist, setFormServiceChecklist] = useState({
+    km:'', aceite:'', filtro_aceite:'', filtro_aire:'', aditivo:'', filtro_combustible:'',
+    engrase:false, caja:false, diferencial:false,
+    proximo_km:'', correa_km:'', correa_proximo_km:'', observaciones:''
+  })
   const [nuevoEmpleado, setNuevoEmpleado] = useState({nombre:'',rol:'mecanico'})
   const [turnos, setTurnos] = useState([])
   const [formTurno, setFormTurno] = useState({nombre:'',telefono:'',vehiculo:'',fecha:'',motivo:''})
@@ -858,7 +864,29 @@ export default function Home({ rol, cerrarSesion }) {
         await cargarTrabajos()
       }
     }
+    if((formChecklist.tipo||tipoChecklist)==='entrega'&&cargarServiceChecklist){
+      const patenteService=(formChecklist.patente||'').toUpperCase().replace(/[^A-Z0-9]/g,'')
+      if(!patenteService||!parseNum(formServiceChecklist.km)){
+        avisar('Checklist guardado, pero el service no se cargó: falta la patente o los km','error')
+      } else {
+        const{error:errService}=await supabase.from('services').insert({
+          patente:patenteService, fecha:formChecklist.fecha_entrega,
+          km:Number(parseNum(formServiceChecklist.km))||null,
+          aceite:formServiceChecklist.aceite||null, filtro_aceite:formServiceChecklist.filtro_aceite||null,
+          filtro_aire:formServiceChecklist.filtro_aire||null, aditivo:formServiceChecklist.aditivo||null,
+          filtro_combustible:formServiceChecklist.filtro_combustible||null,
+          engrase:formServiceChecklist.engrase, caja:formServiceChecklist.caja, diferencial:formServiceChecklist.diferencial,
+          proximo_km:parseNum(formServiceChecklist.proximo_km)?Number(parseNum(formServiceChecklist.proximo_km)):null,
+          correa_km:parseNum(formServiceChecklist.correa_km)?Number(parseNum(formServiceChecklist.correa_km)):null,
+          correa_proximo_km:parseNum(formServiceChecklist.correa_proximo_km)?Number(parseNum(formServiceChecklist.correa_proximo_km)):null,
+          observaciones:formServiceChecklist.observaciones||null
+        })
+        if(errService)avisar('Checklist guardado, pero el service no se pudo cargar: '+errService.message,'error')
+      }
+    }
     setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',tipo:tipoChecklist,fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:itemsVacios(tipoChecklist)})
+    setCargarServiceChecklist(false)
+    setFormServiceChecklist({km:'',aceite:'',filtro_aceite:'',filtro_aire:'',aditivo:'',filtro_combustible:'',engrase:false,caja:false,diferencial:false,proximo_km:'',correa_km:'',correa_proximo_km:'',observaciones:''})
     setVistaChecklist('lista');setChecklistActivo(null);setEditandoChecklist(false)
     const{data}=await supabase.from('checklists').select('*').order('created_at',{ascending:false})
     setChecklists(data||[])
@@ -1774,7 +1802,7 @@ return (
             <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
               <button className={`${styles.btn} ${vistaChecklist==='lista'?styles.navActive:''}`} onClick={()=>{setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Ver registros</button>
               {tipoChecklist==='inyectores'&&<button className={`${styles.btn} ${vistaChecklist==='procedimiento'?styles.navActive:''}`} onClick={()=>setVistaChecklist('procedimiento')}>Ver procedimiento</button>}
-              <button className={styles.btnPrimary} onClick={()=>{setVistaChecklist('nuevo');setEditandoChecklist(false);setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',tipo:tipoChecklist,fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:itemsVacios(tipoChecklist)});setFotosChecklistSubidas([])}}>+ Nuevo checklist</button>
+              <button className={styles.btnPrimary} onClick={()=>{setVistaChecklist('nuevo');setEditandoChecklist(false);setFormChecklist({trabajo_id:'',vehiculo:'',patente:'',color:'',tipo:tipoChecklist,fecha_entrega:new Date().toISOString().split('T')[0],mecanico:'',observacion_general:'',items:itemsVacios(tipoChecklist)});setFotosChecklistSubidas([]);setCargarServiceChecklist(false);setFormServiceChecklist({km:'',aceite:'',filtro_aceite:'',filtro_aire:'',aditivo:'',filtro_combustible:'',engrase:false,caja:false,diferencial:false,proximo_km:'',correa_km:'',correa_proximo_km:'',observaciones:''})}}>+ Nuevo checklist</button>
             </div>
             {!admin&&!empleadoActual&&vistaChecklist==='lista'&&<div className={styles.card} style={{marginBottom:'1rem'}}><div className={styles.cardTitle}>¿Quién sos?</div><div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'8px'}}>{mecanicos.map(e=><button key={e.id} className={styles.btnPrimary} style={{fontSize:'13px',padding:'8px 16px'}} onClick={()=>setEmpleadoActual(e.nombre)}>{e.nombre}</button>)}</div></div>}
             {!admin&&empleadoActual&&<div style={{background:'rgba(47,168,255,.12)',border:'1px solid rgba(47,168,255,.35)',borderRadius:'8px',padding:'8px 14px',marginBottom:'12px',fontSize:'13px',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>Mostrando registros de <b>{empleadoActual}</b></span><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setEmpleadoActual('')}>Cambiar</button></div>}
@@ -1841,8 +1869,41 @@ return (
                   </div>
                   <div className={styles.formGroup} style={{marginTop:'16px'}}><label>Observaciones generales (interno, no se imprime)</label><textarea value={formChecklist.observacion_general} onChange={e=>setFormChecklist({...formChecklist,observacion_general:e.target.value})} placeholder="Notas adicionales..." style={{minHeight:'60px'}}/></div>
                 </div>
+                {(formChecklist.tipo||tipoChecklist)==='entrega'&&(
+                  <div className={styles.card}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:cargarServiceChecklist?'14px':'0'}}>
+                      <div className={styles.cardTitle} style={{margin:0}}>Service</div>
+                      <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px',cursor:'pointer',fontWeight:'600',color:'#2FA8FF'}}>
+                        <input type="checkbox" checked={cargarServiceChecklist} onChange={e=>setCargarServiceChecklist(e.target.checked)}/>
+                        Cargar datos del service
+                      </label>
+                    </div>
+                    {cargarServiceChecklist&&<>
+                      <div style={{fontSize:'12px',color:'#6B7488',marginBottom:'14px'}}>Se guarda junto con el checklist y queda disponible para que el cliente lo consulte en /service.</div>
+                      <div className={styles.formGrid}>
+                        <div className={styles.formGroup}><label>Km actual *</label><input inputMode="numeric" value={formServiceChecklist.km} onChange={e=>setFormServiceChecklist({...formServiceChecklist,km:formatNum(e.target.value)})} placeholder="85.000"/></div>
+                        <div className={styles.formGroup}><label>Próximo cambio (km)</label><input inputMode="numeric" value={formServiceChecklist.proximo_km} onChange={e=>setFormServiceChecklist({...formServiceChecklist,proximo_km:formatNum(e.target.value)})} placeholder="90.000"/></div>
+                        <div className={styles.formGroup}><label>Aceite</label><input value={formServiceChecklist.aceite} onChange={e=>setFormServiceChecklist({...formServiceChecklist,aceite:e.target.value})} placeholder="10W40 SINTÉTICO"/></div>
+                        <div className={styles.formGroup}><label>Filtro de aceite</label><input value={formServiceChecklist.filtro_aceite} onChange={e=>setFormServiceChecklist({...formServiceChecklist,filtro_aceite:e.target.value})} placeholder="ORIGINAL"/></div>
+                        <div className={styles.formGroup}><label>Filtro de aire</label><input value={formServiceChecklist.filtro_aire} onChange={e=>setFormServiceChecklist({...formServiceChecklist,filtro_aire:e.target.value})} placeholder="ORIGINAL"/></div>
+                        <div className={styles.formGroup}><label>Filtro de combustible</label><input value={formServiceChecklist.filtro_combustible} onChange={e=>setFormServiceChecklist({...formServiceChecklist,filtro_combustible:e.target.value})} placeholder="ORIGINAL"/></div>
+                        <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Aditivo</label><input value={formServiceChecklist.aditivo} onChange={e=>setFormServiceChecklist({...formServiceChecklist,aditivo:e.target.value})} placeholder="SÍ / NO / MARCA"/></div>
+                      </div>
+                      <div style={{display:'flex',gap:'16px',flexWrap:'wrap',margin:'4px 0 14px'}}>
+                        <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}><input type="checkbox" checked={formServiceChecklist.engrase} onChange={e=>setFormServiceChecklist({...formServiceChecklist,engrase:e.target.checked})}/> Engrase</label>
+                        <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}><input type="checkbox" checked={formServiceChecklist.caja} onChange={e=>setFormServiceChecklist({...formServiceChecklist,caja:e.target.checked})}/> Caja</label>
+                        <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}><input type="checkbox" checked={formServiceChecklist.diferencial} onChange={e=>setFormServiceChecklist({...formServiceChecklist,diferencial:e.target.checked})}/> Diferencial</label>
+                      </div>
+                      <div className={styles.formGrid}>
+                        <div className={styles.formGroup}><label>Correa hecha a los km</label><input inputMode="numeric" value={formServiceChecklist.correa_km} onChange={e=>setFormServiceChecklist({...formServiceChecklist,correa_km:formatNum(e.target.value)})} placeholder="60.000"/></div>
+                        <div className={styles.formGroup}><label>Correa próximo cambio (km)</label><input inputMode="numeric" value={formServiceChecklist.correa_proximo_km} onChange={e=>setFormServiceChecklist({...formServiceChecklist,correa_proximo_km:formatNum(e.target.value)})} placeholder="160.000"/></div>
+                        <div className={styles.formGroup} style={{gridColumn:'1/-1'}}><label>Observaciones del service</label><textarea value={formServiceChecklist.observaciones} onChange={e=>setFormServiceChecklist({...formServiceChecklist,observaciones:e.target.value})} placeholder="Ej: no aplica correa a este motor"/></div>
+                      </div>
+                    </>}
+                  </div>
+                )}
                 <div className={styles.formActions}>
-                  <button className={styles.btn} onClick={()=>{setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null)}}>Cancelar</button>
+                  <button className={styles.btn} onClick={()=>{setVistaChecklist('lista');setEditandoChecklist(false);setChecklistActivo(null);setCargarServiceChecklist(false)}}>Cancelar</button>
                   <button className={styles.btnPrimary} onClick={guardarChecklist} disabled={guardandoChecklist}>{guardandoChecklist?'Guardando...':(editandoChecklist?'Actualizar checklist':'Guardar checklist')}</button>
                 </div>
               </div>
