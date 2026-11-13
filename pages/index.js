@@ -1773,6 +1773,11 @@ return (
             )}
             {vistaChecklist==='nuevo'&&(
               <div>
+                {(formChecklist.tipo||tipoChecklist)==='entrega'&&(
+                  <div style={{marginBottom:'1rem',padding:'12px 16px',background:'rgba(245,183,0,.12)',border:'1px solid rgba(245,183,0,.4)',borderRadius:'8px',display:'flex',alignItems:'center',gap:'10px'}}>
+                    <span style={{fontSize:'13px',color:'#F5B700',fontWeight:'700'}}>Recordá pegarle el sticker del taller al vehículo antes de entregarlo.</span>
+                  </div>
+                )}
                 <div className={styles.card}>
                   <div className={styles.cardTitle}>{editandoChecklist?'Editar checklist':'Datos del vehículo'}</div>
                   <div className={styles.formGrid}>
