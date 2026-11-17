@@ -46,6 +46,17 @@ function patenteHandlers(valorAnterior, setter) {
 // formatea el próximo número de documento a partir del último usado en la tabla numeracion
 function formatNumeroDoc(ultimoUsado) { return '001-' + String((ultimoUsado||0)+1).padStart(5,'0') }
 function formatNumeroFicha(ultimoUsado) { return 'C-' + String((ultimoUsado||0)+1).padStart(5,'0') }
+// agrupa una lista ya ordenada (más reciente primero) por una clave (vehículo/patente):
+// el primero de cada grupo queda como "principal" y el resto como historial colapsado.
+function agruparPorClave(lista, getKey) {
+  const grupos = new Map()
+  for (const item of lista) {
+    const key = getKey(item)
+    if (!grupos.has(key)) grupos.set(key, [])
+    grupos.get(key).push(item)
+  }
+  return Array.from(grupos.values()).map(items => ({ key: getKey(items[0]), principal: items[0], historial: items.slice(1), count: items.length }))
+}
 // redondea a la media hora más cercana (0, 0.5, 1, 1.5...) y muestra sin decimales de más
 function formatHoras(h){
   const redondeado=Math.ceil((h||0)*2)/2
@@ -320,6 +331,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [vistaStats, setVistaStats] = useState(null)
   const [vistaMarca, setVistaMarca] = useState(null)
   const [verEntregados, setVerEntregados] = useState(false)
+  const [gruposEntregadosAbiertos, setGruposEntregadosAbiertos] = useState({})
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [clientes, setClientes] = useState([])
   const [trabajos, setTrabajos] = useState([])
@@ -329,6 +341,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [limiteClientes, setLimiteClientes] = useState(40)
   const [limiteChecklists, setLimiteChecklists] = useState(40)
   const [busquedaChecklist, setBusquedaChecklist] = useState('')
+  const [gruposChecklistAbiertos, setGruposChecklistAbiertos] = useState({})
   const [numeracion, setNumeracion] = useState({presupuesto:0, recibo:0, cliente:0})
   const [presupuestos, setPresupuestos] = useState([])
   const [presupuestosDetalle, setPresupuestosDetalle] = useState([])
@@ -820,6 +833,7 @@ export default function Home({ rol, cerrarSesion }) {
     }
     return lista
   })()
+  const checklistsAgrupados = agruparPorClave(checklistsFiltrados, ch=>(ch.patente||'').toUpperCase().replace(/[^A-Z0-9]/g,'')||ch.vehiculo||ch.id)
 
   async function guardarChecklist(){
     if(guardandoChecklist) return
@@ -1330,6 +1344,25 @@ export default function Home({ rol, cerrarSesion }) {
   const conteoMarcas=useMemo(()=>trabajosActivos.reduce((acc,t)=>{const m=getMarca(t.vehiculos?.marca_modelo);acc[m]=(acc[m]||0)+1;return acc},{}),[trabajosActivos])
   const trabajosFiltrados=useMemo(()=>trabajosVivos.filter(t=>t.estado!=='Salio').filter(t=>{const q=busqueda.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),[trabajosVivos,busqueda])
   const trabajosEntregadosFiltrados=useMemo(()=>trabajosEntregados.filter(t=>{const q=busquedaEntregados.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}),[trabajosEntregados,busquedaEntregados])
+  const entregadosAgrupados=useMemo(()=>agruparPorClave(trabajosEntregadosFiltrados, t=>t.vehiculos?.id||t.vehiculos?.patente||t.id),[trabajosEntregadosFiltrados])
+  function filaEntregado(t,i,dim){
+    return (
+      <tr key={t.id} style={dim?{opacity:.75,background:'#171B25'}:undefined}>
+        <td style={{color:'#6B7488'}}>{dim?'':i+1}</td>
+        <td onClick={()=>verDetalle(t)} style={{cursor:'pointer'}}><b>{t.vehiculos?.marca_modelo}</b></td>
+        <td onClick={()=>verDetalle(t)} style={{cursor:'pointer'}}>{t.vehiculos?.clientes?.nombre}</td>
+        <td onClick={()=>verDetalle(t)} style={{cursor:'pointer'}}>{t.vehiculos?.patente}</td>
+        <td onClick={()=>verDetalle(t)} style={{cursor:'pointer'}}>{t.taller}</td>
+        <td onClick={()=>verDetalle(t)} style={{fontSize:'12px',color:'#9AA3B8',cursor:'pointer'}}>{t.fecha_salida?new Date(t.fecha_salida).toLocaleDateString('es-AR'):'—'}</td>
+        <td style={{display:'flex',gap:'5px',cursor:'default'}}>
+          <button className={styles.btnPrimary} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>{setModalReingreso(t);setFormReingreso({motivo:'',mecanico:t.mecanico||'',taller:t.taller||'Malvinas 2084',estado:'Diagnóstico',llego_en_grua:false,fecha_ingreso_manual:''})}}>Reingreso</button>
+          <button style={{fontSize:'11px',padding:'4px 8px',background:'rgba(46,204,113,.12)',color:'#2ECC71',border:'1px solid rgba(46,204,113,.4)',borderRadius:'6px',cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:'700',textTransform:'uppercase',letterSpacing:'.03em'}} onClick={()=>abrirWsp(t)}>WSP</button>
+          <button className={styles.btnEdit} onClick={()=>abrirEditar(t)}>Editar</button>
+          <button className={styles.btnDelete} onClick={()=>borrarCliente(t)}><TrashIcon/></button>
+        </td>
+      </tr>
+    )
+  }
   const totalFiltrados=trabajosFiltrados.length
   const stats={total:clientes.length,enTaller:trabajosActivos.length,listos:trabajosVivos.filter(t=>t.estado==='Listo').length,salidos:trabajosEntregados.length}
   const listaVistaStats={enTaller:trabajosVivos.filter(t=>t.estado!=='Salio').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),listos:trabajosVivos.filter(t=>t.estado==='Listo').sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),salidos:trabajosEntregados}
@@ -1588,7 +1621,23 @@ return (
 
         {seccion==='clientes'&&verPapelera&&admin&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVerPapelera(false)}>← Volver</button><h1 className={styles.pageTitle}>Papelera ({trabajosBorrados.length})</h1></div><div className={styles.divider}></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Acciones</th></tr></thead><tbody>{trabajosBorrados.map((t,i)=>(<tr key={t.id}><td style={{color:'#6B7488'}}>{i+1}</td><td><b>{t.vehiculos?.marca_modelo}</b></td><td>{t.vehiculos?.clientes?.nombre}</td><td>{t.vehiculos?.patente}</td><td>{t.taller}</td><td style={{display:'flex',gap:'5px',cursor:'default'}}><button className={styles.btnSuccess} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>restaurarCliente(t)}>Restaurar</button><button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarClienteDefinitivo(t)}><TrashIcon/> Definitivo</button></td></tr>))}{trabajosBorrados.length===0&&<tr><td colSpan="6" style={{textAlign:'center',color:'#6B7488',padding:'2rem'}}>La papelera está vacía</td></tr>}</tbody></table></div></div>)}
 
-        {seccion==='clientes'&&verEntregados&&admin&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVerEntregados(false)}>← Volver</button><h1 className={styles.pageTitle}>Vehículos entregados ({trabajosEntregados.length})</h1></div><div className={styles.divider}></div><div className={styles.searchBar} style={{marginBottom:'12px'}}><input type="text" placeholder="Buscar por nombre, patente o vehículo..." value={busquedaEntregados} onChange={e=>setBusquedaEntregados(e.target.value)}/></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entregado</th><th>Acciones</th></tr></thead><tbody>{trabajosEntregadosFiltrados.map((t,i)=>(<tr key={t.id}><td style={{color:'#6B7488'}}>{i+1}</td><td onClick={()=>verDetalle(t)}><b>{t.vehiculos?.marca_modelo}</b></td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.clientes?.nombre}</td><td onClick={()=>verDetalle(t)}>{t.vehiculos?.patente}</td><td onClick={()=>verDetalle(t)}>{t.taller}</td><td onClick={()=>verDetalle(t)} style={{fontSize:'12px',color:'#9AA3B8'}}>{t.fecha_salida?new Date(t.fecha_salida).toLocaleDateString('es-AR'):'—'}</td><td style={{display:'flex',gap:'5px',cursor:'default'}}><button className={styles.btnPrimary} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>{setModalReingreso(t);setFormReingreso({motivo:'',mecanico:t.mecanico||'',taller:t.taller||'Malvinas 2084',estado:'Diagnóstico',llego_en_grua:false,fecha_ingreso_manual:''})}}>Reingreso</button><button style={{fontSize:'11px',padding:'4px 8px',background:'rgba(46,204,113,.12)',color:'#2ECC71',border:'1px solid rgba(46,204,113,.4)',borderRadius:'6px',cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:'700',textTransform:'uppercase',letterSpacing:'.03em'}} onClick={()=>abrirWsp(t)}>WSP</button><button className={styles.btnEdit} onClick={()=>abrirEditar(t)}>Editar</button><button className={styles.btnDelete} onClick={()=>borrarCliente(t)}><TrashIcon/></button></td></tr>))}{trabajosEntregadosFiltrados.length===0&&<tr><td colSpan="7" style={{textAlign:'center',color:'#6B7488',padding:'2rem'}}>{busquedaEntregados?'Sin resultados':'Sin vehículos entregados todavía'}</td></tr>}</tbody></table></div></div>)}
+        {seccion==='clientes'&&verEntregados&&admin&&(<div><div className={styles.topBar}><button className={styles.btn} onClick={()=>setVerEntregados(false)}>← Volver</button><h1 className={styles.pageTitle}>Vehículos entregados ({trabajosEntregados.length})</h1></div><div className={styles.divider}></div><div className={styles.searchBar} style={{marginBottom:'12px'}}><input type="text" placeholder="Buscar por nombre, patente o vehículo..." value={busquedaEntregados} onChange={e=>setBusquedaEntregados(e.target.value)}/></div><div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>#</th><th>Vehículo</th><th>Cliente</th><th>Patente</th><th>Taller</th><th>Entregado</th><th>Acciones</th></tr></thead><tbody>{entregadosAgrupados.map((g,i)=>{const abierto=!!gruposEntregadosAbiertos[g.key];return(<Fragment key={g.key}>
+          <tr>
+            <td style={{color:'#6B7488'}}>{i+1}</td>
+            <td onClick={()=>verDetalle(g.principal)} style={{cursor:'pointer'}}><b>{g.principal.vehiculos?.marca_modelo}</b>{g.count>1&&<span onClick={e=>{e.stopPropagation();setGruposEntregadosAbiertos(s=>({...s,[g.key]:!s[g.key]}))}} style={{marginLeft:'8px',fontSize:'11px',fontWeight:'700',color:'#2FA8FF',background:'rgba(47,168,255,.12)',border:'1px solid rgba(47,168,255,.35)',borderRadius:'10px',padding:'2px 8px',cursor:'pointer'}}>{abierto?'▲':'▼'} {g.count} visitas</span>}</td>
+            <td onClick={()=>verDetalle(g.principal)} style={{cursor:'pointer'}}>{g.principal.vehiculos?.clientes?.nombre}</td>
+            <td onClick={()=>verDetalle(g.principal)} style={{cursor:'pointer'}}>{g.principal.vehiculos?.patente}</td>
+            <td onClick={()=>verDetalle(g.principal)} style={{cursor:'pointer'}}>{g.principal.taller}</td>
+            <td onClick={()=>verDetalle(g.principal)} style={{fontSize:'12px',color:'#9AA3B8',cursor:'pointer'}}>{g.principal.fecha_salida?new Date(g.principal.fecha_salida).toLocaleDateString('es-AR'):'—'}</td>
+            <td style={{display:'flex',gap:'5px',cursor:'default'}}>
+              <button className={styles.btnPrimary} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>{setModalReingreso(g.principal);setFormReingreso({motivo:'',mecanico:g.principal.mecanico||'',taller:g.principal.taller||'Malvinas 2084',estado:'Diagnóstico',llego_en_grua:false,fecha_ingreso_manual:''})}}>Reingreso</button>
+              <button style={{fontSize:'11px',padding:'4px 8px',background:'rgba(46,204,113,.12)',color:'#2ECC71',border:'1px solid rgba(46,204,113,.4)',borderRadius:'6px',cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:'700',textTransform:'uppercase',letterSpacing:'.03em'}} onClick={()=>abrirWsp(g.principal)}>WSP</button>
+              <button className={styles.btnEdit} onClick={()=>abrirEditar(g.principal)}>Editar</button>
+              <button className={styles.btnDelete} onClick={()=>borrarCliente(g.principal)}><TrashIcon/></button>
+            </td>
+          </tr>
+          {abierto&&g.historial.map(t=>filaEntregado(t,null,true))}
+        </Fragment>)})}{entregadosAgrupados.length===0&&<tr><td colSpan="7" style={{textAlign:'center',color:'#6B7488',padding:'2rem'}}>{busquedaEntregados?'Sin resultados':'Sin vehículos entregados todavía'}</td></tr>}</tbody></table></div></div>)}
 
         {seccion==='turnos'&&admin&&(
           <div>
@@ -1860,7 +1909,32 @@ return (
               <div>
                 <div className={styles.searchBar} style={{marginBottom:'12px'}}><input type="text" placeholder="Buscar por vehículo, patente o mecánico..." value={busquedaChecklist} onChange={e=>setBusquedaChecklist(e.target.value)}/></div>
                 {checklistsFiltrados.length===0?<div style={{color:'#6B7488',fontSize:'14px',textAlign:'center',padding:'3rem'}}>{!admin&&!empleadoActual?'Seleccioná tu nombre arriba para ver tus registros':'No hay checklists registrados todavía'}</div>:(
-                  <div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>Fecha</th><th>Vehículo</th><th>Patente</th><th>Mecánico</th><th>Acciones</th></tr></thead><tbody>{checklistsFiltrados.slice(0,limiteChecklists).map(ch=>(<tr key={ch.id}><td style={{fontSize:'12px',color:'#9AA3B8'}}>{ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td><td onClick={()=>setChecklistActivo(ch)} style={{cursor:'pointer'}}><b>{ch.vehiculo||'—'}</b></td><td onClick={()=>setChecklistActivo(ch)} style={{cursor:'pointer'}}>{ch.patente||'—'}</td><td>{ch.mecanico||'—'}</td><td style={{display:'flex',gap:'5px'}}><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setChecklistActivo(ch)}>Ver</button><button className={styles.btnPrimary} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>abrirEditarChecklist(ch)}>Editar</button><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>imprimirChecklist(ch)}>Imprimir</button>{admin&&<button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarChecklist(ch.id)}><TrashIcon/></button>}</td></tr>))}</tbody></table>{checklistsFiltrados.length>limiteChecklists&&<button className={styles.btn} style={{width:'100%',marginTop:'10px'}} onClick={()=>setLimiteChecklists(l=>l+40)}>Ver más ({checklistsFiltrados.length-limiteChecklists} restantes)</button>}</div>
+                  <div className={styles.tblWrap}><table className={styles.table}><thead><tr><th>Fecha</th><th>Vehículo</th><th>Patente</th><th>Mecánico</th><th>Acciones</th></tr></thead><tbody>{checklistsAgrupados.slice(0,limiteChecklists).map(g=>{const abierto=!!gruposChecklistAbiertos[g.key];return(<Fragment key={g.key}>
+                    <tr>
+                      <td style={{fontSize:'12px',color:'#9AA3B8'}}>{g.principal.fecha_entrega?new Date(g.principal.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td>
+                      <td onClick={()=>setChecklistActivo(g.principal)} style={{cursor:'pointer'}}><b>{g.principal.vehiculo||'—'}</b>{g.count>1&&<span onClick={e=>{e.stopPropagation();setGruposChecklistAbiertos(s=>({...s,[g.key]:!s[g.key]}))}} style={{marginLeft:'8px',fontSize:'11px',fontWeight:'700',color:'#2FA8FF',background:'rgba(47,168,255,.12)',border:'1px solid rgba(47,168,255,.35)',borderRadius:'10px',padding:'2px 8px',cursor:'pointer'}}>{abierto?'▲':'▼'} {g.count} checklists</span>}</td>
+                      <td onClick={()=>setChecklistActivo(g.principal)} style={{cursor:'pointer'}}>{g.principal.patente||'—'}</td>
+                      <td>{g.principal.mecanico||'—'}</td>
+                      <td style={{display:'flex',gap:'5px'}}>
+                        <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setChecklistActivo(g.principal)}>Ver</button>
+                        <button className={styles.btnPrimary} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>abrirEditarChecklist(g.principal)}>Editar</button>
+                        <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>imprimirChecklist(g.principal)}>Imprimir</button>
+                        {admin&&<button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarChecklist(g.principal.id)}><TrashIcon/></button>}
+                      </td>
+                    </tr>
+                    {abierto&&g.historial.map(ch=>(<tr key={ch.id} style={{opacity:.75,background:'#171B25'}}>
+                      <td style={{fontSize:'12px',color:'#9AA3B8'}}>{ch.fecha_entrega?new Date(ch.fecha_entrega+'T12:00:00').toLocaleDateString('es-AR'):'—'}</td>
+                      <td onClick={()=>setChecklistActivo(ch)} style={{cursor:'pointer'}}>{ch.vehiculo||'—'}</td>
+                      <td onClick={()=>setChecklistActivo(ch)} style={{cursor:'pointer'}}>{ch.patente||'—'}</td>
+                      <td>{ch.mecanico||'—'}</td>
+                      <td style={{display:'flex',gap:'5px'}}>
+                        <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setChecklistActivo(ch)}>Ver</button>
+                        <button className={styles.btnPrimary} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>abrirEditarChecklist(ch)}>Editar</button>
+                        <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>imprimirChecklist(ch)}>Imprimir</button>
+                        {admin&&<button className={styles.btnDelete} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>borrarChecklist(ch.id)}><TrashIcon/></button>}
+                      </td>
+                    </tr>))}
+                  </Fragment>)})}</tbody></table>{checklistsAgrupados.length>limiteChecklists&&<button className={styles.btn} style={{width:'100%',marginTop:'10px'}} onClick={()=>setLimiteChecklists(l=>l+40)}>Ver más ({checklistsAgrupados.length-limiteChecklists} restantes)</button>}</div>
                 )}
               </div>
             )}
