@@ -234,7 +234,7 @@ function BuscadorCliente({ trabajos, onSeleccionar, placeholder }) {
     setTexto(q)
     if (!q || q.length < 2) { setSugerencias([]); return }
     const ql = q.toLowerCase()
-    setSugerencias(trabajos.filter(t=>t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql)||t.vehiculos?.patente?.toLowerCase().includes(ql)||t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)).slice(0,6))
+    setSugerencias(trabajos.filter(t=>t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql)||t.vehiculos?.patente?.toLowerCase().includes(ql)||t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)).sort((a,b)=>(a.vehiculos?.marca_modelo||'').localeCompare(b.vehiculos?.marca_modelo||'')).slice(0,6))
   }
   function seleccionar(t) {
     onSeleccionar(t)
@@ -647,10 +647,10 @@ export default function Home({ rol, cerrarSesion }) {
     cargarApuntesMecanico(mecanico)
   }
 
-  function elegirVehiculoApunte(trabajoId){
+  function elegirVehiculoApunte(t){
     const hoyStr=new Date().toISOString().split('T')[0]
-    const existente=apuntesMecanico.find(a=>a.fecha===hoyStr&&a.trabajo_id===trabajoId)
-    setFormApunteVehiculo({id:null,trabajo_id:trabajoId,vehiculo_label:'',texto:existente?.texto||''})
+    const existente=apuntesMecanico.find(a=>a.fecha===hoyStr&&a.trabajo_id===t.id)
+    setFormApunteVehiculo({id:null,trabajo_id:t.id,vehiculo_label:'',texto:existente?.texto||''})
   }
 
   function editarApunteExistente(apunte){
@@ -1459,6 +1459,7 @@ export default function Home({ rol, cerrarSesion }) {
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
   const mecanicos=empleados.filter(e=>e.rol==='mecanico')
+  const vehiculoSeleccionadoApunte=trabajosActivos.find(t=>t.id===formApunteVehiculo.trabajo_id)
   const hoy=new Date().toISOString().split('T')[0]
   const navLinks=[{color:'#E1306C',icon:<IgIcon/>,href:'https://www.instagram.com/di_fiore_mecanica/',label:'@di_fiore_mecanica'},{color:'#1877F2',icon:<FbIcon/>,href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr',label:'di_fiore_mecanica'},{color:'#25D366',icon:<WaIcon/>,href:'tel:+542235299700',label:'223 529-9700'},{color:'#EA4335',icon:<MapIcon/>,href:'https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1',label:'Malvinas 2084, MdP'}]
   const usandoUSD=presupuesto.moneda_mano_obra==='USD'
@@ -1683,11 +1684,13 @@ return (
               <div className={styles.cardTitle}>{formApunteVehiculo.id?'Editando apunte':'Apunte sobre un vehículo'}</div>
               {formApunteVehiculo.id?(
                 <div style={{fontSize:'13px',color:'#9AA3B8',margin:'8px 0'}}>{formApunteVehiculo.vehiculo_label}</div>
+              ):formApunteVehiculo.trabajo_id?(
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'8px',background:'#171B25',border:'1px solid #343B4B',borderRadius:'8px',padding:'10px 12px'}}>
+                  <div style={{fontSize:'13px',color:'#EEF1F7'}}>{vehiculoSeleccionadoApunte?`${vehiculoSeleccionadoApunte.vehiculos?.marca_modelo} (${vehiculoSeleccionadoApunte.vehiculos?.patente})`:''}</div>
+                  <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={cancelarApunteVehiculo}>Cambiar</button>
+                </div>
               ):(
-                <select value={formApunteVehiculo.trabajo_id} onChange={e=>elegirVehiculoApunte(e.target.value)} style={{width:'100%',padding:'10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit',marginTop:'8px'}}>
-                  <option value="">— Elegí un vehículo —</option>
-                  {trabajosActivos.map(t=><option key={t.id} value={t.id}>{t.vehiculos?.marca_modelo} ({t.vehiculos?.patente})</option>)}
-                </select>
+                <div style={{marginTop:'8px'}}><BuscadorCliente trabajos={trabajosActivos} onSeleccionar={elegirVehiculoApunte} placeholder="Buscar vehículo por patente, marca o cliente..."/></div>
               )}
               {(formApunteVehiculo.trabajo_id||formApunteVehiculo.id)&&(
                 <>
