@@ -682,16 +682,19 @@ export default function Home({ rol, cerrarSesion }) {
       return {trabajo_id:id,label:`${t?.vehiculos?.marca_modelo||'Vehículo'} (${t?.vehiculos?.patente||'—'})`}
     })
     const existente=apuntesDia.find(a=>a.mecanico===mecanico)
-    let error
+    let data,error
     if(existente){
-      ;({error}=await supabase.from('apuntes_diarios').update({texto:form.texto,vehiculos:vehiculosData}).eq('id',existente.id))
+      ;({data,error}=await supabase.from('apuntes_diarios').update({texto:form.texto,vehiculos:vehiculosData}).eq('id',existente.id).select())
     } else {
-      ;({error}=await supabase.from('apuntes_diarios').insert({fecha:fechaApuntes,mecanico,texto:form.texto,vehiculos:vehiculosData}))
+      ;({data,error}=await supabase.from('apuntes_diarios').insert({fecha:fechaApuntes,mecanico,texto:form.texto,vehiculos:vehiculosData}).select())
     }
     setGuardandoApunte(false)
     if(error){avisar('No se pudo guardar: '+error.message,'error');return}
+    // Actualizamos solo el registro de este mecánico (no recargamos todo el día), para no
+    // pisar los apuntes que Valentín pueda tener a medio escribir para los demás mecánicos.
+    const fila=data?.[0]
+    if(fila) setApuntesDia(prev=>existente?prev.map(a=>a.id===fila.id?fila:a):[...prev,fila])
     avisar('Apunte guardado','exito')
-    await cargarApuntesDia(fechaApuntes)
   }
 
   async function verHistorialApunte(mecanico){
@@ -1474,7 +1477,7 @@ export default function Home({ rol, cerrarSesion }) {
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
   const mecanicos=empleados.filter(e=>e.rol==='mecanico')
-  const mecanicosAMostrar=admin?mecanicos:(empleadoActual?mecanicos.filter(e=>e.nombre===empleadoActual):[])
+  const mecanicosAMostrar=mecanicos
   const hoy=new Date().toISOString().split('T')[0]
   const navLinks=[{color:'#E1306C',icon:<IgIcon/>,href:'https://www.instagram.com/di_fiore_mecanica/',label:'@di_fiore_mecanica'},{color:'#1877F2',icon:<FbIcon/>,href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr',label:'di_fiore_mecanica'},{color:'#25D366',icon:<WaIcon/>,href:'tel:+542235299700',label:'223 529-9700'},{color:'#EA4335',icon:<MapIcon/>,href:'https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1',label:'Malvinas 2084, MdP'}]
   const usandoUSD=presupuesto.moneda_mano_obra==='USD'
@@ -1684,10 +1687,7 @@ return (
             </div>
             <div className={styles.divider}></div>
 
-            {!admin&&!empleadoActual&&<div className={styles.card} style={{marginBottom:'1rem'}}><div className={styles.cardTitle}>¿Quién sos?</div><div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'8px'}}>{mecanicos.map(e=><button key={e.id} className={styles.btnPrimary} style={{fontSize:'13px',padding:'8px 16px'}} onClick={()=>setEmpleadoActual(e.nombre)}>{e.nombre}</button>)}</div></div>}
-            {!admin&&empleadoActual&&<div style={{background:'rgba(47,168,255,.12)',border:'1px solid rgba(47,168,255,.35)',borderRadius:'8px',padding:'8px 14px',marginBottom:'12px',fontSize:'13px',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>Apuntando como <b>{empleadoActual}</b></span><button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={()=>setEmpleadoActual('')}>Cambiar</button></div>}
-
-            {mecanicosAMostrar.length===0&&admin&&<div style={{color:'#6B7488',fontSize:'14px',textAlign:'center',padding:'3rem'}}>No hay mecánicos registrados en Empleados.</div>}
+            {mecanicosAMostrar.length===0&&<div style={{color:'#6B7488',fontSize:'14px',textAlign:'center',padding:'3rem'}}>No hay mecánicos registrados en Empleados.</div>}
 
             {mecanicosAMostrar.map(mec=>{
               const form=datosApunteForm(mec.nombre)
