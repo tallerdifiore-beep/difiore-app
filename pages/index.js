@@ -234,7 +234,7 @@ function BuscadorCliente({ trabajos, onSeleccionar, placeholder }) {
     setTexto(q)
     if (!q || q.length < 2) { setSugerencias([]); return }
     const ql = q.toLowerCase()
-    setSugerencias(trabajos.filter(t=>t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql)||t.vehiculos?.patente?.toLowerCase().includes(ql)||t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)).slice(0,6))
+    setSugerencias(trabajos.filter(t=>t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql)||t.vehiculos?.patente?.toLowerCase().includes(ql)||t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)).sort((a,b)=>(a.vehiculos?.marca_modelo||'').localeCompare(b.vehiculos?.marca_modelo||'')).slice(0,6))
   }
   function seleccionar(t) {
     onSeleccionar(t)
@@ -415,13 +415,10 @@ export default function Home({ rol, cerrarSesion }) {
   const [notaHoyTexto, setNotaHoyTexto] = useState('')
   const [notaHoyMecanico, setNotaHoyMecanico] = useState('')
   const [guardandoNota, setGuardandoNota] = useState(false)
-  const [apuntesDia, setApuntesDia] = useState([])
-  const [fechaApuntes, setFechaApuntes] = useState(new Date().toISOString().split('T')[0])
-  const [apuntesCargados, setApuntesCargados] = useState(false)
-  const [formApuntes, setFormApuntes] = useState({})
+  const [mecanicoSeleccionadoApuntes, setMecanicoSeleccionadoApuntes] = useState('')
+  const [apuntesMecanico, setApuntesMecanico] = useState([])
+  const [formApunteVehiculo, setFormApunteVehiculo] = useState({id:null,trabajo_id:'',vehiculo_label:'',texto:''})
   const [guardandoApunte, setGuardandoApunte] = useState(false)
-  const [historialApunteAbierto, setHistorialApunteAbierto] = useState('')
-  const [historialApunteMecanico, setHistorialApunteMecanico] = useState([])
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalEditarFecha, setModalEditarFecha] = useState(null)
   const [nuevaFechaHistorial, setNuevaFechaHistorial] = useState('')
@@ -483,7 +480,6 @@ export default function Home({ rol, cerrarSesion }) {
   useEffect(() => {
     if(seccion==='presupuesto'&&!presupuestosCargados){ cargarPresupuestos(); setPresupuestosCargados(true) }
     if(seccion==='plandia'&&!planDiarioCargado){ cargarPlanDiario(fechaPlan); setPlanDiarioCargado(true) }
-    if(seccion==='apuntes'&&!apuntesCargados){ cargarApuntesDia(fechaApuntes); setApuntesCargados(true) }
   }, [seccion])
 
   function seleccionarClientePresupuesto(t) {
@@ -639,70 +635,56 @@ export default function Home({ rol, cerrarSesion }) {
     cargarPlanDiario(nueva)
   }
 
-  async function cargarApuntesDia(fecha){
-    const{data,error}=await supabase.from('apuntes_diarios').select('*').eq('fecha',fecha)
+  async function cargarApuntesMecanico(mecanico){
+    const{data,error}=await supabase.from('apuntes_diarios').select('*').eq('mecanico',mecanico).order('fecha',{ascending:false}).order('created_at',{ascending:false})
     if(error){avisar('No se pudieron cargar los apuntes: '+error.message,'error');return}
-    setApuntesDia(data||[])
-    const nuevo={}
-    ;(data||[]).forEach(a=>{nuevo[a.mecanico]={texto:a.texto||'',vehiculos:(a.vehiculos||[]).map(v=>v.trabajo_id)}})
-    setFormApuntes(nuevo)
+    setApuntesMecanico(data||[])
   }
 
-  function cambiarDiaApuntes(delta){
-    const d=new Date(fechaApuntes+'T12:00:00')
-    d.setDate(d.getDate()+delta)
-    const nueva=d.toISOString().split('T')[0]
-    setFechaApuntes(nueva)
-    cargarApuntesDia(nueva)
+  function seleccionarMecanicoApuntes(mecanico){
+    setMecanicoSeleccionadoApuntes(mecanico)
+    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',texto:''})
+    cargarApuntesMecanico(mecanico)
   }
 
-  function datosApunteForm(mecanico){
-    return formApuntes[mecanico]||{texto:'',vehiculos:[]}
+  function elegirVehiculoApunte(t){
+    const hoyStr=new Date().toISOString().split('T')[0]
+    const existente=apuntesMecanico.find(a=>a.fecha===hoyStr&&a.trabajo_id===t.id)
+    setFormApunteVehiculo({id:null,trabajo_id:t.id,vehiculo_label:'',texto:existente?.texto||''})
   }
 
-  function setApunteFormTexto(mecanico,texto){
-    setFormApuntes(prev=>({...prev,[mecanico]:{...(prev[mecanico]||{texto:'',vehiculos:[]}),texto}}))
+  function editarApunteExistente(apunte){
+    setFormApunteVehiculo({id:apunte.id,trabajo_id:apunte.trabajo_id||'',vehiculo_label:apunte.vehiculo_label,texto:apunte.texto})
   }
 
-  function toggleVehiculoApunte(mecanico,trabajoId){
-    setFormApuntes(prev=>{
-      const actual=prev[mecanico]||{texto:'',vehiculos:[]}
-      const vehiculos=actual.vehiculos.includes(trabajoId)?actual.vehiculos.filter(id=>id!==trabajoId):[...actual.vehiculos,trabajoId]
-      return {...prev,[mecanico]:{...actual,vehiculos}}
-    })
+  function cancelarApunteVehiculo(){
+    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',texto:''})
   }
 
-  async function guardarApunte(mecanico){
+  async function guardarApunteVehiculo(){
     if(guardandoApunte)return
-    const form=datosApunteForm(mecanico)
-    if(!form.texto.trim()){avisar('Escribí el apunte del día','error');return}
+    if(!formApunteVehiculo.trabajo_id&&!formApunteVehiculo.id){avisar('Elegí un vehículo','error');return}
+    if(!formApunteVehiculo.texto.trim()){avisar('Escribí el apunte','error');return}
     setGuardandoApunte(true)
-    const vehiculosData=form.vehiculos.map(id=>{
-      const t=trabajosActivos.find(x=>x.id===id)
-      return {trabajo_id:id,label:`${t?.vehiculos?.marca_modelo||'Vehículo'} (${t?.vehiculos?.patente||'—'})`}
-    })
-    const existente=apuntesDia.find(a=>a.mecanico===mecanico)
-    let data,error
-    if(existente){
-      ;({data,error}=await supabase.from('apuntes_diarios').update({texto:form.texto,vehiculos:vehiculosData}).eq('id',existente.id).select())
+    let error
+    if(formApunteVehiculo.id){
+      ;({error}=await supabase.from('apuntes_diarios').update({texto:formApunteVehiculo.texto}).eq('id',formApunteVehiculo.id))
     } else {
-      ;({data,error}=await supabase.from('apuntes_diarios').insert({fecha:fechaApuntes,mecanico,texto:form.texto,vehiculos:vehiculosData}).select())
+      const t=trabajosActivos.find(x=>x.id===formApunteVehiculo.trabajo_id)
+      const vehiculo_label=`${t?.vehiculos?.marca_modelo||'Vehículo'} (${t?.vehiculos?.patente||'—'})`
+      const hoyStr=new Date().toISOString().split('T')[0]
+      const existente=apuntesMecanico.find(a=>a.fecha===hoyStr&&a.trabajo_id===formApunteVehiculo.trabajo_id)
+      if(existente){
+        ;({error}=await supabase.from('apuntes_diarios').update({texto:formApunteVehiculo.texto,vehiculo_label}).eq('id',existente.id))
+      } else {
+        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:hoyStr,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id,vehiculo_label,texto:formApunteVehiculo.texto}))
+      }
     }
     setGuardandoApunte(false)
     if(error){avisar('No se pudo guardar: '+error.message,'error');return}
-    // Actualizamos solo el registro de este mecánico (no recargamos todo el día), para no
-    // pisar los apuntes que Valentín pueda tener a medio escribir para los demás mecánicos.
-    const fila=data?.[0]
-    if(fila) setApuntesDia(prev=>existente?prev.map(a=>a.id===fila.id?fila:a):[...prev,fila])
     avisar('Apunte guardado','exito')
-  }
-
-  async function verHistorialApunte(mecanico){
-    if(historialApunteAbierto===mecanico){setHistorialApunteAbierto('');return}
-    const{data,error}=await supabase.from('apuntes_diarios').select('*').eq('mecanico',mecanico).order('fecha',{ascending:false}).limit(30)
-    if(error){avisar('No se pudo cargar el historial: '+error.message,'error');return}
-    setHistorialApunteMecanico(data||[])
-    setHistorialApunteAbierto(mecanico)
+    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',texto:''})
+    await cargarApuntesMecanico(mecanicoSeleccionadoApuntes)
   }
 
   function compartirPlanDiario(){
@@ -1477,7 +1459,7 @@ export default function Home({ rol, cerrarSesion }) {
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
   const mecanicos=empleados.filter(e=>e.rol==='mecanico')
-  const mecanicosAMostrar=mecanicos
+  const vehiculoSeleccionadoApunte=trabajosActivos.find(t=>t.id===formApunteVehiculo.trabajo_id)
   const hoy=new Date().toISOString().split('T')[0]
   const navLinks=[{color:'#E1306C',icon:<IgIcon/>,href:'https://www.instagram.com/di_fiore_mecanica/',label:'@di_fiore_mecanica'},{color:'#1877F2',icon:<FbIcon/>,href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr',label:'di_fiore_mecanica'},{color:'#25D366',icon:<WaIcon/>,href:'tel:+542235299700',label:'223 529-9700'},{color:'#EA4335',icon:<MapIcon/>,href:'https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1',label:'Malvinas 2084, MdP'}]
   const usandoUSD=presupuesto.moneda_mano_obra==='USD'
@@ -1674,62 +1656,65 @@ return (
           </div>
         )}
 
-        {seccion==='apuntes'&&(
+        {seccion==='apuntes'&&!mecanicoSeleccionadoApuntes&&(
+          <div>
+            <div className={styles.topBar}><h1 className={styles.pageTitle}>Apuntes diarios de mecánicos</h1></div>
+            <div className={styles.divider}></div>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Elegí un mecánico</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'10px',marginTop:'10px'}}>
+                {mecanicos.map(mec=>(
+                  <button key={mec.id} className={styles.btnPrimary} style={{fontSize:'13px',padding:'10px 18px'}} onClick={()=>seleccionarMecanicoApuntes(mec.nombre)}>{mec.nombre}</button>
+                ))}
+                {mecanicos.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>No hay mecánicos registrados en Empleados.</div>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {seccion==='apuntes'&&mecanicoSeleccionadoApuntes&&(
           <div>
             <div className={styles.topBar}>
-              <h1 className={styles.pageTitle}>Apuntes diarios de mecánicos</h1>
-              <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-                <button className={styles.btn} onClick={()=>cambiarDiaApuntes(-1)}>‹</button>
-                <span style={{fontSize:'13px',fontWeight:'600',color:'#EEF1F7',minWidth:'150px',textAlign:'center'}}>{new Date(fechaApuntes+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}</span>
-                <button className={styles.btn} onClick={()=>cambiarDiaApuntes(1)}>›</button>
-                <button className={styles.btn} onClick={()=>{const hoy=new Date().toISOString().split('T')[0];setFechaApuntes(hoy);cargarApuntesDia(hoy)}}>Hoy</button>
-              </div>
+              <button className={styles.btn} onClick={()=>setMecanicoSeleccionadoApuntes('')}>← Volver</button>
+              <h1 className={styles.pageTitle}>{mecanicoSeleccionadoApuntes}</h1>
             </div>
             <div className={styles.divider}></div>
 
-            {mecanicosAMostrar.length===0&&<div style={{color:'#6B7488',fontSize:'14px',textAlign:'center',padding:'3rem'}}>No hay mecánicos registrados en Empleados.</div>}
-
-            {mecanicosAMostrar.map(mec=>{
-              const form=datosApunteForm(mec.nombre)
-              return (
-                <div key={mec.id} className={styles.card} style={{marginBottom:'1rem'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
-                    <div style={{width:'26px',height:'26px',borderRadius:'50%',background:'rgba(47,168,255,.12)',color:'#2FA8FF',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'700'}}>{mec.nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
-                    <div className={styles.cardTitle} style={{margin:0}}>{mec.nombre}</div>
-                  </div>
-                  <textarea rows={3} placeholder="¿Qué se hizo hoy? Notas, dificultades, tiempos..." value={form.texto} onChange={e=>setApunteFormTexto(mec.nombre,e.target.value)} style={{width:'100%',padding:'10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit',resize:'vertical'}}/>
-                  <div style={{marginTop:'10px'}}>
-                    <div style={{fontSize:'12px',color:'#9AA3B8',marginBottom:'6px'}}>Vehículos en los que trabajó:</div>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                      {trabajosActivos.map(t=>(
-                        <label key={t.id} style={{display:'flex',alignItems:'center',gap:'5px',fontSize:'12px',background:form.vehiculos.includes(t.id)?'rgba(47,168,255,.12)':'#1C2130',border:'1px solid '+(form.vehiculos.includes(t.id)?'#2FA8FF':'#343B4B'),borderRadius:'6px',padding:'5px 9px',cursor:'pointer'}}>
-                          <input type="checkbox" checked={form.vehiculos.includes(t.id)} onChange={()=>toggleVehiculoApunte(mec.nombre,t.id)}/>
-                          {t.vehiculos?.marca_modelo} ({t.vehiculos?.patente})
-                        </label>
-                      ))}
-                      {trabajosActivos.length===0&&<span style={{fontSize:'12px',color:'#6B7488'}}>No hay vehículos en el taller.</span>}
-                    </div>
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'12px'}}>
-                    <button className={styles.btn} style={{fontSize:'12px',padding:'6px 12px'}} onClick={()=>verHistorialApunte(mec.nombre)}>{historialApunteAbierto===mec.nombre?'▲ Ocultar historial':'▼ Ver historial'}</button>
-                    <button className={styles.btnPrimary} style={{fontSize:'12px',padding:'6px 14px'}} disabled={guardandoApunte} onClick={()=>guardarApunte(mec.nombre)}>{guardandoApunte?'Guardando...':'Guardar apunte'}</button>
-                  </div>
-                  {historialApunteAbierto===mec.nombre&&(
-                    <div style={{marginTop:'12px',borderTop:'1px solid #262B38',paddingTop:'10px'}}>
-                      {historialApunteMecanico.length===0?<div style={{fontSize:'12px',color:'#6B7488'}}>Sin apuntes anteriores.</div>:
-                        historialApunteMecanico.map(h=>(
-                          <div key={h.id} style={{padding:'8px 0',borderBottom:'1px solid #262B38'}}>
-                            <div style={{fontSize:'11px',color:'#6B7488',marginBottom:'3px'}}>{new Date(h.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})}</div>
-                            <div style={{fontSize:'13px',color:'#EEF1F7'}}>{h.texto}</div>
-                            {(h.vehiculos||[]).length>0&&<div style={{fontSize:'11px',color:'#9AA3B8',marginTop:'4px'}}>{h.vehiculos.map(v=>v.label).join(', ')}</div>}
-                          </div>
-                        ))
-                      }
-                    </div>
-                  )}
+            <div className={styles.card} style={{marginBottom:'1rem'}}>
+              <div className={styles.cardTitle}>{formApunteVehiculo.id?'Editando apunte':'Apunte sobre un vehículo'}</div>
+              {formApunteVehiculo.id?(
+                <div style={{fontSize:'13px',color:'#9AA3B8',margin:'8px 0'}}>{formApunteVehiculo.vehiculo_label}</div>
+              ):formApunteVehiculo.trabajo_id?(
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'8px',background:'#171B25',border:'1px solid #343B4B',borderRadius:'8px',padding:'10px 12px'}}>
+                  <div style={{fontSize:'13px',color:'#EEF1F7'}}>{vehiculoSeleccionadoApunte?`${vehiculoSeleccionadoApunte.vehiculos?.marca_modelo} (${vehiculoSeleccionadoApunte.vehiculos?.patente})`:''}</div>
+                  <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={cancelarApunteVehiculo}>Cambiar</button>
                 </div>
-              )
-            })}
+              ):(
+                <div style={{marginTop:'8px'}}><BuscadorCliente trabajos={trabajosActivos} onSeleccionar={elegirVehiculoApunte} placeholder="Buscar vehículo por patente, marca o cliente..."/></div>
+              )}
+              {(formApunteVehiculo.trabajo_id||formApunteVehiculo.id)&&(
+                <>
+                  <textarea rows={3} placeholder="¿Qué se hizo en este vehículo?" value={formApunteVehiculo.texto} onChange={e=>setFormApunteVehiculo(f=>({...f,texto:e.target.value}))} style={{width:'100%',padding:'10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit',resize:'vertical',marginTop:'10px'}}/>
+                  <div style={{display:'flex',justifyContent:'flex-end',gap:'8px',marginTop:'10px'}}>
+                    <button className={styles.btn} style={{fontSize:'12px',padding:'6px 14px'}} onClick={cancelarApunteVehiculo}>Cancelar</button>
+                    <button className={styles.btnPrimary} style={{fontSize:'12px',padding:'6px 14px'}} disabled={guardandoApunte} onClick={guardarApunteVehiculo}>{guardandoApunte?'Guardando...':'Guardar y elegir otro'}</button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className={styles.cardTitle} style={{marginBottom:'10px'}}>Historial de apuntes</div>
+            {apuntesMecanico.length===0?<div style={{color:'#6B7488',fontSize:'14px',textAlign:'center',padding:'2rem'}}>Todavía no hay apuntes cargados para {mecanicoSeleccionadoApuntes}.</div>:
+              apuntesMecanico.map(a=>(
+                <div key={a.id} className={styles.card} style={{marginBottom:'10px',cursor:'pointer'}} onClick={()=>editarApunteExistente(a)}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'#9AA3B8',marginBottom:'4px'}}>
+                    <span>{new Date(a.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})}</span>
+                    <span>{a.vehiculo_label||'—'}</span>
+                  </div>
+                  <div style={{fontSize:'13.5px',color:'#EEF1F7'}}>{a.texto}</div>
+                </div>
+              ))
+            }
           </div>
         )}
 
