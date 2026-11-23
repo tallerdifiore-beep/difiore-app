@@ -479,7 +479,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [guardandoNota, setGuardandoNota] = useState(false)
   const [mecanicoSeleccionadoApuntes, setMecanicoSeleccionadoApuntes] = useState('')
   const [apuntesMecanico, setApuntesMecanico] = useState([])
-  const [formApunteVehiculo, setFormApunteVehiculo] = useState({id:null,trabajo_id:'',vehiculo_label:'',texto:''})
+  const [formApunteVehiculo, setFormApunteVehiculo] = useState({id:null,trabajo_id:'',vehiculo_label:'',texto:'',fecha:new Date().toISOString().split('T')[0]})
   const [guardandoApunte, setGuardandoApunte] = useState(false)
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalEditarFecha, setModalEditarFecha] = useState(null)
@@ -705,22 +705,34 @@ export default function Home({ rol, cerrarSesion }) {
 
   function seleccionarMecanicoApuntes(mecanico){
     setMecanicoSeleccionadoApuntes(mecanico)
-    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',texto:''})
+    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',texto:'',fecha:new Date().toISOString().split('T')[0]})
     cargarApuntesMecanico(mecanico)
   }
 
+  function cambiarFechaApunte(fecha){
+    if(formApunteVehiculo.id){
+      setFormApunteVehiculo(f=>({...f,fecha}))
+      return
+    }
+    if(formApunteVehiculo.trabajo_id){
+      const existente=apuntesMecanico.find(a=>a.fecha===fecha&&a.trabajo_id===formApunteVehiculo.trabajo_id)
+      setFormApunteVehiculo(f=>({...f,fecha,texto:existente?.texto||''}))
+      return
+    }
+    setFormApunteVehiculo(f=>({...f,fecha}))
+  }
+
   function elegirVehiculoApunte(t){
-    const hoyStr=new Date().toISOString().split('T')[0]
-    const existente=apuntesMecanico.find(a=>a.fecha===hoyStr&&a.trabajo_id===t.id)
-    setFormApunteVehiculo({id:null,trabajo_id:t.id,vehiculo_label:'',texto:existente?.texto||''})
+    const existente=apuntesMecanico.find(a=>a.fecha===formApunteVehiculo.fecha&&a.trabajo_id===t.id)
+    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:t.id,vehiculo_label:'',texto:existente?.texto||''}))
   }
 
   function editarApunteExistente(apunte){
-    setFormApunteVehiculo({id:apunte.id,trabajo_id:apunte.trabajo_id||'',vehiculo_label:apunte.vehiculo_label,texto:apunte.texto})
+    setFormApunteVehiculo({id:apunte.id,trabajo_id:apunte.trabajo_id||'',vehiculo_label:apunte.vehiculo_label,texto:apunte.texto,fecha:apunte.fecha})
   }
 
   function cancelarApunteVehiculo(){
-    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',texto:''})
+    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',texto:'',fecha:f.fecha}))
   }
 
   async function guardarApunteVehiculo(){
@@ -730,22 +742,21 @@ export default function Home({ rol, cerrarSesion }) {
     setGuardandoApunte(true)
     let error
     if(formApunteVehiculo.id){
-      ;({error}=await supabase.from('apuntes_diarios').update({texto:formApunteVehiculo.texto}).eq('id',formApunteVehiculo.id))
+      ;({error}=await supabase.from('apuntes_diarios').update({texto:formApunteVehiculo.texto,fecha:formApunteVehiculo.fecha}).eq('id',formApunteVehiculo.id))
     } else {
       const t=trabajosActivos.find(x=>x.id===formApunteVehiculo.trabajo_id)
       const vehiculo_label=`${t?.vehiculos?.marca_modelo||'Vehículo'} (${t?.vehiculos?.patente||'—'})`
-      const hoyStr=new Date().toISOString().split('T')[0]
-      const existente=apuntesMecanico.find(a=>a.fecha===hoyStr&&a.trabajo_id===formApunteVehiculo.trabajo_id)
+      const existente=apuntesMecanico.find(a=>a.fecha===formApunteVehiculo.fecha&&a.trabajo_id===formApunteVehiculo.trabajo_id)
       if(existente){
         ;({error}=await supabase.from('apuntes_diarios').update({texto:formApunteVehiculo.texto,vehiculo_label}).eq('id',existente.id))
       } else {
-        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:hoyStr,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id,vehiculo_label,texto:formApunteVehiculo.texto}))
+        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:formApunteVehiculo.fecha,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id,vehiculo_label,texto:formApunteVehiculo.texto}))
       }
     }
     setGuardandoApunte(false)
     if(error){avisar('No se pudo guardar: '+error.message,'error');return}
     avisar('Apunte guardado','exito')
-    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',texto:''})
+    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',texto:'',fecha:f.fecha}))
     await cargarApuntesMecanico(mecanicoSeleccionadoApuntes)
   }
 
@@ -1783,6 +1794,10 @@ return (
 
             <div className={styles.card} style={{marginBottom:'1rem'}}>
               <div className={styles.cardTitle}>{formApunteVehiculo.id?'Editando apunte':'Apunte sobre un vehículo'}</div>
+              <div style={{marginTop:'8px'}}>
+                <label style={{display:'block',fontSize:'11px',color:'#9AA3B8',marginBottom:'4px'}}>Fecha</label>
+                <input type="date" value={formApunteVehiculo.fecha} max={new Date().toISOString().split('T')[0]} onChange={e=>cambiarFechaApunte(e.target.value)} style={{padding:'8px 10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
+              </div>
               {formApunteVehiculo.id?(
                 <div style={{fontSize:'13px',color:'#9AA3B8',margin:'8px 0'}}>{formApunteVehiculo.vehiculo_label}</div>
               ):formApunteVehiculo.trabajo_id?(
