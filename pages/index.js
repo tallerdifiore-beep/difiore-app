@@ -193,9 +193,11 @@ thead th.num-col{text-align:right}
 tbody td{padding:12px;border-top:1px solid #AAB2BD;font-size:13.5px;vertical-align:top;background:#fff;color:#0E1118}
 tbody td.num-col{text-align:right;font-weight:700}
 tbody tr:nth-child(even) td{background:#F1F3F7}
-.tag{display:inline-block;margin-top:5px;padding:2px 8px;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid}
-.tag.repuesto{color:#0A2A9C;border-color:#0A2A9C}
-.tag.mo{color:#6B4F00;border-color:#6B4F00}
+.tag{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:20px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff}
+.tag.repuesto{background:#0A2A9C}
+.tag.mo{background:#C2410C}
+tbody tr.row-repuesto td:first-child{border-left:4px solid #0A2A9C}
+tbody tr.row-mo td:first-child{border-left:4px solid #C2410C}
 .descuento td{color:#136A3B;font-weight:700}
 .foot{display:flex;gap:36px;margin-top:22px;flex-wrap:wrap}
 .notes{flex:1;min-width:220px}
@@ -206,6 +208,9 @@ tbody tr:nth-child(even) td{background:#F1F3F7}
 .totals{min-width:250px;display:flex;flex-direction:column;gap:8px}
 .trow{display:flex;justify-content:space-between;font-size:12.5px;padding:0 4px;color:#0E1118}
 .trow.disc{color:#136A3B;font-weight:700}
+.trow-tag{font-weight:700}
+.trow-tag.repuesto{color:#0A2A9C}
+.trow-tag.mo{color:#C2410C}
 .total-card{display:flex;justify-content:space-between;align-items:center;border-radius:3px;padding:14px 16px;background:#0A2A9C}
 .total-card .lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.8)}
 .total-card .amt{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:21px;color:#fff}
@@ -1171,14 +1176,15 @@ export default function Home({ rol, cerrarSesion }) {
     const filas=presupuesto.items.filter(i=>i.descripcion).map(item=>{
       const s=item.es_mano_obra?(usandoUSD?'USS':'$'):'$'
       const tag=item.es_mano_obra?'<span class="tag mo">Mano de obra</span>':'<span class="tag repuesto">Repuesto</span>'
-      return `<tr><td><div>${item.descripcion}</div>${tag}</td><td class="num-col num">${item.precio_unitario?`${s} ${item.precio_unitario}`:''}</td><td class="num-col num">${item.total?`${s} ${item.total}`:''}</td></tr>`
+      const filaClase=item.es_mano_obra?'row-mo':'row-repuesto'
+      return `<tr class="${filaClase}"><td><div>${item.descripcion}</div>${tag}</td><td class="num-col num">${item.precio_unitario?`${s} ${item.precio_unitario}`:''}</td><td class="num-col num">${item.total?`${s} ${item.total}`:''}</td></tr>`
     }).join('')
     const filaDescuento=descMonto>0?`<tr class="descuento"><td>${presupuesto.descuento_concepto||'Descuento'}</td><td></td><td class="num-col num">− $${formatPeso(descMonto)}</td></tr>`:''
     const notasHTML=presupuesto.notas?presupuesto.notas.split('\n').filter(n=>n.trim()).map(n=>`<li>${n}</li>`).join(''):''
     const totalesHTML=usandoUSD?(
-      `${totalRepuestosPesos>0?`<div class="trow"><span>Repuestos</span><span class="num">$ ${formatPeso(totalRepuestosPesos)}</span></div>`:''}${manoObra&&manoObra.total?`<div class="trow"><span>Mano de obra</span><span class="num">USS ${manoObra.total}</span></div>`:''}<div class="total-card"><span class="lbl">Total mano de obra</span><span class="amt num">USS ${formatPeso(totalManoObraUSD)}</span></div>${totalRepuestosPesos>0?`<div class="total-card"><span class="lbl">+ Repuestos</span><span class="amt num">$ ${formatPeso(totalRepuestosPesos)}</span></div>`:''}`
+      `${totalRepuestosPesos>0?`<div class="trow"><span class="trow-tag repuesto">Repuestos</span><span class="num">$ ${formatPeso(totalRepuestosPesos)}</span></div>`:''}${manoObra&&manoObra.total?`<div class="trow"><span class="trow-tag mo">Mano de obra</span><span class="num">USS ${manoObra.total}</span></div>`:''}<div class="total-card"><span class="lbl">Total mano de obra</span><span class="amt num">USS ${formatPeso(totalManoObraUSD)}</span></div>${totalRepuestosPesos>0?`<div class="total-card"><span class="lbl">+ Repuestos</span><span class="amt num">$ ${formatPeso(totalRepuestosPesos)}</span></div>`:''}`
     ):(
-      `${totalRepuestosPesos>0?`<div class="trow"><span>Repuestos</span><span class="num">$ ${formatPeso(totalRepuestosPesos)}</span></div>`:''}${descMonto>0?`<div class="trow disc"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span class="num">− $ ${formatPeso(descMonto)}</span></div>`:''}${mostrarTransferencia?`<div class="total-card"><span class="lbl">Transferencia</span><span class="amt num">$ ${formatPeso(Math.round(totalTransferencia))}</span></div><div class="total-card"><span class="lbl">Efectivo</span><span class="amt num">$ ${formatPeso(Math.round(totalEfectivo))}</span></div>`:`<div class="total-card"><span class="lbl">Efectivo</span><span class="amt num">$ ${formatPeso(Math.round(totalEfectivo))}</span></div>`}`
+      `${totalRepuestosPesos>0?`<div class="trow"><span class="trow-tag repuesto">Repuestos</span><span class="num">$ ${formatPeso(totalRepuestosPesos)}</span></div>`:''}${descMonto>0?`<div class="trow disc"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span class="num">− $ ${formatPeso(descMonto)}</span></div>`:''}${mostrarTransferencia?`<div class="total-card"><span class="lbl">Transferencia</span><span class="amt num">$ ${formatPeso(Math.round(totalTransferencia))}</span></div><div class="total-card"><span class="lbl">Efectivo</span><span class="amt num">$ ${formatPeso(Math.round(totalEfectivo))}</span></div>`:`<div class="total-card"><span class="lbl">Efectivo</span><span class="amt num">$ ${formatPeso(Math.round(totalEfectivo))}</span></div>`}`
     )
     const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>${comprobanteFonts}<style>${comprobanteCSS}</style></head><body>${buildDocHeader('Presupuesto','N° Presupuesto',presupuesto.numero,`Ficha ${numeroFicha} · ${fechaFmt}`)}<div class="fields" style="grid-template-columns:repeat(3,1fr)"><div class="field"><label>Cliente</label><span>${presupuesto.cliente||'—'}</span></div><div class="field"><label>Vehículo</label><span>${presupuesto.vehiculo||'—'}</span></div><div class="field"><label>Patente</label><span>${patente}</span></div></div><div class="section-lbl">Detalle</div><table><thead><tr><th>Descripción</th><th class="num-col" style="width:140px">Precio unitario</th><th class="num-col" style="width:140px">Total</th></tr></thead><tbody>${filas}${filaDescuento}</tbody></table><div class="foot"><div class="notes">${notasHTML?`<div class="section-lbl" style="margin-top:0">Notas</div><ul>${notasHTML}</ul>`:''}<div class="validity">Presupuesto válido por 20 días corridos desde la fecha de emisión.</div></div><div class="totals">${totalesHTML}</div></div><div class="signoff"><div class="signline">Firma y aclaración</div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
