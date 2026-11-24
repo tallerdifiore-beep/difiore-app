@@ -296,7 +296,21 @@ function BuscadorCliente({ trabajos, onSeleccionar, placeholder }) {
     setTexto(q)
     if (!q || q.length < 2) { setSugerencias([]); return }
     const ql = q.toLowerCase()
-    setSugerencias(trabajos.filter(t=>t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql)||t.vehiculos?.patente?.toLowerCase().includes(ql)||t.vehiculos?.marca_modelo?.toLowerCase().includes(ql)).sort((a,b)=>(a.vehiculos?.marca_modelo||'').localeCompare(b.vehiculos?.marca_modelo||'')).slice(0,6))
+    const coincidencias = trabajos.filter(t=>t.vehiculos?.clientes?.nombre?.toLowerCase().includes(ql)||t.vehiculos?.patente?.toLowerCase().includes(ql)||t.vehiculos?.marca_modelo?.toLowerCase().includes(ql))
+    // Un vehículo con varios reingresos tiene un "trabajo" por cada visita — nos quedamos con
+    // uno solo por vehículo (el activo si lo hay, si no el más reciente) para no repetirlo.
+    const porVehiculo = {}
+    coincidencias.forEach(t=>{
+      const clave = t.vehiculos?.id || t.vehiculos?.patente || t.id
+      const actual = porVehiculo[clave]
+      if (!actual) { porVehiculo[clave] = t; return }
+      const actualActivo = actual.estado !== 'Salio'
+      const nuevoActivo = t.estado !== 'Salio'
+      if (nuevoActivo && !actualActivo) { porVehiculo[clave] = t; return }
+      if (!nuevoActivo && actualActivo) { return }
+      if (new Date(t.fecha_ingreso) > new Date(actual.fecha_ingreso)) porVehiculo[clave] = t
+    })
+    setSugerencias(Object.values(porVehiculo).sort((a,b)=>(a.vehiculos?.marca_modelo||'').localeCompare(b.vehiculos?.marca_modelo||'')).slice(0,6))
   }
   function seleccionar(t) {
     onSeleccionar(t)
