@@ -1859,10 +1859,16 @@ return (
                 <input type="date" value={formApunteVehiculo.fecha} max={new Date().toISOString().split('T')[0]} onChange={e=>cambiarFechaApunte(e.target.value)} style={{padding:'8px 10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
               </div>
               {formApunteVehiculo.id?(
-                <div style={{fontSize:'13px',color:'#9AA3B8',margin:'8px 0'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#6B7488',textTransform:'uppercase',letterSpacing:'.04em'}}>{formApunteVehiculo.es_tarea?'(tarea general)':'(cargado a mano)'}</span>}</div>
+                <div style={{display:'flex',alignItems:'center',gap:'8px',margin:'8px 0'}}>
+                  {formApunteVehiculo.es_tarea&&<span style={{background:'#F2A900',color:'#1A1200',fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'10px',textTransform:'uppercase',letterSpacing:'.04em'}}>Tarea</span>}
+                  <span style={{fontSize:'13px',color:'#9AA3B8'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&!formApunteVehiculo.es_tarea&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#6B7488',textTransform:'uppercase',letterSpacing:'.04em'}}>(cargado a mano)</span>}</span>
+                </div>
               ):formApunteVehiculo.vehiculo_label?(
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'8px',background:'#171B25',border:'1px solid #343B4B',borderRadius:'8px',padding:'10px 12px'}}>
-                  <div style={{fontSize:'13px',color:'#EEF1F7'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#9AA3B8',textTransform:'uppercase',letterSpacing:'.04em'}}>{formApunteVehiculo.es_tarea?'(tarea general)':'(cargado a mano)'}</span>}</div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'8px',background:formApunteVehiculo.es_tarea?'rgba(242,169,0,.1)':'#171B25',border:'1px solid '+(formApunteVehiculo.es_tarea?'#F2A900':'#343B4B'),borderRadius:'8px',padding:'10px 12px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                    {formApunteVehiculo.es_tarea&&<span style={{background:'#F2A900',color:'#1A1200',fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'10px',textTransform:'uppercase',letterSpacing:'.04em'}}>Tarea</span>}
+                    <span style={{fontSize:'13px',color:'#EEF1F7'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&!formApunteVehiculo.es_tarea&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#9AA3B8',textTransform:'uppercase',letterSpacing:'.04em'}}>(cargado a mano)</span>}</span>
+                  </div>
                   <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={cancelarApunteVehiculo}>Cambiar</button>
                 </div>
               ):modoManualApunte?(
@@ -1918,10 +1924,13 @@ return (
             <div className={styles.cardTitle} style={{marginBottom:'10px'}}>Historial de apuntes</div>
             {apuntesMecanico.length===0?<div style={{color:'#6B7488',fontSize:'14px',textAlign:'center',padding:'2rem'}}>Todavía no hay apuntes cargados para {mecanicoSeleccionadoApuntes}.</div>:
               apuntesMecanico.map(a=>(
-                <div key={a.id} className={styles.card} style={{marginBottom:'10px',cursor:'pointer'}} onClick={()=>editarApunteExistente(a)}>
-                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'#9AA3B8',marginBottom:'4px'}}>
+                <div key={a.id} className={styles.card} style={{marginBottom:'10px',cursor:'pointer',...(a.es_tarea?{borderLeft:'4px solid #F2A900',background:'rgba(242,169,0,.07)'}:{})}} onClick={()=>editarApunteExistente(a)}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'12px',color:'#9AA3B8',marginBottom:'4px'}}>
                     <span>{new Date(a.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})}</span>
-                    <span>{a.vehiculo_label||'—'}{a.es_tarea&&<span style={{marginLeft:'6px',color:'#6B7488'}}>(tarea)</span>}</span>
+                    <span style={{display:'flex',alignItems:'center',gap:'7px'}}>
+                      {a.es_tarea&&<span style={{background:'#F2A900',color:'#1A1200',fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'10px',textTransform:'uppercase',letterSpacing:'.04em'}}>Tarea</span>}
+                      <span>{a.vehiculo_label||'—'}</span>
+                    </span>
                   </div>
                   {(a.bloques&&a.bloques.length>0)?(
                     <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
