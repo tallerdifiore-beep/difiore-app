@@ -480,10 +480,12 @@ export default function Home({ rol, cerrarSesion }) {
   const [guardandoNota, setGuardandoNota] = useState(false)
   const [mecanicoSeleccionadoApuntes, setMecanicoSeleccionadoApuntes] = useState('')
   const [apuntesMecanico, setApuntesMecanico] = useState([])
-  const [formApunteVehiculo, setFormApunteVehiculo] = useState({id:null,trabajo_id:'',vehiculo_label:'',bloques:[{desde:'',hasta:'',texto:''}],fecha:new Date().toISOString().split('T')[0]})
+  const [formApunteVehiculo, setFormApunteVehiculo] = useState({id:null,trabajo_id:'',vehiculo_label:'',es_tarea:false,bloques:[{desde:'',hasta:'',texto:''}],fecha:new Date().toISOString().split('T')[0]})
   const [guardandoApunte, setGuardandoApunte] = useState(false)
   const [modoManualApunte, setModoManualApunte] = useState(false)
   const [textoVehiculoManual, setTextoVehiculoManual] = useState('')
+  const [modoTareaApunte, setModoTareaApunte] = useState(false)
+  const [textoTareaApunte, setTextoTareaApunte] = useState('')
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalEditarFecha, setModalEditarFecha] = useState(null)
   const [nuevaFechaHistorial, setNuevaFechaHistorial] = useState('')
@@ -714,15 +716,17 @@ export default function Home({ rol, cerrarSesion }) {
 
   function seleccionarMecanicoApuntes(mecanico){
     setMecanicoSeleccionadoApuntes(mecanico)
-    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',bloques:[bloqueVacio()],fecha:new Date().toISOString().split('T')[0]})
+    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',es_tarea:false,bloques:[bloqueVacio()],fecha:new Date().toISOString().split('T')[0]})
     setModoManualApunte(false)
     setTextoVehiculoManual('')
+    setModoTareaApunte(false)
+    setTextoTareaApunte('')
     cargarApuntesMecanico(mecanico)
   }
 
-  function buscarApunteExistenteVehiculo(fecha,trabajoId,vehiculoLabel){
+  function buscarApunteExistenteVehiculo(fecha,trabajoId,vehiculoLabel,esTarea){
     if(trabajoId) return apuntesMecanico.find(a=>a.fecha===fecha&&a.trabajo_id===trabajoId)
-    if(vehiculoLabel) return apuntesMecanico.find(a=>a.fecha===fecha&&!a.trabajo_id&&(a.vehiculo_label||'').trim().toLowerCase()===vehiculoLabel.trim().toLowerCase())
+    if(vehiculoLabel) return apuntesMecanico.find(a=>a.fecha===fecha&&!a.trabajo_id&&!!a.es_tarea===!!esTarea&&(a.vehiculo_label||'').trim().toLowerCase()===vehiculoLabel.trim().toLowerCase())
     return null
   }
 
@@ -732,7 +736,7 @@ export default function Home({ rol, cerrarSesion }) {
       return
     }
     if(formApunteVehiculo.trabajo_id||formApunteVehiculo.vehiculo_label){
-      const existente=buscarApunteExistenteVehiculo(fecha,formApunteVehiculo.trabajo_id||null,formApunteVehiculo.trabajo_id?null:formApunteVehiculo.vehiculo_label)
+      const existente=buscarApunteExistenteVehiculo(fecha,formApunteVehiculo.trabajo_id||null,formApunteVehiculo.trabajo_id?null:formApunteVehiculo.vehiculo_label,formApunteVehiculo.es_tarea)
       setFormApunteVehiculo(f=>({...f,fecha,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
       return
     }
@@ -742,26 +746,37 @@ export default function Home({ rol, cerrarSesion }) {
   function elegirVehiculoApunte(t){
     const vehiculo_label=`${t.vehiculos?.marca_modelo||'Vehículo'} (${t.vehiculos?.patente||'—'})`
     const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,t.id,null)
-    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:t.id,vehiculo_label,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
+    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:t.id,vehiculo_label,es_tarea:false,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
   }
 
   function elegirVehiculoManual(label){
     const limpio=(label||'').trim()
     if(!limpio){avisar('Escribí el vehículo','error');return}
-    const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,null,limpio)
-    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:'',vehiculo_label:limpio,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
+    const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,null,limpio,false)
+    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:'',vehiculo_label:limpio,es_tarea:false,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
     setModoManualApunte(false)
     setTextoVehiculoManual('')
+  }
+
+  function elegirTareaGeneral(texto){
+    const limpio=(texto||'').trim()
+    if(!limpio){avisar('Escribí la tarea','error');return}
+    const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,null,limpio,true)
+    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:'',vehiculo_label:limpio,es_tarea:true,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
+    setModoTareaApunte(false)
+    setTextoTareaApunte('')
   }
 
   function editarApunteExistente(apunte){
-    setFormApunteVehiculo({id:apunte.id,trabajo_id:apunte.trabajo_id||'',vehiculo_label:apunte.vehiculo_label,bloques:bloquesDeApunte(apunte),fecha:apunte.fecha})
+    setFormApunteVehiculo({id:apunte.id,trabajo_id:apunte.trabajo_id||'',vehiculo_label:apunte.vehiculo_label,es_tarea:!!apunte.es_tarea,bloques:bloquesDeApunte(apunte),fecha:apunte.fecha})
   }
 
   function cancelarApunteVehiculo(){
-    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',bloques:[bloqueVacio()],fecha:f.fecha}))
+    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',es_tarea:false,bloques:[bloqueVacio()],fecha:f.fecha}))
     setModoManualApunte(false)
     setTextoVehiculoManual('')
+    setModoTareaApunte(false)
+    setTextoTareaApunte('')
   }
 
   function actualizarBloqueApunte(idx,campo,valor){
@@ -792,17 +807,17 @@ export default function Home({ rol, cerrarSesion }) {
       ;({error}=await supabase.from('apuntes_diarios').update({texto,bloques,fecha:formApunteVehiculo.fecha}).eq('id',formApunteVehiculo.id))
     } else {
       const vehiculo_label=formApunteVehiculo.vehiculo_label
-      const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,formApunteVehiculo.trabajo_id||null,formApunteVehiculo.trabajo_id?null:vehiculo_label)
+      const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,formApunteVehiculo.trabajo_id||null,formApunteVehiculo.trabajo_id?null:vehiculo_label,formApunteVehiculo.es_tarea)
       if(existente){
         ;({error}=await supabase.from('apuntes_diarios').update({texto,bloques,vehiculo_label}).eq('id',existente.id))
       } else {
-        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:formApunteVehiculo.fecha,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id||null,vehiculo_label,texto,bloques}))
+        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:formApunteVehiculo.fecha,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id||null,vehiculo_label,es_tarea:formApunteVehiculo.es_tarea,texto,bloques}))
       }
     }
     setGuardandoApunte(false)
     if(error){avisar('No se pudo guardar: '+error.message,'error');return}
     avisar('Apunte guardado','exito')
-    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',bloques:[bloqueVacio()],fecha:f.fecha}))
+    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',es_tarea:false,bloques:[bloqueVacio()],fecha:f.fecha}))
     await cargarApuntesMecanico(mecanicoSeleccionadoApuntes)
   }
 
@@ -1838,16 +1853,16 @@ return (
             <div className={styles.divider}></div>
 
             <div className={styles.card} style={{marginBottom:'1rem'}}>
-              <div className={styles.cardTitle}>{formApunteVehiculo.id?'Editando apunte':'Apunte sobre un vehículo'}</div>
+              <div className={styles.cardTitle}>{formApunteVehiculo.id?'Editando apunte':formApunteVehiculo.vehiculo_label?(formApunteVehiculo.es_tarea?'Tarea general':'Apunte sobre un vehículo'):'Nuevo apunte'}</div>
               <div style={{marginTop:'8px'}}>
                 <label style={{display:'block',fontSize:'11px',color:'#9AA3B8',marginBottom:'4px'}}>Fecha</label>
                 <input type="date" value={formApunteVehiculo.fecha} max={new Date().toISOString().split('T')[0]} onChange={e=>cambiarFechaApunte(e.target.value)} style={{padding:'8px 10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
               </div>
               {formApunteVehiculo.id?(
-                <div style={{fontSize:'13px',color:'#9AA3B8',margin:'8px 0'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#6B7488',textTransform:'uppercase',letterSpacing:'.04em'}}>(cargado a mano)</span>}</div>
+                <div style={{fontSize:'13px',color:'#9AA3B8',margin:'8px 0'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#6B7488',textTransform:'uppercase',letterSpacing:'.04em'}}>{formApunteVehiculo.es_tarea?'(tarea general)':'(cargado a mano)'}</span>}</div>
               ):formApunteVehiculo.vehiculo_label?(
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'8px',background:'#171B25',border:'1px solid #343B4B',borderRadius:'8px',padding:'10px 12px'}}>
-                  <div style={{fontSize:'13px',color:'#EEF1F7'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#9AA3B8',textTransform:'uppercase',letterSpacing:'.04em'}}>(cargado a mano)</span>}</div>
+                  <div style={{fontSize:'13px',color:'#EEF1F7'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#9AA3B8',textTransform:'uppercase',letterSpacing:'.04em'}}>{formApunteVehiculo.es_tarea?'(tarea general)':'(cargado a mano)'}</span>}</div>
                   <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={cancelarApunteVehiculo}>Cambiar</button>
                 </div>
               ):modoManualApunte?(
@@ -1858,10 +1873,21 @@ return (
                     <button className={styles.btn} style={{fontSize:'12px',padding:'8px 14px'}} onClick={()=>{setModoManualApunte(false);setTextoVehiculoManual('')}}>Volver a buscar</button>
                   </div>
                 </div>
+              ):modoTareaApunte?(
+                <div style={{marginTop:'8px'}}>
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    <input type="text" value={textoTareaApunte} onChange={e=>setTextoTareaApunte(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();elegirTareaGeneral(textoTareaApunte)}}} placeholder="Ej: Traslado de un vehículo de Malvinas 2084 a Malvinas 3906" style={{flex:1,minWidth:'200px',padding:'10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
+                    <button className={styles.btnPrimary} style={{fontSize:'12px',padding:'8px 14px'}} onClick={()=>elegirTareaGeneral(textoTareaApunte)}>Usar esta tarea</button>
+                    <button className={styles.btn} style={{fontSize:'12px',padding:'8px 14px'}} onClick={()=>{setModoTareaApunte(false);setTextoTareaApunte('')}}>Cancelar</button>
+                  </div>
+                </div>
               ):(
                 <div style={{marginTop:'8px'}}>
                   <BuscadorCliente trabajos={trabajosVivos} onSeleccionar={elegirVehiculoApunte} placeholder="Buscar vehículo por patente, marca o cliente (incluye entregados)..."/>
-                  <button type="button" onClick={()=>setModoManualApunte(true)} style={{background:'none',border:'none',color:'#2FA8FF',fontSize:'12px',cursor:'pointer',marginTop:'8px',padding:0,textDecoration:'underline'}}>¿No está en el sistema? Cargarlo a mano</button>
+                  <div style={{display:'flex',gap:'16px',flexWrap:'wrap',marginTop:'8px'}}>
+                    <button type="button" onClick={()=>setModoManualApunte(true)} style={{background:'none',border:'none',color:'#2FA8FF',fontSize:'12px',cursor:'pointer',padding:0,textDecoration:'underline'}}>¿No está en el sistema? Cargarlo a mano</button>
+                    <button type="button" onClick={()=>setModoTareaApunte(true)} style={{background:'none',border:'none',color:'#2FA8FF',fontSize:'12px',cursor:'pointer',padding:0,textDecoration:'underline'}}>+ Tarea general (sin vehículo)</button>
+                  </div>
                 </div>
               )}
               {(formApunteVehiculo.vehiculo_label||formApunteVehiculo.id)&&(
@@ -1895,7 +1921,7 @@ return (
                 <div key={a.id} className={styles.card} style={{marginBottom:'10px',cursor:'pointer'}} onClick={()=>editarApunteExistente(a)}>
                   <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'#9AA3B8',marginBottom:'4px'}}>
                     <span>{new Date(a.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})}</span>
-                    <span>{a.vehiculo_label||'—'}</span>
+                    <span>{a.vehiculo_label||'—'}{a.es_tarea&&<span style={{marginLeft:'6px',color:'#6B7488'}}>(tarea)</span>}</span>
                   </div>
                   {(a.bloques&&a.bloques.length>0)?(
                     <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
