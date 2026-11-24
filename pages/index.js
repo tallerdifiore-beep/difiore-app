@@ -388,6 +388,7 @@ function FotoZoomViewer({ url, onClose, styles }) {
 
 export default function Home({ rol, cerrarSesion }) {
   const admin = rol === 'admin'
+  const puedeVerApuntes = rol === 'admin' || rol === 'valentin'
   const [seccion, setSeccion] = useState('dashboard')
   const [tallerVista, setTallerVista] = useState(null)
   const [vistaStats, setVistaStats] = useState(null)
@@ -479,7 +480,7 @@ export default function Home({ rol, cerrarSesion }) {
   const [guardandoNota, setGuardandoNota] = useState(false)
   const [mecanicoSeleccionadoApuntes, setMecanicoSeleccionadoApuntes] = useState('')
   const [apuntesMecanico, setApuntesMecanico] = useState([])
-  const [formApunteVehiculo, setFormApunteVehiculo] = useState({id:null,trabajo_id:'',vehiculo_label:'',texto:'',fecha:new Date().toISOString().split('T')[0]})
+  const [formApunteVehiculo, setFormApunteVehiculo] = useState({id:null,trabajo_id:'',vehiculo_label:'',bloques:[{desde:'',hasta:'',texto:''}],fecha:new Date().toISOString().split('T')[0]})
   const [guardandoApunte, setGuardandoApunte] = useState(false)
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalEditarFecha, setModalEditarFecha] = useState(null)
@@ -703,9 +704,15 @@ export default function Home({ rol, cerrarSesion }) {
     setApuntesMecanico(data||[])
   }
 
+  function bloqueVacio(){return{desde:'',hasta:'',texto:''}}
+  function bloquesDeApunte(apunte){
+    if(apunte?.bloques&&apunte.bloques.length) return apunte.bloques.map(b=>({desde:b.desde||'',hasta:b.hasta||'',texto:b.texto||''}))
+    return [{desde:'',hasta:'',texto:apunte?.texto||''}]
+  }
+
   function seleccionarMecanicoApuntes(mecanico){
     setMecanicoSeleccionadoApuntes(mecanico)
-    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',texto:'',fecha:new Date().toISOString().split('T')[0]})
+    setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',bloques:[bloqueVacio()],fecha:new Date().toISOString().split('T')[0]})
     cargarApuntesMecanico(mecanico)
   }
 
@@ -716,7 +723,7 @@ export default function Home({ rol, cerrarSesion }) {
     }
     if(formApunteVehiculo.trabajo_id){
       const existente=apuntesMecanico.find(a=>a.fecha===fecha&&a.trabajo_id===formApunteVehiculo.trabajo_id)
-      setFormApunteVehiculo(f=>({...f,fecha,texto:existente?.texto||''}))
+      setFormApunteVehiculo(f=>({...f,fecha,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
       return
     }
     setFormApunteVehiculo(f=>({...f,fecha}))
@@ -724,39 +731,57 @@ export default function Home({ rol, cerrarSesion }) {
 
   function elegirVehiculoApunte(t){
     const existente=apuntesMecanico.find(a=>a.fecha===formApunteVehiculo.fecha&&a.trabajo_id===t.id)
-    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:t.id,vehiculo_label:'',texto:existente?.texto||''}))
+    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:t.id,vehiculo_label:'',bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
   }
 
   function editarApunteExistente(apunte){
-    setFormApunteVehiculo({id:apunte.id,trabajo_id:apunte.trabajo_id||'',vehiculo_label:apunte.vehiculo_label,texto:apunte.texto,fecha:apunte.fecha})
+    setFormApunteVehiculo({id:apunte.id,trabajo_id:apunte.trabajo_id||'',vehiculo_label:apunte.vehiculo_label,bloques:bloquesDeApunte(apunte),fecha:apunte.fecha})
   }
 
   function cancelarApunteVehiculo(){
-    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',texto:'',fecha:f.fecha}))
+    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',bloques:[bloqueVacio()],fecha:f.fecha}))
+  }
+
+  function actualizarBloqueApunte(idx,campo,valor){
+    setFormApunteVehiculo(f=>{
+      const bloques=[...f.bloques]
+      bloques[idx]={...bloques[idx],[campo]:valor}
+      return {...f,bloques}
+    })
+  }
+
+  function agregarBloqueApunte(){
+    setFormApunteVehiculo(f=>({...f,bloques:[...f.bloques,bloqueVacio()]}))
+  }
+
+  function quitarBloqueApunte(idx){
+    setFormApunteVehiculo(f=>({...f,bloques:f.bloques.filter((_,i)=>i!==idx)}))
   }
 
   async function guardarApunteVehiculo(){
     if(guardandoApunte)return
     if(!formApunteVehiculo.trabajo_id&&!formApunteVehiculo.id){avisar('Elegí un vehículo','error');return}
-    if(!formApunteVehiculo.texto.trim()){avisar('Escribí el apunte','error');return}
+    const bloques=formApunteVehiculo.bloques.map(b=>({desde:b.desde||'',hasta:b.hasta||'',texto:(b.texto||'').trim()})).filter(b=>b.texto)
+    if(bloques.length===0){avisar('Escribí al menos un apunte','error');return}
+    const texto=bloques.map(b=>b.desde&&b.hasta?`${b.desde}–${b.hasta}: ${b.texto}`:b.texto).join(' / ')
     setGuardandoApunte(true)
     let error
     if(formApunteVehiculo.id){
-      ;({error}=await supabase.from('apuntes_diarios').update({texto:formApunteVehiculo.texto,fecha:formApunteVehiculo.fecha}).eq('id',formApunteVehiculo.id))
+      ;({error}=await supabase.from('apuntes_diarios').update({texto,bloques,fecha:formApunteVehiculo.fecha}).eq('id',formApunteVehiculo.id))
     } else {
       const t=trabajosActivos.find(x=>x.id===formApunteVehiculo.trabajo_id)
       const vehiculo_label=`${t?.vehiculos?.marca_modelo||'Vehículo'} (${t?.vehiculos?.patente||'—'})`
       const existente=apuntesMecanico.find(a=>a.fecha===formApunteVehiculo.fecha&&a.trabajo_id===formApunteVehiculo.trabajo_id)
       if(existente){
-        ;({error}=await supabase.from('apuntes_diarios').update({texto:formApunteVehiculo.texto,vehiculo_label}).eq('id',existente.id))
+        ;({error}=await supabase.from('apuntes_diarios').update({texto,bloques,vehiculo_label}).eq('id',existente.id))
       } else {
-        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:formApunteVehiculo.fecha,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id,vehiculo_label,texto:formApunteVehiculo.texto}))
+        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:formApunteVehiculo.fecha,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id,vehiculo_label,texto,bloques}))
       }
     }
     setGuardandoApunte(false)
     if(error){avisar('No se pudo guardar: '+error.message,'error');return}
     avisar('Apunte guardado','exito')
-    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',texto:'',fecha:f.fecha}))
+    setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',bloques:[bloqueVacio()],fecha:f.fecha}))
     await cargarApuntesMecanico(mecanicoSeleccionadoApuntes)
   }
 
@@ -1701,7 +1726,7 @@ return (
           ...(admin?[{id:'presupuesto',label:'Presupuesto'}]:[]),
           ...(admin?[{id:'recibo',label:'Recibo'}]:[]),
           {id:'checklist',label:'Checklist entrega'},
-          {id:'apuntes',label:'Apuntes diarios'},
+          ...(puedeVerApuntes?[{id:'apuntes',label:'Apuntes diarios'}]:[]),
           ...(admin?[{id:'informe',label:'Informe mensual'},{id:'informe-taller',label:'Vehículos en el taller'},{id:'empleados',label:'Empleados'}]:[])
         ].map(item=>(
           <button key={item.id} className={`${styles.navItem} ${seccion===item.id?styles.navActive:''}`} onClick={()=>{setSeccion(item.id);setTallerVista(null);setVistaStats(null);setVistaMarca(null);setVerEntregados(false);setVerPapelera(false);setSidebarOpen(false)}}>{item.label}</button>
@@ -1712,7 +1737,7 @@ return (
             {navLinks.map((l,i)=><a key={i} href={l.href} target="_blank" rel="noreferrer" className={styles.contactItem}><span className={styles.contactIcon} style={{color:l.color,background:l.color+'1F'}}>{l.icon}</span>{l.label}</a>)}
           </div>
           <div style={{padding:'10px 0 0',borderTop:'1px solid #262B38',marginTop:'10px'}}>
-            <div className={styles.sidebarRole}>{admin?'Admin':'Empleado'}</div>
+            <div className={styles.sidebarRole}>{admin?'Admin':rol==='valentin'?'Valentín':'Empleado'}</div>
             <button onClick={cerrarSesion} className={styles.btnDangerSolid} style={{width:'100%'}}>Cerrar sesión</button>
           </div>
         </div>
@@ -1768,7 +1793,7 @@ return (
           </div>
         )}
 
-        {seccion==='apuntes'&&!mecanicoSeleccionadoApuntes&&(
+        {seccion==='apuntes'&&puedeVerApuntes&&!mecanicoSeleccionadoApuntes&&(
           <div>
             <div className={styles.topBar}><h1 className={styles.pageTitle}>Apuntes diarios de mecánicos</h1></div>
             <div className={styles.divider}></div>
@@ -1784,7 +1809,7 @@ return (
           </div>
         )}
 
-        {seccion==='apuntes'&&mecanicoSeleccionadoApuntes&&(
+        {seccion==='apuntes'&&puedeVerApuntes&&mecanicoSeleccionadoApuntes&&(
           <div>
             <div className={styles.topBar}>
               <button className={styles.btn} onClick={()=>setMecanicoSeleccionadoApuntes('')}>← Volver</button>
@@ -1810,7 +1835,21 @@ return (
               )}
               {(formApunteVehiculo.trabajo_id||formApunteVehiculo.id)&&(
                 <>
-                  <textarea rows={3} placeholder="¿Qué se hizo en este vehículo?" value={formApunteVehiculo.texto} onChange={e=>setFormApunteVehiculo(f=>({...f,texto:e.target.value}))} style={{width:'100%',padding:'10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit',resize:'vertical',marginTop:'10px'}}/>
+                  <div style={{marginTop:'10px',display:'flex',flexDirection:'column',gap:'8px'}}>
+                    {formApunteVehiculo.bloques.map((b,idx)=>(
+                      <div key={idx} style={{background:'#171B25',border:'1px solid #343B4B',borderRadius:'8px',padding:'10px'}}>
+                        <div style={{display:'flex',gap:'8px',alignItems:'center',marginBottom:'8px',flexWrap:'wrap'}}>
+                          <label style={{fontSize:'11px',color:'#9AA3B8'}}>De</label>
+                          <input type="time" value={b.desde} onChange={e=>actualizarBloqueApunte(idx,'desde',e.target.value)} style={{padding:'6px 8px',borderRadius:'6px',border:'1px solid #343B4B',background:'#0E1118',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
+                          <label style={{fontSize:'11px',color:'#9AA3B8'}}>a</label>
+                          <input type="time" value={b.hasta} onChange={e=>actualizarBloqueApunte(idx,'hasta',e.target.value)} style={{padding:'6px 8px',borderRadius:'6px',border:'1px solid #343B4B',background:'#0E1118',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
+                          {formApunteVehiculo.bloques.length>1&&<button className={styles.btnDelete} style={{fontSize:'10px',padding:'3px 7px',marginLeft:'auto'}} onClick={()=>quitarBloqueApunte(idx)}><TrashIcon/></button>}
+                        </div>
+                        <textarea rows={2} placeholder="¿Qué se hizo en este horario?" value={b.texto} onChange={e=>actualizarBloqueApunte(idx,'texto',e.target.value)} style={{width:'100%',padding:'10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#0E1118',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit',resize:'vertical'}}/>
+                      </div>
+                    ))}
+                  </div>
+                  <button className={styles.btn} style={{fontSize:'12px',padding:'6px 12px',marginTop:'8px'}} onClick={agregarBloqueApunte}>+ Agregar otro horario</button>
                   <div style={{display:'flex',justifyContent:'flex-end',gap:'8px',marginTop:'10px'}}>
                     <button className={styles.btn} style={{fontSize:'12px',padding:'6px 14px'}} onClick={cancelarApunteVehiculo}>Cancelar</button>
                     <button className={styles.btnPrimary} style={{fontSize:'12px',padding:'6px 14px'}} disabled={guardandoApunte} onClick={guardarApunteVehiculo}>{guardandoApunte?'Guardando...':'Guardar y elegir otro'}</button>
@@ -1827,7 +1866,15 @@ return (
                     <span>{new Date(a.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})}</span>
                     <span>{a.vehiculo_label||'—'}</span>
                   </div>
-                  <div style={{fontSize:'13.5px',color:'#EEF1F7'}}>{a.texto}</div>
+                  {(a.bloques&&a.bloques.length>0)?(
+                    <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                      {a.bloques.map((b,i)=>(
+                        <div key={i} style={{fontSize:'13.5px',color:'#EEF1F7'}}>{b.desde&&b.hasta?<b style={{color:'#2FA8FF'}}>{b.desde}–{b.hasta}: </b>:null}{b.texto}</div>
+                      ))}
+                    </div>
+                  ):(
+                    <div style={{fontSize:'13.5px',color:'#EEF1F7'}}>{a.texto}</div>
+                  )}
                 </div>
               ))
             }
