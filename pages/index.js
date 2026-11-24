@@ -1860,7 +1860,7 @@ return (
                 </div>
               ):(
                 <div style={{marginTop:'8px'}}>
-                  <BuscadorCliente trabajos={trabajosActivos} onSeleccionar={elegirVehiculoApunte} placeholder="Buscar vehículo por patente, marca o cliente..."/>
+                  <BuscadorCliente trabajos={trabajosVivos} onSeleccionar={elegirVehiculoApunte} placeholder="Buscar vehículo por patente, marca o cliente (incluye entregados)..."/>
                   <button type="button" onClick={()=>setModoManualApunte(true)} style={{background:'none',border:'none',color:'#2FA8FF',fontSize:'12px',cursor:'pointer',marginTop:'8px',padding:0,textDecoration:'underline'}}>¿No está en el sistema? Cargarlo a mano</button>
                 </div>
               )}
