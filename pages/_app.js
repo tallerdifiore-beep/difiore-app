@@ -7,6 +7,7 @@ const LOGO_URL = '/logo-difiore.png'
 // variables de entorno, se usan las de siempre (las de DiFiore).
 const PASS_ADMIN = process.env.NEXT_PUBLIC_PASS_ADMIN || 'Oficina2084'
 const PASS_EMPLEADO = process.env.NEXT_PUBLIC_PASS_EMPLEADO || 'Taller2084'
+const PASS_VALENTIN = process.env.NEXT_PUBLIC_PASS_VALENTIN || 'valen2084'
 
 // Prueba por tiempo limitado: solo se activa si el deploy define estas variables de
 // entorno. El deploy de DiFiore no las tiene, así que a esta app nunca le corre el
@@ -109,6 +110,9 @@ export default function App({ Component, pageProps }) {
     if (pass === PASS_ADMIN) {
       sessionStorage.setItem('rol', 'admin')
       setRol('admin'); setAutenticado(true); setError('')
+    } else if (pass === PASS_VALENTIN) {
+      sessionStorage.setItem('rol', 'valentin')
+      setRol('valentin'); setAutenticado(true); setError('')
     } else if (pass === PASS_EMPLEADO) {
       sessionStorage.setItem('rol', 'empleado')
       setRol('empleado'); setAutenticado(true); setError('')
