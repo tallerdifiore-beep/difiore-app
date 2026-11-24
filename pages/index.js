@@ -482,6 +482,8 @@ export default function Home({ rol, cerrarSesion }) {
   const [apuntesMecanico, setApuntesMecanico] = useState([])
   const [formApunteVehiculo, setFormApunteVehiculo] = useState({id:null,trabajo_id:'',vehiculo_label:'',bloques:[{desde:'',hasta:'',texto:''}],fecha:new Date().toISOString().split('T')[0]})
   const [guardandoApunte, setGuardandoApunte] = useState(false)
+  const [modoManualApunte, setModoManualApunte] = useState(false)
+  const [textoVehiculoManual, setTextoVehiculoManual] = useState('')
   const [modalActualizar, setModalActualizar] = useState(null)
   const [modalEditarFecha, setModalEditarFecha] = useState(null)
   const [nuevaFechaHistorial, setNuevaFechaHistorial] = useState('')
@@ -713,7 +715,15 @@ export default function Home({ rol, cerrarSesion }) {
   function seleccionarMecanicoApuntes(mecanico){
     setMecanicoSeleccionadoApuntes(mecanico)
     setFormApunteVehiculo({id:null,trabajo_id:'',vehiculo_label:'',bloques:[bloqueVacio()],fecha:new Date().toISOString().split('T')[0]})
+    setModoManualApunte(false)
+    setTextoVehiculoManual('')
     cargarApuntesMecanico(mecanico)
+  }
+
+  function buscarApunteExistenteVehiculo(fecha,trabajoId,vehiculoLabel){
+    if(trabajoId) return apuntesMecanico.find(a=>a.fecha===fecha&&a.trabajo_id===trabajoId)
+    if(vehiculoLabel) return apuntesMecanico.find(a=>a.fecha===fecha&&!a.trabajo_id&&(a.vehiculo_label||'').trim().toLowerCase()===vehiculoLabel.trim().toLowerCase())
+    return null
   }
 
   function cambiarFechaApunte(fecha){
@@ -721,8 +731,8 @@ export default function Home({ rol, cerrarSesion }) {
       setFormApunteVehiculo(f=>({...f,fecha}))
       return
     }
-    if(formApunteVehiculo.trabajo_id){
-      const existente=apuntesMecanico.find(a=>a.fecha===fecha&&a.trabajo_id===formApunteVehiculo.trabajo_id)
+    if(formApunteVehiculo.trabajo_id||formApunteVehiculo.vehiculo_label){
+      const existente=buscarApunteExistenteVehiculo(fecha,formApunteVehiculo.trabajo_id||null,formApunteVehiculo.trabajo_id?null:formApunteVehiculo.vehiculo_label)
       setFormApunteVehiculo(f=>({...f,fecha,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
       return
     }
@@ -730,8 +740,18 @@ export default function Home({ rol, cerrarSesion }) {
   }
 
   function elegirVehiculoApunte(t){
-    const existente=apuntesMecanico.find(a=>a.fecha===formApunteVehiculo.fecha&&a.trabajo_id===t.id)
-    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:t.id,vehiculo_label:'',bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
+    const vehiculo_label=`${t.vehiculos?.marca_modelo||'Vehículo'} (${t.vehiculos?.patente||'—'})`
+    const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,t.id,null)
+    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:t.id,vehiculo_label,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
+  }
+
+  function elegirVehiculoManual(label){
+    const limpio=(label||'').trim()
+    if(!limpio){avisar('Escribí el vehículo','error');return}
+    const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,null,limpio)
+    setFormApunteVehiculo(f=>({...f,id:null,trabajo_id:'',vehiculo_label:limpio,bloques:existente?bloquesDeApunte(existente):[bloqueVacio()]}))
+    setModoManualApunte(false)
+    setTextoVehiculoManual('')
   }
 
   function editarApunteExistente(apunte){
@@ -740,6 +760,8 @@ export default function Home({ rol, cerrarSesion }) {
 
   function cancelarApunteVehiculo(){
     setFormApunteVehiculo(f=>({id:null,trabajo_id:'',vehiculo_label:'',bloques:[bloqueVacio()],fecha:f.fecha}))
+    setModoManualApunte(false)
+    setTextoVehiculoManual('')
   }
 
   function actualizarBloqueApunte(idx,campo,valor){
@@ -760,7 +782,7 @@ export default function Home({ rol, cerrarSesion }) {
 
   async function guardarApunteVehiculo(){
     if(guardandoApunte)return
-    if(!formApunteVehiculo.trabajo_id&&!formApunteVehiculo.id){avisar('Elegí un vehículo','error');return}
+    if(!formApunteVehiculo.vehiculo_label&&!formApunteVehiculo.id){avisar('Elegí un vehículo','error');return}
     const bloques=formApunteVehiculo.bloques.map(b=>({desde:b.desde||'',hasta:b.hasta||'',texto:(b.texto||'').trim()})).filter(b=>b.texto)
     if(bloques.length===0){avisar('Escribí al menos un apunte','error');return}
     const texto=bloques.map(b=>b.desde&&b.hasta?`${b.desde}–${b.hasta}: ${b.texto}`:b.texto).join(' / ')
@@ -769,13 +791,12 @@ export default function Home({ rol, cerrarSesion }) {
     if(formApunteVehiculo.id){
       ;({error}=await supabase.from('apuntes_diarios').update({texto,bloques,fecha:formApunteVehiculo.fecha}).eq('id',formApunteVehiculo.id))
     } else {
-      const t=trabajosActivos.find(x=>x.id===formApunteVehiculo.trabajo_id)
-      const vehiculo_label=`${t?.vehiculos?.marca_modelo||'Vehículo'} (${t?.vehiculos?.patente||'—'})`
-      const existente=apuntesMecanico.find(a=>a.fecha===formApunteVehiculo.fecha&&a.trabajo_id===formApunteVehiculo.trabajo_id)
+      const vehiculo_label=formApunteVehiculo.vehiculo_label
+      const existente=buscarApunteExistenteVehiculo(formApunteVehiculo.fecha,formApunteVehiculo.trabajo_id||null,formApunteVehiculo.trabajo_id?null:vehiculo_label)
       if(existente){
         ;({error}=await supabase.from('apuntes_diarios').update({texto,bloques,vehiculo_label}).eq('id',existente.id))
       } else {
-        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:formApunteVehiculo.fecha,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id,vehiculo_label,texto,bloques}))
+        ;({error}=await supabase.from('apuntes_diarios').insert({fecha:formApunteVehiculo.fecha,mecanico:mecanicoSeleccionadoApuntes,trabajo_id:formApunteVehiculo.trabajo_id||null,vehiculo_label,texto,bloques}))
       }
     }
     setGuardandoApunte(false)
@@ -1596,7 +1617,6 @@ body{max-width:860px;padding:60px 56px}
 
   const{totalEfectivo,totalTransferencia,totalManoObraUSD}=calcularTotalesPresupuesto()
   const mecanicos=empleados.filter(e=>e.rol==='mecanico')
-  const vehiculoSeleccionadoApunte=trabajosActivos.find(t=>t.id===formApunteVehiculo.trabajo_id)
   const hoy=new Date().toISOString().split('T')[0]
   const navLinks=[{color:'#E1306C',icon:<IgIcon/>,href:'https://www.instagram.com/di_fiore_mecanica/',label:'@di_fiore_mecanica'},{color:'#1877F2',icon:<FbIcon/>,href:'https://www.facebook.com/share/19VHZRovXq/?mibextid=wwXIfr',label:'di_fiore_mecanica'},{color:'#25D366',icon:<WaIcon/>,href:'tel:+542235299700',label:'223 529-9700'},{color:'#EA4335',icon:<MapIcon/>,href:'https://maps.google.com/maps?ftid=0x9584d9005992c969:0x872bb0a9e0f1a2f1',label:'Malvinas 2084, MdP'}]
   const usandoUSD=presupuesto.moneda_mano_obra==='USD'
@@ -1824,16 +1844,27 @@ return (
                 <input type="date" value={formApunteVehiculo.fecha} max={new Date().toISOString().split('T')[0]} onChange={e=>cambiarFechaApunte(e.target.value)} style={{padding:'8px 10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
               </div>
               {formApunteVehiculo.id?(
-                <div style={{fontSize:'13px',color:'#9AA3B8',margin:'8px 0'}}>{formApunteVehiculo.vehiculo_label}</div>
-              ):formApunteVehiculo.trabajo_id?(
+                <div style={{fontSize:'13px',color:'#9AA3B8',margin:'8px 0'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#6B7488',textTransform:'uppercase',letterSpacing:'.04em'}}>(cargado a mano)</span>}</div>
+              ):formApunteVehiculo.vehiculo_label?(
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'8px',background:'#171B25',border:'1px solid #343B4B',borderRadius:'8px',padding:'10px 12px'}}>
-                  <div style={{fontSize:'13px',color:'#EEF1F7'}}>{vehiculoSeleccionadoApunte?`${vehiculoSeleccionadoApunte.vehiculos?.marca_modelo} (${vehiculoSeleccionadoApunte.vehiculos?.patente})`:''}</div>
+                  <div style={{fontSize:'13px',color:'#EEF1F7'}}>{formApunteVehiculo.vehiculo_label}{!formApunteVehiculo.trabajo_id&&<span style={{marginLeft:'8px',fontSize:'10.5px',color:'#9AA3B8',textTransform:'uppercase',letterSpacing:'.04em'}}>(cargado a mano)</span>}</div>
                   <button className={styles.btn} style={{fontSize:'11px',padding:'4px 8px'}} onClick={cancelarApunteVehiculo}>Cambiar</button>
                 </div>
+              ):modoManualApunte?(
+                <div style={{marginTop:'8px'}}>
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    <input type="text" value={textoVehiculoManual} onChange={e=>setTextoVehiculoManual(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();elegirVehiculoManual(textoVehiculoManual)}}} placeholder="Ej: Renault Clio gris, sin patente todavía" style={{flex:1,minWidth:'200px',padding:'10px',borderRadius:'8px',border:'1px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit'}}/>
+                    <button className={styles.btnPrimary} style={{fontSize:'12px',padding:'8px 14px'}} onClick={()=>elegirVehiculoManual(textoVehiculoManual)}>Usar este vehículo</button>
+                    <button className={styles.btn} style={{fontSize:'12px',padding:'8px 14px'}} onClick={()=>{setModoManualApunte(false);setTextoVehiculoManual('')}}>Volver a buscar</button>
+                  </div>
+                </div>
               ):(
-                <div style={{marginTop:'8px'}}><BuscadorCliente trabajos={trabajosActivos} onSeleccionar={elegirVehiculoApunte} placeholder="Buscar vehículo por patente, marca o cliente..."/></div>
+                <div style={{marginTop:'8px'}}>
+                  <BuscadorCliente trabajos={trabajosVivos} onSeleccionar={elegirVehiculoApunte} placeholder="Buscar vehículo por patente, marca o cliente (incluye entregados)..."/>
+                  <button type="button" onClick={()=>setModoManualApunte(true)} style={{background:'none',border:'none',color:'#2FA8FF',fontSize:'12px',cursor:'pointer',marginTop:'8px',padding:0,textDecoration:'underline'}}>¿No está en el sistema? Cargarlo a mano</button>
+                </div>
               )}
-              {(formApunteVehiculo.trabajo_id||formApunteVehiculo.id)&&(
+              {(formApunteVehiculo.vehiculo_label||formApunteVehiculo.id)&&(
                 <>
                   <div style={{marginTop:'10px',display:'flex',flexDirection:'column',gap:'8px'}}>
                     {formApunteVehiculo.bloques.map((b,idx)=>(
