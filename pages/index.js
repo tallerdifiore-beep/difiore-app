@@ -1280,7 +1280,7 @@ export default function Home({ rol, cerrarSesion }) {
   function construirDetalleTrabajo(trabajo){
     const items=[]
     if(trabajo.motivo)items.push({fecha:trabajo.fecha_ingreso,texto:`Ingreso: ${trabajo.motivo}`})
-    historial.filter(h=>h.trabajo_id===trabajo.id).forEach(h=>items.push({fecha:h.fecha,texto:h.descripcion}))
+    historial.filter(h=>h.trabajo_id===trabajo.id&&h._origen==='actualizaciones').forEach(h=>items.push({fecha:h.fecha,texto:h.descripcion}))
     notasDiarias.filter(n=>n.trabajo_id===trabajo.id).forEach(n=>items.push({fecha:n.fecha,texto:n.texto}))
     if(trabajo.observacion_final)items.push({fecha:trabajo.fecha_salida||trabajo.updated_at||new Date().toISOString(),texto:`Observación final: ${trabajo.observacion_final}`})
     return items.filter(i=>i.fecha&&i.texto).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha))
