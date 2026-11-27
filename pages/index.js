@@ -1657,10 +1657,10 @@ body{max-width:860px;padding:60px 56px}
   const trabajosFiltrados=useMemo(()=>trabajosVivos.filter(t=>t.estado!=='Salio').filter(t=>{const q=busqueda.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),[trabajosVivos,busqueda])
   const trabajosEntregadosFiltrados=useMemo(()=>trabajosEntregados.filter(t=>{const q=busquedaEntregados.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}),[trabajosEntregados,busquedaEntregados])
   const entregadosAgrupados=useMemo(()=>agruparPorClave(trabajosEntregadosFiltrados, t=>t.vehiculos?.id||t.vehiculos?.patente||t.id),[trabajosEntregadosFiltrados])
-  function bloquesOrdenados(bloques){return [...(bloques||[])].sort((a,b)=>(a.desde||'99:99').localeCompare(b.desde||'99:99'))}
+  function bloquesOrdenados(bloques){return [...(bloques||[])].sort((a,b)=>(b.desde||'').localeCompare(a.desde||''))}
   const apuntesOrdenados=useMemo(()=>{
-    const horaInicio=a=>bloquesOrdenados(a.bloques)[0]?.desde||'99:99'
-    return [...apuntesMecanico].sort((a,b)=>a.fecha!==b.fecha?(a.fecha<b.fecha?1:-1):horaInicio(a).localeCompare(horaInicio(b)))
+    const horaInicio=a=>bloquesOrdenados(a.bloques)[0]?.desde||''
+    return [...apuntesMecanico].sort((a,b)=>a.fecha!==b.fecha?(a.fecha<b.fecha?1:-1):horaInicio(b).localeCompare(horaInicio(a)))
   },[apuntesMecanico])
   function filaEntregado(t,i,dim){
     return (
