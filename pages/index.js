@@ -1657,6 +1657,10 @@ body{max-width:860px;padding:60px 56px}
   const trabajosFiltrados=useMemo(()=>trabajosVivos.filter(t=>t.estado!=='Salio').filter(t=>{const q=busqueda.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),[trabajosVivos,busqueda])
   const trabajosEntregadosFiltrados=useMemo(()=>trabajosEntregados.filter(t=>{const q=busquedaEntregados.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}),[trabajosEntregados,busquedaEntregados])
   const entregadosAgrupados=useMemo(()=>agruparPorClave(trabajosEntregadosFiltrados, t=>t.vehiculos?.id||t.vehiculos?.patente||t.id),[trabajosEntregadosFiltrados])
+  const apuntesOrdenados=useMemo(()=>{
+    const horaInicio=a=>{const horas=(a.bloques||[]).map(b=>b.desde).filter(Boolean).sort();return horas[0]||'99:99'}
+    return [...apuntesMecanico].sort((a,b)=>a.fecha!==b.fecha?(a.fecha<b.fecha?1:-1):horaInicio(a).localeCompare(horaInicio(b)))
+  },[apuntesMecanico])
   function filaEntregado(t,i,dim){
     return (
       <tr key={t.id} style={dim?{opacity:.75,background:'#171B25'}:undefined}>
@@ -2006,7 +2010,7 @@ return (
 
             <div className={styles.cardTitle} style={{marginBottom:'10px'}}>Historial de apuntes</div>
             {apuntesMecanico.length===0?<div style={{color:'#6B7488',fontSize:'14px',textAlign:'center',padding:'2rem'}}>Todavía no hay apuntes cargados para {mecanicoSeleccionadoApuntes}.</div>:
-              apuntesMecanico.map(a=>(
+              apuntesOrdenados.map(a=>(
                 <div key={a.id} className={styles.card} style={{marginBottom:'10px',cursor:'pointer',...(a.es_tarea?{borderLeft:'4px solid #F2A900',background:'rgba(242,169,0,.07)'}:{})}} onClick={()=>editarApunteExistente(a)}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'12px',color:'#9AA3B8',marginBottom:'4px'}}>
                     <span>{new Date(a.fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})}</span>
