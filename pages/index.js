@@ -173,11 +173,15 @@ const comprobanteCSS = `
 *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 body{font-family:'Barlow',Arial,sans-serif;font-size:12.5px;color:#0E1118;background:#F7F8FB;padding:30px;max-width:800px;margin:0 auto}
 .num{font-variant-numeric:tabular-nums}
-.letterhead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;padding-bottom:18px;border-bottom:2px solid #0D1018}
+.letterhead{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;padding-bottom:18px;border-bottom:2px solid #0D1018}
 .brandblock{display:flex;align-items:center;gap:14px}
 .brandblock img{height:46px;width:auto;display:block}
-.brandtext .title{font-family:'Saira Extra Condensed',Impact,sans-serif;font-weight:800;font-size:28px;line-height:.95;letter-spacing:.01em;text-transform:uppercase;color:#0E1118}
-.brandtext .line{height:2px;width:110px;background:linear-gradient(90deg,#1B4CFF,#2FA8FF);margin:6px 0 4px;border-radius:2px}
+.sello{width:76px;height:76px;flex:none;transform:rotate(-6deg)}
+.sello .ring-out,.sello .ring-in{fill:none;stroke:#0A2A9C}
+.sello .arc-txt{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1.6px;fill:#0A2A9C}
+.sello .mid-txt{font-family:'Saira Extra Condensed',Impact,sans-serif;font-weight:800;fill:#0A2A9C;text-transform:uppercase}
+.sello .sub-txt{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1.5px;fill:#3D434C}
+.sello .star{font-size:9px;fill:#0A2A9C}
 .folio{background:#0A2A9C;border-radius:4px;padding:10px 18px;text-align:center;min-width:150px}
 .folio .lbl{font-family:'Barlow Condensed',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.8)}
 .folio .numero{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;color:#fff;margin-top:2px}
@@ -188,7 +192,7 @@ body{font-family:'Barlow',Arial,sans-serif;font-size:12.5px;color:#0E1118;backgr
 .field span{font-size:14.5px;font-weight:600;color:#0E1118}
 .section-lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3D434C;margin:26px 0 10px}
 table{width:100%;border-collapse:collapse;border:1px solid #AAB2BD}
-thead th{background:#0D1018;color:#fff;text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+thead th{background:#0A2A9C;color:#fff;text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 thead th.num-col{text-align:right}
 tbody td{padding:12px;border-top:1px solid #AAB2BD;font-size:13.5px;vertical-align:top;background:#fff;color:#0E1118}
 tbody td.num-col{text-align:right;font-weight:700}
@@ -211,20 +215,50 @@ tbody tr.row-mo td:first-child{border-left:4px solid #C2410C}
 .trow-tag{font-weight:700}
 .trow-tag.repuesto{color:#0A2A9C}
 .trow-tag.mo{color:#C2410C}
-.total-card{display:flex;justify-content:space-between;align-items:center;border-radius:3px;padding:14px 16px;background:#0A2A9C}
-.total-card .lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.8)}
-.total-card .amt{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:21px;color:#fff}
+.total-card{display:flex;justify-content:space-between;align-items:center;border-radius:3px;padding:14px 16px;background:#E8EDFB;border:1px solid #C7D3F2}
+.total-card .lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#0A2A9C;opacity:.75}
+.total-card .amt{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:21px;color:#0A2A9C}
 .content-box{background:#fff;border:1px solid #AAB2BD;border-radius:3px;padding:14px 16px;margin-top:10px}
 .content-box label{display:block;font-family:'Barlow Condensed',sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:#3D434C;margin-bottom:5px}
 .content-box p{font-size:13.5px;line-height:1.6;color:#0E1118}
-.signoff{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-top:34px;flex-wrap:wrap}
-.signline{width:210px;border-top:1px solid #AAB2BD;padding-top:6px;font-family:'Barlow Condensed',sans-serif;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#3D434C;text-align:center}
+.signoff{display:flex;justify-content:center;gap:20px;margin-top:34px;flex-wrap:wrap}
+.sigbox{border-top:1px solid #0D1018;padding-top:7px;text-align:center;width:240px}
+.sigbox .cap{font-family:'Barlow Condensed',sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#3D434C}
+.sigbox .who{font-size:11.5px;font-weight:700;margin-top:2px;color:#0E1118}
+.sigbox .dni{font-size:9px;color:#3D434C;margin-top:5px}
 .footer{margin-top:8px;padding-top:14px;border-top:1px solid #AAB2BD;display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:10px;color:#3D434C}
 .footer-icon{display:flex;align-items:center;gap:5px;text-decoration:none;color:#3D434C}
+.b-row{display:flex;gap:0;border-bottom:1px solid #E4E7EC;padding:7px 0}
+.b-row label{width:140px;flex:none;font-family:'Barlow Condensed',sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:#3D434C}
+.b-row span{font-size:12.5px;font-weight:600}
+.b-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-top:14px}
+.chk-line{display:flex;gap:8px;align-items:center;font-size:11px;font-weight:600;color:#3D434C;margin-top:8px}
+.chk-line .lbl{font-family:'Barlow Condensed',sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#3D434C}
+.box{width:13px;height:13px;border:1.5px solid #0D1018;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#0A2A9C;border-radius:2px}
+.trabajo{margin-top:4px;padding:14px 18px;border:1px solid #AAB2BD;border-left:3px solid #0A2A9C;border-radius:3px;background:#FBFCFE}
+.trabajo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.trabajo-list li{position:relative;padding-left:17px;font-size:12.5px;line-height:1.55}
+.trabajo-list li::before{content:"";position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:#0A2A9C}
+.acepto{display:flex;justify-content:center;margin-top:22px}
+.tc-bar{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#fff;background:#0A2A9C;padding:6px 12px;margin-top:20px;border-radius:3px}
+.tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:0;border:1px solid #AAB2BD;border-top:none}
+.tc-item{padding:7px 12px;font-size:9px;line-height:1.55;border-bottom:1px solid #E4E7EC}
+.tc-item:nth-child(odd){border-right:1px solid #E4E7EC}
+.tc-item .num-lbl{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#0A2A9C;margin-right:3px}
+.tc-foot{margin-top:10px;font-size:9.5px;color:#3D434C;display:flex;gap:26px}
+.empty-note{color:#3D434C;font-size:12.5px;font-style:italic}
+.closing{margin-top:24px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#0A2A9C;font-weight:700}
+.timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.timeline li{font-size:12.5px;line-height:1.5;padding-left:14px;border-left:2px solid #C7D3F2}
+.timeline .fecha{font-weight:700;color:#0A2A9C;display:block;font-size:11px;margin-bottom:2px}
+.foto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px}
+.foto-grid img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:3px;border:1px solid #AAB2BD}
 @media print{body{padding:15px}@page{margin:0.5cm}}
+@media (max-width:560px){.b-cols{grid-template-columns:1fr}.tc-grid{grid-template-columns:1fr}.tc-item:nth-child(odd){border-right:none}}
 `
-function buildDocHeader(titulo,label,numero,extraInfo){
-  return `<div class="letterhead"><div class="brandblock"><img src="${LOGO_URL}" alt="DiFiore"/><div class="brandtext"><div class="title">${titulo}</div><div class="line"></div></div></div><div class="folio"><div class="lbl">${label}</div><div class="numero num">${numero}</div><div class="fecha">${extraInfo}</div></div></div>`
+function buildDocHeader(label,numero,extraInfo){
+  const selloId='sello'+String(numero).replace(/[^A-Za-z0-9]/g,'')
+  return `<div class="letterhead"><div class="brandblock"><img src="${LOGO_URL}" alt="DiFiore"/></div><div style="display:flex;align-items:center;gap:20px"><div class="folio"><div class="lbl">${label}</div><div class="numero num">${numero}</div><div class="fecha">${extraInfo}</div></div><svg class="sello" viewBox="0 0 120 120"><defs><path id="${selloId}" d="M 14 78 A 50 50 0 1 1 106 78" fill="none"/></defs><circle class="ring-out" cx="60" cy="60" r="56" stroke-width="2"/><circle class="ring-in" cx="60" cy="60" r="47" stroke-width="1"/><text class="arc-txt" font-size="9.5"><textPath href="#${selloId}" startOffset="50%" text-anchor="middle">DI FIORE PERFORMANCE</textPath></text><text class="star" x="25" y="63">&#9733;</text><text class="star" x="88" y="63">&#9733;</text><text class="mid-txt" x="60" y="68" font-size="16" text-anchor="middle">Taller</text><text class="sub-txt" x="60" y="80" font-size="8.5" text-anchor="middle">OFICIAL</text></svg></div></div>`
 }
 
 const baseCSS = `
@@ -263,26 +297,20 @@ function buildTC(trabajo){
   const fecha=trabajo?.fecha_ingreso?new Date(trabajo.fecha_ingreso).toLocaleDateString('es-AR'):new Date().toLocaleDateString('es-AR')
   const patente=trabajo?.vehiculos?.patente||''
   return `
-<div class="tc">
-  <div class="tc-title">TÉRMINOS Y CONDICIONES</div>
-  <div class="tc-grid">
-    <div class="tc-item"><b>1. Ingreso al taller</b>Al ingresar el vehículo, el cliente deberá abonar $150.000 correspondientes al diagnóstico inicial (*). En caso de aceptar el trabajo, el valor del diagnóstico se descuenta de la mano de obra.</div>
-    <div class="tc-item"><b>2. Seguro vigente</b>El cliente declara entregar el vehículo con la póliza de seguro al día. Di Fiore no se responsabiliza por siniestros en caso de que el seguro no se encuentre vigente.</div>
-    <div class="tc-item"><b>3. Pertenencias</b>El cliente deberá retirar todas las pertenencias personales. Di Fiore no se responsabiliza por objetos personales en el interior del vehículo.</div>
-    <div class="tc-item"><b>4. Diagnóstico</b>El diagnóstico es para que los profesionales tengan un panorama del problema. El taller no está obligado a enviar reportes periódicos; al final se entregará un informe detallado del trabajo realizado.</div>
-    <div class="tc-item"><b>5. Presupuesto y aceptación</b>Una vez realizado el diagnóstico se enviará el detalle de repuestos y mano de obra. Si el cliente acepta, contará con 48hs hábiles para entregar el importe y dar inicio a la reparación.</div>
-    <div class="tc-item"><b>6. Vencimiento / Cochera</b>Si pasadas las 48hs hábiles no se realizó el pago, se cobrará cochera a $8.000/día. Las mismas condiciones aplican una vez notificada la finalización del trabajo.</div>
-    <div class="tc-item"><b>7. Prueba de manejo</b>El cliente presta su consentimiento para que el vehículo sea probado en calle entre 10 y 100 km, a fin de realizar las pruebas correspondientes al diagnóstico o reparación.</div>
-    <div class="tc-item"><b>8. Combustible</b>Si durante el diagnóstico, la reparación o las pruebas de manejo fue necesario cargarle combustible al vehículo, el cliente deberá abonar ese importe al momento del retiro.</div>
-    <div class="tc-item"><b>9. Repuestos propios</b>Si el cliente opta por reparar el vehículo aportando sus propios repuestos, el trabajo realizado no cuenta con garantía.</div>
-    <div class="tc-item"><b>10. Garantía (30 días o 15.000 km desde la entrega, lo que ocurra primero)</b>El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. Si el vehículo es intervenido por otro taller durante este período, la garantía queda anulada. NO TRABAJAMOS DE OTRA MANERA.</div>
-  </div>
-  <div style="display:flex;gap:30px;margin-top:8px;font-size:9px;">
-    <div>Fecha: ${fecha}</div>
-    <div>Patente: ${patente}</div>
-    <div style="flex:1;text-align:right;">Firma y aclaración: ___________________</div>
-  </div>
-</div>`
+<div class="tc-bar">Términos y condiciones</div>
+<div class="tc-grid">
+  <div class="tc-item"><span class="num-lbl">1.</span><b>Ingreso al taller.</b> Al ingresar el vehículo, el cliente deberá abonar $150.000 correspondientes al diagnóstico inicial (*). En caso de aceptar el trabajo, el valor del diagnóstico se descuenta de la mano de obra.</div>
+  <div class="tc-item"><span class="num-lbl">2.</span><b>Seguro vigente.</b> El cliente declara entregar el vehículo con la póliza de seguro al día. Di Fiore no se responsabiliza por siniestros en caso de que el seguro no se encuentre vigente.</div>
+  <div class="tc-item"><span class="num-lbl">3.</span><b>Pertenencias.</b> El cliente deberá retirar todas las pertenencias personales. Di Fiore no se responsabiliza por objetos personales en el interior del vehículo.</div>
+  <div class="tc-item"><span class="num-lbl">4.</span><b>Diagnóstico.</b> El diagnóstico es para que los profesionales tengan un panorama del problema. El taller no está obligado a enviar reportes periódicos; al final se entregará un informe detallado del trabajo realizado.</div>
+  <div class="tc-item"><span class="num-lbl">5.</span><b>Presupuesto y aceptación.</b> Una vez realizado el diagnóstico se enviará el detalle de repuestos y mano de obra. Si el cliente acepta, contará con 48hs hábiles para entregar el importe y dar inicio a la reparación.</div>
+  <div class="tc-item"><span class="num-lbl">6.</span><b>Vencimiento / Cochera.</b> Si pasadas las 48hs hábiles no se realizó el pago, se cobrará cochera a $8.000/día. Las mismas condiciones aplican una vez notificada la finalización del trabajo.</div>
+  <div class="tc-item"><span class="num-lbl">7.</span><b>Prueba de manejo.</b> El cliente presta su consentimiento para que el vehículo sea probado en calle entre 10 y 100 km, a fin de realizar las pruebas correspondientes al diagnóstico o reparación.</div>
+  <div class="tc-item"><span class="num-lbl">8.</span><b>Combustible.</b> Si durante el diagnóstico, la reparación o las pruebas de manejo fue necesario cargarle combustible al vehículo, el cliente deberá abonar ese importe al momento del retiro.</div>
+  <div class="tc-item"><span class="num-lbl">9.</span><b>Repuestos propios.</b> Si el cliente opta por reparar el vehículo aportando sus propios repuestos, el trabajo realizado no cuenta con garantía.</div>
+  <div class="tc-item" style="border-bottom:none"><span class="num-lbl">10.</span><b>Garantía (30 días o 15.000 km desde la entrega, lo que ocurra primero).</b> El taller proveerá materiales, repuestos y trabajos tercerizados. La garantía es sobre el trabajo en el vehículo y NO incluye traslados. Si el vehículo es intervenido por otro taller durante este período, la garantía queda anulada. NO TRABAJAMOS DE OTRA MANERA.</div>
+</div>
+<div class="tc-foot"><span>Fecha: <b class="num">${fecha}</b></span><span>Patente: <b>${patente}</b></span></div>`
 }
 
 const autocompleteSyle={position:'absolute',top:'100%',left:0,right:0,background:'#171B25',border:'1px solid #343B4B',borderRadius:'6px',zIndex:100,boxShadow:'0 8px 24px rgba(0,0,0,.4)',maxHeight:'200px',overflowY:'auto'}
@@ -516,6 +544,8 @@ export default function Home({ rol, cerrarSesion }) {
   const [formRepuesto, setFormRepuesto] = useState({nombre:'',valor:'',lugar:'',fecha:new Date().toISOString().split('T')[0]})
   const [formActualizar, setFormActualizar] = useState({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906',mecanico:'',fecha_manual:''})
   const [subiendo, setSubiendo] = useState(false)
+  const [subiendoDiagnostico, setSubiendoDiagnostico] = useState(false)
+  const [codigosInput, setCodigosInput] = useState('')
   const [presupuesto, setPresupuesto] = useState({
     numero:'001-00001', fecha:new Date().toISOString().split('T')[0],
     cliente:'', vehiculo:'', trabajo_id:'',
@@ -533,6 +563,7 @@ export default function Home({ rol, cerrarSesion }) {
   const fileNuevoRef = useRef()
   const fileFotosRef = useRef()
   const fileChecklistFotoRef = useRef()
+  const fileDiagnosticoRef = useRef()
 
   // sistema propio de confirmación/aviso, reemplaza alert()/confirm() nativos
   const [toast, setToast] = useState(null) // {mensaje, tipo}
@@ -1026,6 +1057,26 @@ export default function Home({ rol, cerrarSesion }) {
     const{data}=supabase.storage.from('fotos-vehiculos').getPublicUrl(nombre)
     return data.publicUrl
   }
+  async function subirDiagnosticoPdf(e){
+    const file=e.target.files[0]
+    if(!file||!clienteDetalle)return
+    setSubiendoDiagnostico(true)
+    const nombre=`${clienteDetalle.id}/${Date.now()}_${file.name}`
+    const{error}=await supabase.storage.from('diagnosticos-pdf').upload(nombre,file,{upsert:true})
+    if(!error){
+      const{data}=supabase.storage.from('diagnosticos-pdf').getPublicUrl(nombre)
+      await supabase.from('trabajos').update({diagnostico_pdf_url:data.publicUrl}).eq('id',clienteDetalle.id)
+      setClienteDetalle(c=>({...c,diagnostico_pdf_url:data.publicUrl}))
+    } else avisar('No se pudo subir el PDF.','error')
+    setSubiendoDiagnostico(false)
+    e.target.value=''
+  }
+  async function guardarCodigosError(){
+    if(!clienteDetalle)return
+    await supabase.from('trabajos').update({codigos_error:codigosInput}).eq('id',clienteDetalle.id)
+    setClienteDetalle(c=>({...c,codigos_error:codigosInput}))
+    avisar('Códigos de error guardados.','exito')
+  }
   function formatPeso(v){return Number(v).toLocaleString('es-AR')}
 
   const checklistsFiltrados = (() => {
@@ -1223,13 +1274,30 @@ export default function Home({ rol, cerrarSesion }) {
     return{totalRepuestosPesos,totalManoObraUSD,totalManoObraPesos,totalEfectivo:Math.max(0,totalEfectivo),totalTransferencia:Math.max(0,totalTransferencia),descMonto}
   }
 
-  function buildHeader(nroCliente){return`<div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div class="header-center"><h1>ORDEN DE SERVICIO</h1><div class="brand">DiFiore<span style="color:#333">Performance</span></div></div><div class="folio">N° CLIENTE<br><span class="folio-num">${nroCliente}</span></div></div>`}
-  function buildDatosVehiculo(trabajo){const v=trabajo.vehiculos;return`<div class="body"><div><div class="field"><label>Marca / Modelo:</label><div class="val">${v?.marca_modelo||''}</div></div><div class="field"><label>Color:</label><div class="val">${v?.color||''}</div></div><div class="field"><label>Kilometraje:</label><div class="val">${v?.kilometraje||''}</div></div><div class="field"><label>Patente:</label><div class="val">${v?.patente||''}</div></div><div class="grua-seg"><div class="grua-item"><span>Grúa:</span><span class="checkbox"><span class="box">${trabajo.llego_en_grua?'✓':''}</span> Sí</span><span class="checkbox"><span class="box">${!trabajo.llego_en_grua?'✓':''}</span> No</span></div><div class="grua-item"><span>Seguro:</span><span class="checkbox"><span class="box">${trabajo.tiene_seguro?'✓':''}</span> Sí</span><span class="checkbox"><span class="box">${!trabajo.tiene_seguro?'✓':''}</span> No</span></div></div></div><div><div style="font-weight:900;margin-bottom:5px;font-size:10px;">DATOS DEL CLIENTE</div><div class="field"><label>Ingreso:</label><div class="val">${trabajo.fecha_ingreso?new Date(trabajo.fecha_ingreso).toLocaleDateString('es-AR'):'___/___/______'}</div></div><div class="field"><label>Nombre:</label><div class="val">${v?.clientes?.nombre||''}</div></div><div class="field"><label>Teléfono:</label><div class="val">${v?.clientes?.telefono||''}</div></div><div class="field"><label>Email:</label><div class="val">${v?.clientes?.email||''}</div></div></div></div>`}
-  function buildTrabajoBox(motivo){const lineas=(motivo||'').split('.').map(l=>l.trim()).filter(l=>l.length>0);return`<div class="section-title">TRABAJO A REALIZAR / DESCRIPCIÓN DEL PROBLEMA</div><div class="trabajo-box"><div class="trabajo-lineas">${Array(7).fill('<div></div>').join('')}</div><div class="trabajo-texto">${lineas.map(l=>`<div>${l}.</div>`).join('')}</div></div>`}
+  function buildDatosVehiculo(trabajo){const v=trabajo.vehiculos;return`<div class="section-lbl">Vehículo</div><div class="b-cols"><div><div class="b-row"><label>Marca / Modelo</label><span>${v?.marca_modelo||''}</span></div><div class="b-row"><label>Color</label><span>${v?.color||''}</span></div><div class="b-row"><label>Kilometraje</label><span>${v?.kilometraje||''}</span></div><div class="b-row"><label>Patente</label><span>${v?.patente||''}</span></div><div class="chk-line"><span class="lbl">Grúa</span><span class="box">${trabajo.llego_en_grua?'✓':''}</span><span>Sí</span><span class="box">${!trabajo.llego_en_grua?'✓':''}</span><span>No</span></div><div class="chk-line"><span class="lbl">Seguro</span><span class="box">${trabajo.tiene_seguro?'✓':''}</span><span>Sí</span><span class="box">${!trabajo.tiene_seguro?'✓':''}</span><span>No</span></div></div><div><div class="b-row"><label>Cliente</label><span>${v?.clientes?.nombre||''}</span></div><div class="b-row"><label>Teléfono</label><span>${v?.clientes?.telefono||''}</span></div><div class="b-row"><label>Email</label><span>${v?.clientes?.email||''}</span></div><div class="b-row"><label>Ingreso</label><span>${trabajo.fecha_ingreso?new Date(trabajo.fecha_ingreso).toLocaleDateString('es-AR'):'—'}</span></div></div></div>`}
+  function buildTrabajoBox(motivo){const lineas=(motivo||'').split('.').map(l=>l.trim()).filter(l=>l.length>0);return`<div class="section-lbl">Trabajo a realizar / descripción del problema</div><div class="trabajo"><ul class="trabajo-list">${lineas.length?lineas.map(l=>`<li>${l}.</li>`).join(''):'<li>—</li>'}</ul></div>`}
   function abrirVentana(html){const w=window.open('','_blank','width=820,height=1000');w.document.write(html);w.document.close()}
+  function construirDetalleTrabajo(trabajo){
+    const items=[]
+    if(trabajo.motivo)items.push({fecha:trabajo.fecha_ingreso,texto:`Ingreso: ${trabajo.motivo}`})
+    historial.filter(h=>h.trabajo_id===trabajo.id&&h._origen==='actualizaciones').forEach(h=>items.push({fecha:h.fecha,texto:h.descripcion}))
+    notasDiarias.filter(n=>n.trabajo_id===trabajo.id).forEach(n=>items.push({fecha:n.fecha,texto:n.texto}))
+    if(trabajo.observacion_final)items.push({fecha:trabajo.fecha_salida||trabajo.updated_at||new Date().toISOString(),texto:`Observación final: ${trabajo.observacion_final}`})
+    return items.filter(i=>i.fecha&&i.texto).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha))
+  }
+  function buildTimeline(trabajo){
+    const items=construirDetalleTrabajo(trabajo)
+    if(!items.length)return '<div class="empty-note">Sin registros cargados.</div>'
+    return `<ul class="timeline">${items.map(i=>`<li><span class="fecha">${new Date(i.fecha).toLocaleDateString('es-AR')}</span>${i.texto}</li>`).join('')}</ul>`
+  }
+  function buildFotosGrid(lista){
+    if(!lista||!lista.length)return '<div class="empty-note">Sin fotos cargadas.</div>'
+    return `<div class="foto-grid">${lista.map(f=>`<img src="${f.url}" alt="foto"/>`).join('')}</div>`
+  }
 
-  function imprimirOrden(trabajo){const nroCliente=trabajo.vehiculos?.clientes?.numero_ficha||'—';const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title><style>${baseCSS}.tc{margin-top:8px;border-top:2px solid #000;padding-top:6px;}.tc-title{font-size:11px;font-weight:900;letter-spacing:1px;margin-bottom:6px;text-align:center;background:#222;color:#fff;padding:4px;}.tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 16px;}.tc-item{font-size:9.5px;line-height:1.5;margin-bottom:5px;}.tc-item b{display:block;font-size:9.5px;text-transform:uppercase;margin-bottom:1px;}</style></head><body>${buildHeader(nroCliente)}${buildDatosVehiculo(trabajo)}${buildTrabajoBox(trabajo.motivo)}<div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">A C E P T O</span><div class="firma"></div></div></div>${buildTC(trabajo)}<div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
-  function imprimirOrdenConObservaciones(trabajo,obs){const nroCliente=trabajo.vehiculos?.clientes?.numero_ficha||'—';const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title><style>${baseCSS}.obs-box{margin-top:10px;border-top:2px solid #000;padding-top:8px;}.obs-title{font-size:11px;font-weight:900;letter-spacing:1px;margin-bottom:8px;text-align:center;background:#222;color:#fff;padding:4px;}.obs-text{font-size:12px;line-height:1.7;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;min-height:60px;}</style></head><body>${buildHeader(nroCliente)}${buildDatosVehiculo(trabajo)}${buildTrabajoBox(trabajo.motivo)}<div class="acepto"><div class="acepto-line"><div class="firma"></div><span style="font-weight:900;letter-spacing:3px;">RECIBÍ CONFORME</span><div class="firma"></div></div></div><div class="obs-box"><div class="obs-title">OBSERVACIONES FINALES</div><div class="obs-text">${obs||'—'}</div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
+  function imprimirOrden(trabajo){const nroCliente=trabajo.vehiculos?.clientes?.numero_ficha||'—';const fechaFmt=trabajo.fecha_ingreso?new Date(trabajo.fecha_ingreso).toLocaleDateString('es-AR'):new Date().toLocaleDateString('es-AR');const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title>${comprobanteFonts}<style>${comprobanteCSS}</style></head><body>${buildDocHeader('N° Cliente',nroCliente,`Ingreso: ${fechaFmt}`)}${buildDatosVehiculo(trabajo)}${buildTrabajoBox(trabajo.motivo)}<div class="acepto"><div class="sigbox"><div class="cap">Conforme</div><div class="who">${trabajo.vehiculos?.clientes?.nombre||'Cliente'}</div><div class="dni">DNI: ___________________</div></div></div>${buildTC(trabajo)}<div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
+  function imprimirOrdenConObservaciones(trabajo,obs){const nroCliente=trabajo.vehiculos?.clientes?.numero_ficha||'—';const fechaFmt=trabajo.fecha_ingreso?new Date(trabajo.fecha_ingreso).toLocaleDateString('es-AR'):new Date().toLocaleDateString('es-AR');const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Servicio</title>${comprobanteFonts}<style>${comprobanteCSS}</style></head><body>${buildDocHeader('N° Cliente',nroCliente,`Ingreso: ${fechaFmt}`)}${buildDatosVehiculo(trabajo)}${buildTrabajoBox(trabajo.motivo)}<div class="acepto"><div class="sigbox"><div class="cap">Recibí conforme</div><div class="who">${trabajo.vehiculos?.clientes?.nombre||'Cliente'}</div><div class="dni">DNI: ___________________</div></div></div><div class="content-box"><label>Observaciones finales</label><p>${obs||'—'}</p></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
+  function imprimirComprobanteEntrega(trabajo){const nroCliente=trabajo.vehiculos?.clientes?.numero_ficha||'—';const fechaIngreso=trabajo.fecha_ingreso?new Date(trabajo.fecha_ingreso).toLocaleDateString('es-AR'):'—';const fechaSalida=trabajo.fecha_salida?new Date(trabajo.fecha_salida).toLocaleDateString('es-AR'):'—';const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Comprobante de Entrega</title>${comprobanteFonts}<style>${comprobanteCSS}</style></head><body>${buildDocHeader('N° Cliente',nroCliente,`Ingreso: ${fechaIngreso} · Salida: ${fechaSalida}`)}${buildDatosVehiculo(trabajo)}<div class="section-lbl">Trabajo realizado</div>${buildTimeline(trabajo)}<div class="section-lbl">Fotos del ingreso</div>${buildFotosGrid(fotos)}<div class="closing">¡Gracias por confiar en nosotros!</div><div class="acepto"><div class="sigbox"><div class="cap">Conforme con la entrega</div><div class="who">${trabajo.vehiculos?.clientes?.nombre||'Cliente'}</div><div class="dni">DNI: ___________________</div></div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
   function imprimirRepuestos(trabajo,lista){const c=trabajo.vehiculos?.clientes;const v=trabajo.vehiculos;const total=lista.reduce((a,r)=>a+Number(r.valor),0);const nroCliente=trabajo.vehiculos?.clientes?.numero_ficha||'—';const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Historial de Repuestos</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:15px;max-width:720px;margin:0 auto;}.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border-bottom:2px solid #000;padding-bottom:8px;}.header-logo{width:160px;}.header-logo img{width:100%;}.header-center{text-align:center;flex:1;}.header-center h1{font-size:16px;font-weight:900;letter-spacing:1px;margin-bottom:2px;}.header-center .brand{font-size:13px;font-weight:900;color:#1a56db;letter-spacing:2px;}.folio{text-align:right;font-size:9px;font-weight:bold;}.folio-num{font-size:22px;font-weight:900;border-bottom:2px solid #000;display:inline-block;min-width:60px;text-align:center;}.info{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;}.info-item label{font-size:9px;color:#555;display:block;font-weight:bold;text-transform:uppercase;}.info-item span{font-size:12px;font-weight:700;}table{width:100%;border-collapse:collapse;margin-bottom:12px;}thead th{background:#222;color:#fff;padding:7px 10px;text-align:left;font-size:10px;font-weight:bold;}tbody td{padding:7px 10px;border-bottom:1px solid #ddd;font-size:11px;}tbody tr:nth-child(even){background:#f9f9f9;}.total-row td{font-weight:900;background:#e8f4e8;font-size:13px;border-top:2px solid #000;}.footer{margin-top:10px;border-top:1px solid #ccc;padding-top:6px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:9px;color:#444;}.footer-icon{display:flex;align-items:center;gap:4px;text-decoration:none;color:#444;}@media print{body{padding:8px;}@page{margin:0.5cm;}}</style></head><body><div class="header"><div class="header-logo"><img src="${LOGO_URL}" alt="DiFiore"/></div><div class="header-center"><h1>HISTORIAL DE REPUESTOS</h1><div class="brand">DiFiore<span style="color:#333">Performance</span></div></div><div class="folio">N° CLIENTE<br><span class="folio-num">${nroCliente}</span></div></div><div class="info"><div class="info-item"><label>Cliente</label><span>${c?.nombre||'—'}</span></div><div class="info-item"><label>Teléfono</label><span>${c?.telefono||'—'}</span></div><div class="info-item"><label>Email</label><span>${c?.email||'—'}</span></div><div class="info-item"><label>Vehículo</label><span>${v?.marca_modelo||'—'}</span></div><div class="info-item"><label>Patente</label><span>${v?.patente||'—'}</span></div><div class="info-item"><label>Color</label><span>${v?.color||'—'}</span></div></div><table><thead><tr><th>#</th><th>Repuesto</th><th>Valor</th><th>Lugar</th><th>Fecha</th></tr></thead><tbody>${lista.map((r,i)=>`<tr><td>${i+1}</td><td>${r.nombre}</td><td>$${Number(r.valor).toLocaleString('es-AR')}</td><td>${r.lugar||'—'}</td><td>${new Date(r.fecha).toLocaleDateString('es-AR')}</td></tr>`).join('')}<tr class="total-row"><td colspan="2">TOTAL</td><td>$${total.toLocaleString('es-AR')}</td><td colspan="2"></td></tr></tbody></table><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`;abrirVentana(html)}
 
   async function imprimirPresupuesto(){
@@ -1254,7 +1322,7 @@ export default function Home({ rol, cerrarSesion }) {
     ):(
       `${totalRepuestosPesos>0?`<div class="trow"><span class="trow-tag repuesto">Repuestos</span><span class="num">$ ${formatPeso(totalRepuestosPesos)}</span></div>`:''}${descMonto>0?`<div class="trow disc"><span>${presupuesto.descuento_concepto||'Descuento'}</span><span class="num">− $ ${formatPeso(descMonto)}</span></div>`:''}${mostrarTransferencia?`<div class="total-card"><span class="lbl">Transferencia</span><span class="amt num">$ ${formatPeso(Math.round(totalTransferencia))}</span></div><div class="total-card"><span class="lbl">Efectivo</span><span class="amt num">$ ${formatPeso(Math.round(totalEfectivo))}</span></div>`:`<div class="total-card"><span class="lbl">Efectivo</span><span class="amt num">$ ${formatPeso(Math.round(totalEfectivo))}</span></div>`}`
     )
-    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>${comprobanteFonts}<style>${comprobanteCSS}</style></head><body>${buildDocHeader('Presupuesto','N° Presupuesto',presupuesto.numero,`Ficha ${numeroFicha} · ${fechaFmt}`)}<div class="fields" style="grid-template-columns:repeat(3,1fr)"><div class="field"><label>Cliente</label><span>${presupuesto.cliente||'—'}</span></div><div class="field"><label>Vehículo</label><span>${presupuesto.vehiculo||'—'}</span></div><div class="field"><label>Patente</label><span>${patente}</span></div></div><div class="section-lbl">Detalle</div><table><thead><tr><th>Descripción</th><th class="num-col" style="width:140px">Precio unitario</th><th class="num-col" style="width:140px">Total</th></tr></thead><tbody>${filas}${filaDescuento}</tbody></table><div class="foot"><div class="notes">${notasHTML?`<div class="section-lbl" style="margin-top:0">Notas</div><ul>${notasHTML}</ul>`:''}<div class="validity">Presupuesto válido por 20 días corridos desde la fecha de emisión.</div></div><div class="totals">${totalesHTML}</div></div><div class="signoff"><div class="signline">Firma y aclaración</div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto</title>${comprobanteFonts}<style>${comprobanteCSS}</style></head><body>${buildDocHeader('N° Presupuesto',presupuesto.numero,`Ficha ${numeroFicha} · ${fechaFmt}`)}<div class="fields" style="grid-template-columns:repeat(3,1fr)"><div class="field"><label>Cliente</label><span>${presupuesto.cliente||'—'}</span></div><div class="field"><label>Vehículo</label><span>${presupuesto.vehiculo||'—'}</span></div><div class="field"><label>Patente</label><span>${patente}</span></div></div><div class="section-lbl">Detalle</div><table><thead><tr><th>Descripción</th><th class="num-col" style="width:140px">Precio unitario</th><th class="num-col" style="width:140px">Total</th></tr></thead><tbody>${filas}${filaDescuento}</tbody></table><div class="foot"><div class="notes">${notasHTML?`<div class="section-lbl" style="margin-top:0">Notas</div><ul>${notasHTML}</ul>`:''}<div class="validity">Presupuesto válido por 20 días corridos desde la fecha de emisión.</div></div><div class="totals">${totalesHTML}</div></div><div class="signoff"><div class="sigbox"><div class="cap">Conforme</div><div class="who">${presupuesto.cliente||'Cliente'}</div></div><div class="sigbox"><div class="cap">Recibe</div><div class="who">Di Fiore Performance</div></div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
     const eraNuevo=!editandoPresupuesto
     const id=await guardarPresupuestoDB()
@@ -1280,8 +1348,7 @@ export default function Home({ rol, cerrarSesion }) {
 .recibo-wm{position:fixed;inset:0;z-index:-1;background:url('${LOGO_URL}') no-repeat center 55%/440px auto;opacity:.05;pointer-events:none}
 body{max-width:860px;padding:60px 56px}
 .brandblock img{height:66px}
-.brandtext .title{font-size:40px}
-.brandtext .line{width:150px;height:3px;margin:10px 0 6px}
+.sello{width:92px;height:92px}
 .folio{padding:16px 26px;min-width:190px}
 .folio .lbl{font-size:11px}
 .folio .numero{font-size:26px}
@@ -1296,13 +1363,15 @@ body{max-width:860px;padding:60px 56px}
 .content-box{padding:22px 24px;margin-top:22px}
 .content-box label{font-size:10.5px}
 .content-box p{font-size:16px;line-height:1.7}
-.closing{margin-top:40px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#0A2A9C;font-weight:700}
-.signoff{margin-top:56px}
-.signline{width:260px;font-size:11px;padding-top:10px}
+.closing{margin-top:40px;font-size:13px}
+.signoff{margin-top:56px;gap:40px}
+.sigbox{width:260px}
+.sigbox .cap{font-size:10.5px}
+.sigbox .who{font-size:13px}
 .footer{margin-top:30px;font-size:11px;gap:20px}
 @media print{body{padding:40px 36px}}
 `
-    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibo</title>${comprobanteFonts}<style>${comprobanteCSS}${reciboExtraCSS}</style></head><body><div class="recibo-wm"></div>${buildDocHeader('Recibo','N° Recibo',recibo.numero,`Ficha ${numeroFicha} · ${fechaFmt}`)}<div class="fields"><div class="field"><label>Cliente</label><span>${recibo.cliente||'—'}</span></div><div class="field"><label>Vehículo</label><span>${recibo.vehiculo||'—'}</span></div><div class="field"><label>Patente</label><span>${recibo.patente||'—'}</span></div><div class="field"><label>Forma de pago</label><span>${recibo.forma_pago}</span></div></div><div class="totals" style="margin-top:34px"><div class="total-card"><span class="lbl">Monto recibido</span><span class="amt num">${esUSD?'USS':'$'} ${montoNum?formatPeso(montoNum):'0'}</span></div></div><div class="content-box"><label>Concepto</label><p>${recibo.concepto||'—'}</p></div>${recibo.observaciones?`<div class="content-box"><label>Observaciones</label><p>${recibo.observaciones}</p></div>`:''}<div class="closing">¡Gracias por confiar en nosotros!</div><div class="signoff"><div class="signline">Firma del cliente</div><div class="signline">Di Fiore Performance</div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibo</title>${comprobanteFonts}<style>${comprobanteCSS}${reciboExtraCSS}</style></head><body><div class="recibo-wm"></div>${buildDocHeader('N° Recibo',recibo.numero,`Ficha ${numeroFicha} · ${fechaFmt}`)}<div class="fields"><div class="field"><label>Cliente</label><span>${recibo.cliente||'—'}</span></div><div class="field"><label>Vehículo</label><span>${recibo.vehiculo||'—'}</span></div><div class="field"><label>Patente</label><span>${recibo.patente||'—'}</span></div><div class="field"><label>Forma de pago</label><span>${recibo.forma_pago}</span></div></div><div class="totals" style="margin-top:34px"><div class="total-card"><span class="lbl">Monto recibido</span><span class="amt num">${esUSD?'USS':'$'} ${montoNum?formatPeso(montoNum):'0'}</span></div></div><div class="content-box"><label>Concepto</label><p>${recibo.concepto||'—'}</p></div>${recibo.observaciones?`<div class="content-box"><label>Observaciones</label><p>${recibo.observaciones}</p></div>`:''}<div class="closing">¡Gracias por confiar en nosotros!</div><div class="signoff"><div class="sigbox"><div class="cap">Conforme</div><div class="who">${recibo.cliente||'Cliente'}</div></div><div class="sigbox"><div class="cap">Recibe</div><div class="who">Di Fiore Performance</div></div></div><div class="footer">${footerIconsHTML}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`
     abrirVentana(html)
     const nuevo=await incrementarNumeracion('recibo')
     setRecibo(r=>({...r,numero:formatNumeroDoc(nuevo)}))
@@ -1530,7 +1599,7 @@ body{max-width:860px;padding:60px 56px}
   async function borrarFotoModal(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotosModal(modalFotos.vehiculos?.id)}
   async function subirFoto(e){const files=Array.from(e.target.files);if(!files.length||!clienteDetalle)return;setSubiendo(true);for(const f of files){const url=await subirFotoStorage(f,clienteDetalle.id);if(url)await supabase.from('fotos').insert({trabajo_id:clienteDetalle.id,url})}await cargarFotos(clienteDetalle.id);setSubiendo(false);e.target.value=''}
   async function borrarFoto(f){await supabase.from('fotos').delete().eq('id',f.id);await cargarFotos(clienteDetalle.id)}
-  function verDetalle(t){setClienteDetalle(t);setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarFotosAnteriores(t.vehiculos?.id,t.id);cargarHistorial(t.vehiculos?.id);cargarRepuestos(t.id);cargarPresupuestosVehiculo(t.vehiculos?.id);cargarChecklistsVehiculo(t.vehiculos?.id);cargarNotasDiarias(t.id)}
+  function verDetalle(t){setClienteDetalle(t);setCodigosInput(t.codigos_error||'');setSeccion('detalle');setSidebarOpen(false);cargarFotos(t.id);cargarFotosAnteriores(t.vehiculos?.id,t.id);cargarHistorial(t.vehiculos?.id);cargarRepuestos(t.id);cargarPresupuestosVehiculo(t.vehiculos?.id);cargarChecklistsVehiculo(t.vehiculos?.id);cargarNotasDiarias(t.id)}
   function abrirEditar(t){
     setFormEditar({trabajo_id:t.id,cliente_id:t.vehiculos?.clientes?.id,vehiculo_id:t.vehiculos?.id,nombre:t.vehiculos?.clientes?.nombre,telefono:t.vehiculos?.clientes?.telefono,email:t.vehiculos?.clientes?.email,marca_modelo:t.vehiculos?.marca_modelo,patente:t.vehiculos?.patente,anio:t.vehiculos?.anio,kilometraje:t.vehiculos?.kilometraje,color:t.vehiculos?.color,motivo:t.motivo,estado:t.estado,mecanico:t.mecanico,taller:t.taller,taller_anterior:t.taller,llego_en_grua:t.llego_en_grua||false,tiene_seguro:t.tiene_seguro||false,fecha_ingreso:fechaISOAInputLocal(t.fecha_ingreso)})
     setModalEditar(true)
@@ -2365,7 +2434,7 @@ return (
 
         {seccion==='detalle'&&clienteDetalle&&(
           <div>
-            <div className={styles.topBar}><div style={{display:'flex',gap:'8px'}}><button className={styles.btn} onClick={()=>setSeccion('clientes')}>← Volver</button><button className={styles.btn} onClick={actualizarTodo}>↻ Actualizar</button></div><div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{admin&&<button className={styles.btn} onClick={()=>imprimirOrden(clienteDetalle)}>Imprimir</button>}{admin&&<button className={styles.btnSuccess} onClick={()=>{setModalActualizar(clienteDetalle);setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906',mecanico:'',fecha_manual:''})}}>Actualización</button>}{admin&&<button className={styles.btnRepuesto} onClick={()=>setModalRepuesto(clienteDetalle)}>Repuesto</button>}{admin&&<button className={styles.btnSuccess} onClick={()=>abrirWsp(clienteDetalle)}>WhatsApp</button>}{admin&&<button className={styles.btnPrimary} onClick={()=>abrirEditar(clienteDetalle)}>Editar</button>}{admin&&clienteDetalle.estado!=='Salio'&&<button className={styles.btnDangerSolid} onClick={()=>setModalSalida(clienteDetalle)}>Registrar salida</button>}{admin&&clienteDetalle.estado==='Salio'&&<button className={styles.btnPrimary} onClick={()=>{setModalReingreso(clienteDetalle);setFormReingreso({motivo:'',mecanico:clienteDetalle.mecanico||'',taller:clienteDetalle.taller||'Malvinas 2084',estado:'Diagnóstico',llego_en_grua:false,fecha_ingreso_manual:''})}}>Reingreso</button>}{admin&&<button className={styles.btnDanger} onClick={()=>borrarCliente(clienteDetalle)}><TrashIcon/></button>}</div></div>
+            <div className={styles.topBar}><div style={{display:'flex',gap:'8px'}}><button className={styles.btn} onClick={()=>setSeccion('clientes')}>← Volver</button><button className={styles.btn} onClick={actualizarTodo}>↻ Actualizar</button></div><div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{admin&&<button className={styles.btn} onClick={()=>imprimirOrden(clienteDetalle)}>Imprimir</button>}{admin&&<button className={styles.btn} onClick={()=>imprimirComprobanteEntrega(clienteDetalle)}>Imprimir entrega</button>}{admin&&<button className={styles.btnSuccess} onClick={()=>{setModalActualizar(clienteDetalle);setFormActualizar({tipo:'estado',descripcion:'',taller_nuevo:'Malvinas 3906',mecanico:'',fecha_manual:''})}}>Actualización</button>}{admin&&<button className={styles.btnRepuesto} onClick={()=>setModalRepuesto(clienteDetalle)}>Repuesto</button>}{admin&&<button className={styles.btnSuccess} onClick={()=>abrirWsp(clienteDetalle)}>WhatsApp</button>}{admin&&<button className={styles.btnPrimary} onClick={()=>abrirEditar(clienteDetalle)}>Editar</button>}{admin&&clienteDetalle.estado!=='Salio'&&<button className={styles.btnDangerSolid} onClick={()=>setModalSalida(clienteDetalle)}>Registrar salida</button>}{admin&&clienteDetalle.estado==='Salio'&&<button className={styles.btnPrimary} onClick={()=>{setModalReingreso(clienteDetalle);setFormReingreso({motivo:'',mecanico:clienteDetalle.mecanico||'',taller:clienteDetalle.taller||'Malvinas 2084',estado:'Diagnóstico',llego_en_grua:false,fecha_ingreso_manual:''})}}>Reingreso</button>}{admin&&<button className={styles.btnDanger} onClick={()=>borrarCliente(clienteDetalle)}><TrashIcon/></button>}</div></div>
             <div className={styles.divider}></div>
             <div className={styles.detailHeader}><div className={styles.detailAvatar}>{clienteDetalle.vehiculos?.clientes?.nombre?.charAt(0)}</div><div style={{flex:1}}><div className={styles.detailNombre}>{clienteDetalle.vehiculos?.clientes?.nombre}</div><div className={styles.detailSub}>{clienteDetalle.vehiculos?.clientes?.telefono} · {clienteDetalle.llego_en_grua?'Llegó en grúa':'Llegó andando'} · {clienteDetalle.tiene_seguro?'Con seguro':'Sin seguro'} · N° {clienteDetalle.vehiculos?.clientes?.numero_ficha||'—'}</div></div><span className={badgeClass(clienteDetalle.estado)}>{clienteDetalle.estado}</span></div>
             <div className={styles.detGrid}>
@@ -2407,6 +2476,7 @@ return (
             {(()=>{const mecs=[...new Set(historial.filter(h=>h.mecanico&&h.mecanico!=='Oficina').map(h=>h.mecanico))];return mecs.length>0&&<div className={styles.card}><div className={styles.cardTitle}>Mecánicos que intervinieron</div><div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>{mecs.map(m=><span key={m} style={{fontSize:'12px',padding:'4px 12px',borderRadius:'20px',background:'#1C2130',color:'#9AA3B8',fontWeight:'600'}}>{m}</span>)}</div></div>})()}
             <div className={styles.card}><div className={styles.cardTitle}>Historial</div>{historial.length===0&&<div style={{color:'#6B7488',fontSize:'13px'}}>Sin historial todavía</div>}{historial.map(h=>(<div key={h.id} className={styles.histItem}><span className={styles.histIcon}>{tipoHistorial[h.tipo]||'⚪'}</span><div style={{flex:1}}><div style={{fontSize:'13px',color:'#EEF1F7'}}>{h.descripcion}</div>{h.mecanico&&<div style={{fontSize:'11px',color:h.mecanico==='Oficina'?'#2FA8FF':'#2ECC71',fontWeight:'600',marginTop:'2px'}}>{h.mecanico}</div>}<div style={{fontSize:'11px',color:'#9AA3B8',marginTop:'2px'}}>{formatFechaAR(h.fecha,true)}</div></div>{admin&&h._origen==='actualizaciones'&&<button className={styles.btnEdit} style={{fontSize:'10px',padding:'3px 7px'}} onClick={()=>abrirEditarFechaHistorial(h)}>Editar</button>}{admin&&h._origen==='actualizaciones'&&<button className={styles.btnDelete} style={{fontSize:'10px',padding:'3px 7px',marginLeft:'4px'}} onClick={()=>borrarActualizacion(h)}><TrashIcon/></button>}</div>))}</div>
             <div className={styles.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><div className={styles.cardTitle} style={{margin:0}}>Fotos del vehículo</div>{fotosAnteriores.length>0&&<button className={styles.btn} style={{fontSize:'12px',padding:'6px 12px'}} onClick={()=>setModalFotosAnteriores(true)}>Ver fotos de ingresos anteriores ({fotosAnteriores.length})</button>}</div><input type="file" accept="image/*" multiple ref={fileRef} style={{display:'none'}} onChange={subirFoto}/>{admin&&<button className={styles.btnPrimary} onClick={()=>fileRef.current.click()} style={{marginTop:'1rem',marginBottom:'1rem'}}>{subiendo?'Subiendo...':'+ Agregar fotos'}</button>}<div className={styles.fotoGrid}>{fotos.map(f=><div key={f.id} className={styles.fotoItem}><img src={f.url} alt="foto" className={styles.fotoImg} onClick={()=>setFotoZoom(f.url)} style={{cursor:'zoom-in'}}/><button style={{position:'absolute',bottom:'4px',left:'4px',fontSize:'11px',padding:'3px 7px',background:'rgba(46,204,113,.12)',color:'#2ECC71',border:'1px solid rgba(46,204,113,.4)',borderRadius:'6px',cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:'700',textTransform:'uppercase',letterSpacing:'.03em'}} onClick={()=>enviarFotoWsp(clienteDetalle,f.url)}>WSP</button>{admin&&<button className={styles.fotoBorrar} onClick={()=>borrarFoto(f)}>✕</button>}</div>)}{fotos.length===0&&<div className={styles.fotoVacio}>No hay fotos todavía</div>}</div></div>
+            <div className={styles.card}><div className={styles.cardTitle}>Diagnóstico (códigos de error)</div><input type="file" accept="application/pdf" ref={fileDiagnosticoRef} style={{display:'none'}} onChange={subirDiagnosticoPdf}/>{admin&&<button className={styles.btnPrimary} onClick={()=>fileDiagnosticoRef.current.click()} style={{marginBottom:'10px'}}>{subiendoDiagnostico?'Subiendo...':clienteDetalle.diagnostico_pdf_url?'Reemplazar PDF del escáner':'+ Subir PDF del escáner'}</button>}{clienteDetalle.diagnostico_pdf_url&&<div style={{marginBottom:'10px'}}><a href={clienteDetalle.diagnostico_pdf_url} target="_blank" rel="noreferrer" style={{color:'#2FA8FF',fontSize:'13px'}}>Ver PDF del escáner</a></div>}<label style={{fontSize:'11px',color:'#9AA3B8',textTransform:'uppercase',letterSpacing:'.04em',fontWeight:'700',display:'block',marginBottom:'6px'}}>Códigos de error (separados por coma o salto de línea)</label><textarea value={codigosInput} onChange={e=>setCodigosInput(e.target.value)} placeholder="Ej: P0171, P0300" style={{width:'100%',minHeight:'70px',padding:'8px 10px',borderRadius:'8px',border:'1.5px solid #343B4B',background:'#171B25',color:'#EEF1F7',fontSize:'13px',fontFamily:'inherit',boxSizing:'border-box'}}/>{admin&&<button className={styles.btnSuccess} onClick={guardarCodigosError} style={{marginTop:'10px'}}>Guardar códigos</button>}</div>
           </div>
         )}
       </div>
