@@ -1657,8 +1657,9 @@ body{max-width:860px;padding:60px 56px}
   const trabajosFiltrados=useMemo(()=>trabajosVivos.filter(t=>t.estado!=='Salio').filter(t=>{const q=busqueda.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}).sort((a,b)=>new Date(b.fecha_ingreso)-new Date(a.fecha_ingreso)),[trabajosVivos,busqueda])
   const trabajosEntregadosFiltrados=useMemo(()=>trabajosEntregados.filter(t=>{const q=busquedaEntregados.toLowerCase();return t.vehiculos?.clientes?.nombre?.toLowerCase().includes(q)||t.vehiculos?.patente?.toLowerCase().includes(q)||t.vehiculos?.marca_modelo?.toLowerCase().includes(q)}),[trabajosEntregados,busquedaEntregados])
   const entregadosAgrupados=useMemo(()=>agruparPorClave(trabajosEntregadosFiltrados, t=>t.vehiculos?.id||t.vehiculos?.patente||t.id),[trabajosEntregadosFiltrados])
+  function bloquesOrdenados(bloques){return [...(bloques||[])].sort((a,b)=>(a.desde||'99:99').localeCompare(b.desde||'99:99'))}
   const apuntesOrdenados=useMemo(()=>{
-    const horaInicio=a=>{const horas=(a.bloques||[]).map(b=>b.desde).filter(Boolean).sort();return horas[0]||'99:99'}
+    const horaInicio=a=>bloquesOrdenados(a.bloques)[0]?.desde||'99:99'
     return [...apuntesMecanico].sort((a,b)=>a.fecha!==b.fecha?(a.fecha<b.fecha?1:-1):horaInicio(a).localeCompare(horaInicio(b)))
   },[apuntesMecanico])
   function filaEntregado(t,i,dim){
@@ -2021,7 +2022,7 @@ return (
                   </div>
                   {(a.bloques&&a.bloques.length>0)?(
                     <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-                      {a.bloques.map((b,i)=>(
+                      {bloquesOrdenados(a.bloques).map((b,i)=>(
                         <div key={i} style={{fontSize:'13.5px',color:'#EEF1F7'}}>{b.desde&&b.hasta?<b style={{color:'#2FA8FF'}}>{b.desde}–{b.hasta}: </b>:null}{b.texto}</div>
                       ))}
                     </div>
